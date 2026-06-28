@@ -4201,7 +4201,7 @@ function dLoop(){
   // Ice particle update — runs in main loop, not inside rock draw
   for(var _ii=_excIceParts.length-1;_ii>=0;_ii--){var _ip2=_excIceParts[_ii];_ip2.x+=_ip2.vx;_ip2.y+=_ip2.vy;_ip2.life-=_dt;if(_ip2.life<=0)_excIceParts.splice(_ii,1);}
   // Spawn new ice particles near excalibur (only if visible and cap not hit)
-  if(_excIceParts.length<40){var _ef2=dflData[dfl];if(_ef2){for(var _ri2=0;_ri2<_ef2.rocks.length;_ri2++){var _er=_ef2.rocks[_ri2];if(_er.isExcalibur&&!_er.done&&dtk%4===0){_excIceParts.push({x:_er.x+(Math.random()-0.5)*50,y:_er.y-10-Math.random()*50,vx:(Math.random()-0.5)*0.5,vy:-0.4-Math.random()*0.6,life:60+Math.random()*60,maxLife:120,r:1+Math.random()*2});break;}}}}
+  if(_excIceParts.length<40){var _ef2=dflData[dfl];if(_ef2){for(var _ri2=0;_ri2<_ef2.rocks.length;_ri2++){var _er=_ef2.rocks[_ri2];if(_er.isExcalibur&&!_er.done&&dtk%4===0){_excIceParts.push({x:_er.x+(Math.random()-0.5)*50,y:_er.y-10-Math.random()*50,vx:(Math.random()-0.5)*0.6,vy:-0.3-Math.random()*0.5,life:40+Math.random()*50,maxLife:90,r:0.3+Math.random()*0.9});break;}}}}
   dDraw();drawMinimap();
   requestAnimationFrame(dLoop);
 }
@@ -4352,14 +4352,14 @@ function dDraw(){
       var _cy=r.y-ih+36;
       // Single circular pulsing light — full canvas height rect so it NEVER clips at top
       var _glowCX=rx,_glowCY=_cy+ih*0.38;
-      var _glowR=180+Math.sin(dtk*.06+r.x)*18;
-      var _pulse=0.30+Math.sin(dtk*.08+r.x)*0.10;
+      var _glowR=200+Math.sin(dtk*.06+r.x)*22;
+      var _pulse=0.55+Math.sin(dtk*.08+r.x)*0.12;
       var _glowGrd=DC.createRadialGradient(_glowCX,_glowCY,0,_glowCX,_glowCY,_glowR);
-      _glowGrd.addColorStop(0,'rgba(210,250,255,'+(_pulse*0.95).toFixed(3)+')');
-      _glowGrd.addColorStop(0.15,'rgba(0,225,255,'+(_pulse*0.80).toFixed(3)+')');
-      _glowGrd.addColorStop(0.40,'rgba(0,185,255,'+(_pulse*0.35).toFixed(3)+')');
-      _glowGrd.addColorStop(0.70,'rgba(0,140,220,'+(_pulse*0.10).toFixed(3)+')');
-      _glowGrd.addColorStop(1,'rgba(0,100,180,0)');
+      _glowGrd.addColorStop(0,'rgba(230,252,255,'+(_pulse*1.0).toFixed(3)+')');
+      _glowGrd.addColorStop(0.12,'rgba(0,235,255,'+(_pulse*0.92).toFixed(3)+')');
+      _glowGrd.addColorStop(0.35,'rgba(0,200,255,'+(_pulse*0.55).toFixed(3)+')');
+      _glowGrd.addColorStop(0.62,'rgba(0,155,230,'+(_pulse*0.20).toFixed(3)+')');
+      _glowGrd.addColorStop(1,'rgba(0,110,190,0)');
       DC.fillStyle=_glowGrd;
       DC.fillRect(_glowCX-_glowR-10,0,(_glowR+10)*2,400);
       // Draw ice particles (updated in main loop)
