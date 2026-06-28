@@ -1848,58 +1848,99 @@ function openListModal(itemId){
   document.getElementById('listModal').style.display='flex';
 }
 function closeListModal(){document.getElementById('listModal').style.display='none';listingItemId=null;}
+function _getAuth(){try{return JSON.parse(localStorage.getItem(_xAuthKey)||'null');}catch(e){return null;}}
 function confirmList(){
   var it=inventory.find(function(x){return x.id===listingItemId});if(!it)return;
   var price=parseInt(document.getElementById('listPrice').value);
   if(!price||price<1){alert('Enter a valid price.');return;}
+  var _xd=_getAuth();if(!_xd||!_xd.username){alert('Sign in to list items.');return;}
+  // Serialize item for server
+  var itemData={id:it.id,slot:it.slot||'pickaxe',mat:it.mat,type:it.type,rarN:it.rar.n,
+    affixes:it.affixes.map(function(a){return{tk:a.t.k,v:a.v};}),price:price};
+  // Remove from local inventory immediately
   inventory=inventory.filter(function(x){return x.id!==listingItemId});
-  listedItems.push({item:it,price:price,lid:'L'+it.id});
-  closeListModal();uiAll();if(activeTab===3)renderMarket(mkFilter);
+  saveGame();closeListModal();uiAll();
+  fetch('/api/listings',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'list',username:_xd.username,token:_xd.token||'',item:itemData,price:price})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){if(activeTab===3)renderMarket(mkFilter);}
+    else{// Failed — restore item
+      inventory.push(it);saveGame();uiAll();alert('Listing failed: '+(d.error||'Try again'));}
+  }).catch(function(){inventory.push(it);saveGame();uiAll();});
 }
 function withdrawListing(lid){
-  var li=listedItems.find(function(x){return x.lid===lid});if(!li)return;
-  inventory.push(li.item);listedItems=listedItems.filter(function(x){return x.lid!==lid});
-  uiAll();if(activeTab===3)renderMarket(mkFilter);
+  var _xd=_getAuth();if(!_xd)return;
+  fetch('/api/listings',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'withdraw',username:_xd.username,token:_xd.token||'',lid:lid})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok&&d.item){inventory.push(_relinkItem(d.item));saveGame();}
+    if(activeTab===3)renderMarket(mkFilter);uiAll();
+  }).catch(function(){if(activeTab===3)renderMarket(mkFilter);});
 }
 function buyListedItem(lid){
-  var li=listedItems.find(function(x){return x.lid===lid});
-  if(!li){alert('Item no longer available.');return;}
-  if(gold<li.price){alert('Not enough gold!');return;}
-  gold-=li.price;inventory.push(li.item);listedItems=listedItems.filter(function(x){return x.lid!==lid});
-  uiAll();if(activeTab===3)renderMarket(mkFilter);
+  var _xd=_getAuth();if(!_xd){alert('Sign in to buy.');return;}
+  fetch('/api/listings',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'buy',username:_xd.username,token:_xd.token||'',lid:lid})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){
+      var it=_relinkItem(d.item);if(it)inventory.push(it);
+      tokens-=d.price;saveGame();uiAll();
+      if(activeTab===3)renderMarket(mkFilter);
+      showAchieve('🛒','Purchase Complete','Got '+d.item.mat+' '+d.item.type+'!');
+    } else {alert(d.error||'Purchase failed. Try again.');}
+  }).catch(function(){alert('Network error. Try again.');});
 }
 
 function renderMarket(filter){
+  var _xd=_getAuth();var myUser=_xd?_xd.username:'';
   var ir=document.getElementById('mkInvRow');
   ir.innerHTML=!inventory.length?'<div class="mk-inv-empty">No items — run the dungeon first!</div>':
     inventory.map(function(it){return'<div class="bp-inv-slot" style="border-color:'+it.rar.c+'" onclick="openListModal(\''+it.id+'\')" title="'+it.mat+' '+it.type+' · '+it.rar.n+' — tap to list for sale">'+itemIcon(it.rar,70)+'<span style="font-size:7px;color:'+it.rar.c+';line-height:1;overflow:hidden;white-space:nowrap;max-width:100%;text-overflow:ellipsis">'+it.rar.n+'</span><i class="ti ti-tag" style="position:absolute;top:7px;right:9px;font-size:12px;color:var(--text4)"></i></div>';}).join('');
+  var grid=document.getElementById('mkGrid');
   var mw=document.getElementById('mkMyListingsWrap'),mg=document.getElementById('mkMyListingsGrid');
-  if(!listedItems.length){mw.style.display='none';}
-  else{mw.style.display='block';mg.innerHTML=listedItems.map(function(li){var it=li.item;var afxH=it.affixes.map(function(a){return'<div class="mk-afx"><i class="ti '+a.t.i+'"></i> +'+a.v+'% '+a.t.n+'</div>'}).join('');return'<div style="background:var(--bg4);border:1.5px solid '+it.rar.c+';border-radius:10px;padding:10px 14px;min-width:180px;max-width:240px">'+'<div style="font-size:10px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>'+'<div style="display:flex;align-items:center;gap:8px">'+itemIcon(it.rar,40)+'<div><div style="color:'+it.rar.c+';font-size:13px;font-weight:700;line-height:1.2">'+it.mat+' '+it.type+'</div><div style="color:'+it.rar.c+';font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.85">'+it.rar.n+'</div></div></div>'+'<div class="mk-affixes">'+afxH+'</div>'+'<div style="color:#a070ff;font-size:11px;font-weight:700">'+li.price+' EXT</div>'+'<div onclick="withdrawListing(\''+li.lid+'\')" style="margin-top:6px;font-size:9px;color:var(--text4);cursor:pointer;text-decoration:underline">Withdraw</div>'+'</div>';}).join('');}
-  var allItems=[];
-  var pv=filter==='all'?listedItems:listedItems.filter(function(li){return li.item.rar.n.toLowerCase()===filter});
-  document.getElementById('mkCount').textContent=pv.length+' items listed';
-  var grid=document.getElementById('mkGrid'),html='';
-  if(!pv.length){grid.innerHTML='<div style="text-align:center;padding:40px 20px;color:var(--text3);font-size:11px">No listings yet — be the first to list a pickaxe!</div>';return;}
-  var combined=[];
-  pv.forEach(function(li){combined.push({kind:'pv',it:li.item,price:li.price,lid:li.lid});});
-  if(mkSortRarity||mkSortCheap){
-    combined.sort(function(a,b){
-      if(mkSortRarity){var d=pickRarRank(b.it)-pickRarRank(a.it);if(d)return d;}
-      if(mkSortCheap){var p=a.price-b.price;if(p)return p;}
-      return 0;
-    });
-  }
-  combined.forEach(function(e){
-    var it=e.it;
-    var afxH=it.affixes.map(function(a){return'<div class="mk-afx"><i class="ti '+a.t.i+'"></i> +'+a.v+'% '+a.t.n+'</div>'}).join('');
-    var badge=e.kind==='pv'?'<div style="font-size:9px;color:var(--blue);margin-bottom:4px">PLAYER</div>':'';
-    var canBuy=tokens>=e.price;
-    var onClick=e.kind==='pv'?'buyListedItem(\''+e.lid+'\')':'buyMkItem(\''+e.id+'\')';
-    var buyBtn='<button onclick="'+onClick+'" style="margin-top:6px;width:100%;background:'+(canBuy?'#4a2060':'var(--bg3)')+';border:1px solid '+(canBuy?'#a070ff':'var(--border2)')+';border-radius:5px;color:'+(canBuy?'#c090ff':'var(--text4)')+';padding:4px;cursor:'+(canBuy?'pointer':'default')+';font-size:9px;font-family:\'Space Mono\',monospace">Buy</button>';
-    html+='<div style="background:var(--bg4);border:1.5px solid '+it.rar.c+';border-radius:10px;padding:10px 14px;min-width:180px;max-width:240px">'+badge+'<div style="display:flex;align-items:center;gap:8px">'+itemIcon(it.rar,40)+'<div><div style="color:'+it.rar.c+';font-size:13px;font-weight:700;line-height:1.2">'+it.mat+' '+it.type+'</div><div style="color:'+it.rar.c+';font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.85">'+it.rar.n+'</div></div></div><div class="mk-affixes">'+afxH+'</div><div style="color:#a070ff;font-size:11px;font-weight:700">'+e.price+' EXT</div>'+buyBtn+'</div>';
-  });
-  grid.innerHTML=html;
+  grid.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:11px">Loading...</div>';
+  fetch('/api/listings?v='+Date.now())
+    .then(function(r){return r.ok?r.json():{listings:[]};})
+    .then(function(data){
+      var all=data.listings||[];
+      var filtered=filter==='all'?all:all.filter(function(l){return(l.item_data.rarN||'').toLowerCase()===filter;});
+      // My listings
+      var myListings=all.filter(function(l){return l.seller===myUser;});
+      document.getElementById('mkCount').textContent=filtered.length+' items listed';
+      if(!myListings.length){if(mw)mw.style.display='none';}
+      else{if(mw)mw.style.display='block';if(mg)mg.innerHTML=myListings.map(function(l){
+        var it=_relinkItem(l.item_data);if(!it)return'';
+        var afxH=it.affixes.map(function(a){return'<div class="mk-afx"><i class="ti '+a.t.i+'"></i> +'+a.v+'% '+a.t.n+'</div>';}).join('');
+        return'<div style="background:var(--bg4);border:1.5px solid '+it.rar.c+';border-radius:10px;padding:10px 14px;min-width:180px;max-width:240px">'
+          +'<div style="font-size:10px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>'
+          +'<div style="display:flex;align-items:center;gap:8px">'+itemIcon(it.rar,40)+'<div><div style="color:'+it.rar.c+';font-size:13px;font-weight:700;line-height:1.2">'+it.mat+' '+it.type+'</div><div style="color:'+it.rar.c+';font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.85">'+it.rar.n+'</div></div></div>'
+          +'<div class="mk-affixes">'+afxH+'</div>'
+          +'<div style="color:#a070ff;font-size:11px;font-weight:700">'+l.price+' EXT</div>'
+          +'<div onclick="withdrawListing(\''+l.id+'\')" style="margin-top:6px;font-size:9px;color:var(--text4);cursor:pointer;text-decoration:underline">Withdraw</div>'
+          +'</div>';
+      }).join('');}
+      if(!filtered.length){grid.innerHTML='<div style="text-align:center;padding:40px 20px;color:var(--text3);font-size:11px">No listings yet — be the first to list a pickaxe!</div>';return;}
+      // Sort
+      if(mkSortRarity||mkSortCheap){filtered.sort(function(a,b){
+        if(mkSortRarity){var d=pickRarRank(_relinkItem(b.item_data)||{})-pickRarRank(_relinkItem(a.item_data)||{});if(d)return d;}
+        if(mkSortCheap){return a.price-b.price;}
+        return 0;
+      });}
+      grid.innerHTML=filtered.map(function(l){
+        var it=_relinkItem(l.item_data);if(!it)return'';
+        var isOwn=l.seller===myUser;
+        var afxH=it.affixes.map(function(a){return'<div class="mk-afx"><i class="ti '+a.t.i+'"></i> +'+a.v+'% '+a.t.n+'</div>';}).join('');
+        var canBuy=!isOwn&&tokens>=l.price;
+        var badge=isOwn?'<div style="font-size:9px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>':'<div style="font-size:9px;color:var(--blue);margin-bottom:4px">@'+l.seller+'</div>';
+        var btn=isOwn
+          ?'<button style="margin-top:6px;width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--text4);padding:4px;font-size:9px;font-family:\'Space Mono\',monospace;cursor:default">Listed</button>'
+          :'<button onclick="buyListedItem(\''+l.id+'\')" style="margin-top:6px;width:100%;background:'+(canBuy?'#4a2060':'var(--bg3)')+';border:1px solid '+(canBuy?'#a070ff':'var(--border2)')+';border-radius:5px;color:'+(canBuy?'#c090ff':'var(--text4)')+';padding:4px;cursor:'+(canBuy?'pointer':'default')+';font-size:9px;font-family:\'Space Mono\',monospace">Buy</button>';
+        return'<div style="background:var(--bg4);border:1.5px solid '+it.rar.c+';border-radius:10px;padding:10px 14px;min-width:180px;max-width:240px">'+badge
+          +'<div style="display:flex;align-items:center;gap:8px">'+itemIcon(it.rar,40)+'<div><div style="color:'+it.rar.c+';font-size:13px;font-weight:700;line-height:1.2">'+it.mat+' '+it.type+'</div><div style="color:'+it.rar.c+';font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.85">'+it.rar.n+'</div></div></div>'
+          +'<div class="mk-affixes">'+afxH+'</div>'
+          +'<div style="color:#a070ff;font-size:11px;font-weight:700">'+l.price+' EXT</div>'+btn+'</div>';
+      }).join('');
+    }).catch(function(){grid.innerHTML='<div style="text-align:center;padding:30px;color:var(--red);font-size:11px">Failed to load listings. Refresh to try again.</div>';});
 }
 function filterMk(f,el){
   if(mkFilter===f){ mkFilter='all'; if(el)el.classList.remove('on'); renderMarket('all'); return; }
@@ -1970,20 +2011,48 @@ function renderOreMarket(){
       return '<div class="mk-ore-listing" style="background:var(--bg4);border:1.5px solid '+ore.c+';border-radius:10px;padding:10px 14px;min-width:160px">'+'<div style="font-size:10px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>'+'<div style="display:flex;align-items:center;gap:8px">'+oreSprite(ore,32)+'<span style="color:'+ore.tc+';font-size:12px;font-weight:700">'+li.oreName+'</span>'+'</div>'+'<div style="color:var(--text3);font-size:10px;margin:3px 0">×'+li.qty+' units</div>'+'<div style="color:#a070ff;font-size:11px;font-weight:700">'+li.price+' EXT</div>'+'<div onclick="withdrawOreListing(\''+li.lid+'\')" style="margin-top:6px;font-size:9px;color:var(--text4);cursor:pointer;text-decoration:underline">Withdraw</div>'+'</div>';
     }).join('');
   }
-  // All market listings — real player listings only
+  // All market listings — fetch from server
   var allGrid=document.getElementById('mkOreGrid');
-  if(allGrid){
-    var all=oreListedItems.map(function(li){return{lid:li.lid,oreName:li.oreName,qty:li.qty,price:li.price,player:'You',isOwn:true};});
-    if(oreFilter!=='all'){ all=all.filter(function(li){return li.oreName===oreFilter;}); }
-    if(oreSortCheap){
-      all.sort(function(a,b){return a.price-b.price;});
-    }
-    allGrid.innerHTML=all.length?all.map(function(li){
-      var ore=DORES.find(function(o){return o.n===li.oreName;})||DORES[0];
-      var canBuy=!li.isOwn&&tokens>=li.price;
-      return '<div style="background:var(--bg4);border:1.5px solid '+ore.c+';border-radius:10px;padding:10px 14px;min-width:180px">'+(li.isOwn?'<div style="font-size:10px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>':li.player?'<div style="font-size:9px;color:var(--blue);margin-bottom:4px">@'+li.player+'</div>':'')+'<div style="display:flex;align-items:center;gap:8px">'+oreSprite(ore,32)+'<span style="color:'+ore.tc+';font-size:12px;font-weight:700">'+li.oreName+'</span>'+'</div>'+'<div style="color:var(--text3);font-size:10px;margin:3px 0">×'+li.qty+' units</div>'+'<div style="color:#a070ff;font-size:11px;font-weight:700">'+li.price+' EXT each</div>'+'<button onclick="buyOreItem(\''+li.lid+'\')" style="margin-top:6px;width:100%;background:'+(canBuy?'#4a2060':'var(--bg3)')+';border:1px solid '+(canBuy?'#a070ff':'var(--border2)')+';border-radius:5px;color:'+(canBuy?'#c090ff':'var(--text4)')+';padding:4px;cursor:'+(canBuy?'pointer':'default')+';font-size:9px;font-family:\'Space Mono\',monospace">'+(li.isOwn?'Listed':'Buy '+li.qty+' ore')+'</button></div>';
-    }).join(''):'<div style="text-align:center;padding:40px 20px;color:var(--text3);font-size:11px">No ore listings yet — be the first to list!</div>';
-  }
+  var myWrap2=document.getElementById('mkOreMyListingsWrap');
+  var myGrid2=document.getElementById('mkOreMyListingsGrid');
+  var _xd2=_getAuth();var myUser2=_xd2?_xd2.username:'';
+  if(allGrid)allGrid.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:11px">Loading...</div>';
+  fetch('/api/ore-listings?v='+Date.now())
+    .then(function(r){return r.ok?r.json():{listings:[]};})
+    .then(function(data){
+      var all=data.listings||[];
+      var myListings=all.filter(function(l){return l.seller===myUser2;});
+      var filtered=oreFilter==='all'?all:all.filter(function(l){return l.ore_name===oreFilter;});
+      if(oreSortCheap)filtered.sort(function(a,b){return a.price-b.price;});
+      // My listings section
+      if(myWrap2)myWrap2.style.display=myListings.length?'':'none';
+      if(myGrid2)myGrid2.innerHTML=myListings.map(function(l){
+        var ore=DORES.find(function(o){return o.n===l.ore_name;})||DORES[0];
+        return'<div class="mk-ore-listing" style="background:var(--bg4);border:1.5px solid '+ore.c+';border-radius:10px;padding:10px 14px;min-width:160px">'
+          +'<div style="font-size:10px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>'
+          +'<div style="display:flex;align-items:center;gap:8px">'+oreSprite(ore,32)+'<span style="color:'+ore.tc+';font-size:12px;font-weight:700">'+l.ore_name+'</span></div>'
+          +'<div style="color:var(--text3);font-size:10px;margin:3px 0">×'+l.qty+' units</div>'
+          +'<div style="color:#a070ff;font-size:11px;font-weight:700">'+l.price+' EXT each</div>'
+          +'<div onclick="withdrawOreListing(\''+l.id+'\')" style="margin-top:6px;font-size:9px;color:var(--text4);cursor:pointer;text-decoration:underline">Withdraw</div>'
+          +'</div>';
+      }).join('');
+      if(!allGrid)return;
+      if(!filtered.length){allGrid.innerHTML='<div style="text-align:center;padding:40px 20px;color:var(--text3);font-size:11px">No ore listings yet — be the first to list!</div>';return;}
+      allGrid.innerHTML=filtered.map(function(l){
+        var ore=DORES.find(function(o){return o.n===l.ore_name;})||DORES[0];
+        var isOwn=l.seller===myUser2;
+        var totalCost=l.price*l.qty;
+        var canBuy=!isOwn&&tokens>=totalCost;
+        var badge=isOwn?'<div style="font-size:10px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>':'<div style="font-size:9px;color:var(--blue);margin-bottom:4px">@'+l.seller+'</div>';
+        var btn=isOwn
+          ?'<button style="margin-top:6px;width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--text4);padding:4px;font-size:9px;font-family:\'Space Mono\',monospace;cursor:default">Listed</button>'
+          :'<button onclick="buyOreItem(\''+l.id+'\')" style="margin-top:6px;width:100%;background:'+(canBuy?'#4a2060':'var(--bg3)')+';border:1px solid '+(canBuy?'#a070ff':'var(--border2)')+';border-radius:5px;color:'+(canBuy?'#c090ff':'var(--text4)')+';padding:4px;cursor:'+(canBuy?'pointer':'default')+';font-size:9px;font-family:\'Space Mono\',monospace">Buy ×'+l.qty+'</button>';
+        return'<div style="background:var(--bg4);border:1.5px solid '+ore.c+';border-radius:10px;padding:10px 14px;min-width:180px">'+badge
+          +'<div style="display:flex;align-items:center;gap:8px">'+oreSprite(ore,32)+'<span style="color:'+ore.tc+';font-size:12px;font-weight:700">'+l.ore_name+'</span></div>'
+          +'<div style="color:var(--text3);font-size:10px;margin:3px 0">×'+l.qty+' units @ '+l.price+' each</div>'
+          +'<div style="color:#a070ff;font-size:11px;font-weight:700">'+totalCost.toFixed(2)+' EXT total</div>'+btn+'</div>';
+      }).join('');
+    }).catch(function(){if(allGrid)allGrid.innerHTML='<div style="text-align:center;padding:30px;color:var(--red);font-size:11px">Failed to load. Refresh to try again.</div>';});
 }
 function openOreListModal(oreName){
   _oreListingName=oreName;
@@ -2006,29 +2075,40 @@ function confirmOreList(){
   var avail=oreStash[_oreListingName]||0;
   if(qty<1||qty>avail){alert('Invalid quantity');return;}
   if(price<=0){alert('Enter a price');return;}
+  var _xd=_getAuth();if(!_xd||!_xd.username){alert('Sign in to list.');return;}
+  // Deduct from stash immediately
   oreStash[_oreListingName]=avail-qty;
   if(oreStash[_oreListingName]<=0)delete oreStash[_oreListingName];
-  oreListedItems.push({lid:'OL'+Date.now(),oreName:_oreListingName,qty:qty,price:price});
-  closeOreListModal();saveGame();renderOreMarket();
+  saveGame();closeOreListModal();renderOreMarket();
+  fetch('/api/ore-listings',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'list',username:_xd.username,token:_xd.token||'',ore_name:_oreListingName,qty:qty,price:price})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){// Restore stash on failure
+      oreStash[_oreListingName]=(oreStash[_oreListingName]||0)+qty;saveGame();renderOreMarket();
+      alert('Listing failed: '+(d.error||'Try again'));
+    } else renderOreMarket();
+  }).catch(function(){oreStash[_oreListingName]=(oreStash[_oreListingName]||0)+qty;saveGame();renderOreMarket();});
 }
 function withdrawOreListing(lid){
-  var li=oreListedItems.find(function(x){return x.lid===lid;});if(!li)return;
-  oreStash[li.oreName]=(oreStash[li.oreName]||0)+li.qty;
-  oreListedItems=oreListedItems.filter(function(x){return x.lid!==lid;});
-  saveGame();renderOreMarket();
+  var _xd=_getAuth();if(!_xd)return;
+  fetch('/api/ore-listings',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'withdraw',username:_xd.username,token:_xd.token||'',lid:lid})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){oreStash[d.ore_name]=(oreStash[d.ore_name]||0)+d.qty;saveGame();}
+    renderOreMarket();
+  }).catch(function(){renderOreMarket();});
 }
 function buyOreItem(lid){
-  // Check player listings first
-  var li=oreListedItems.find(function(x){return x.lid===lid;});
-  if(li){alert('This is your own listing!');return;}
-  var ml=oreMarketListings.find(function(x){return x.lid===lid;});
-  if(!ml)return;
-  var totalCost=ml.price*ml.qty;
-  if(tokens<totalCost){alert('Not enough $EXT! Need '+totalCost.toFixed(2)+' EXT');return;}
-  tokens-=totalCost;
-  oreStash[ml.oreName]=(oreStash[ml.oreName]||0)+ml.qty;
-  oreMarketListings=oreMarketListings.filter(function(x){return x.lid!==lid;});
-  saveGame();renderOreMarket();uiAll();
+  var _xd=_getAuth();if(!_xd){alert('Sign in to buy.');return;}
+  fetch('/api/ore-listings',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'buy',username:_xd.username,token:_xd.token||'',lid:lid})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){
+      oreStash[d.ore_name]=(oreStash[d.ore_name]||0)+d.qty;
+      tokens-=d.cost;saveGame();uiAll();renderOreMarket();
+      showAchieve('⛏️','Purchase Complete','Got ×'+d.qty+' '+d.ore_name+'!');
+    } else alert(d.error||'Purchase failed. Try again.');
+  }).catch(function(){alert('Network error. Try again.');});
 }
 
 function uiAll(){
