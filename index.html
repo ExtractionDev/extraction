@@ -3155,7 +3155,7 @@ function dBuildFloors(){
   }
 }
 function _seedAmbient(fi){
-  dAmbientParts=[];var fl=dflData[fi];if(!fl)return;
+  dAmbientParts=[];_excIceParts=[];var fl=dflData[fi];if(!fl)return;
   var isHot=(fi===4||fi===9),isCrystal=(fi===6||fi===7);
   for(var _ai=0;_ai<22;_ai++){
     dAmbientParts.push({x:Math.random()*fl.w,y:30+Math.random()*(DGY-50),
@@ -4198,6 +4198,10 @@ function dLoop(){
   for(var _ci=dChips.length-1;_ci>=0;_ci--){var _ch=dChips[_ci];_ch.x+=_ch.vx*_dt;_ch.y+=_ch.vy*_dt;_ch.vy+=0.35*_dt;_ch.life-=_dt;if(_ch.life<=0)dChips.splice(_ci,1);}
   for(var _di=dDeathParts.length-1;_di>=0;_di--){var _dprt=dDeathParts[_di];_dprt.x+=_dprt.vx*_dt;_dprt.y+=_dprt.vy*_dt;_dprt.vy+=0.22*_dt;_dprt.life-=_dt;if(_dprt.life<=0)dDeathParts.splice(_di,1);}
   for(var _ai=dAmbientParts.length-1;_ai>=0;_ai--){var _ap=dAmbientParts[_ai];_ap.x+=_ap.vx*_dt;_ap.y+=_ap.vy*_dt;_ap.life-=_dt;if(_ap.life<=0){_ap.x=Math.random()*(f.w||800);_ap.y=30+Math.random()*(DGY-50);_ap.life=_ap.maxLife;}}
+  // Ice particle update — runs in main loop, not inside rock draw
+  for(var _ii=_excIceParts.length-1;_ii>=0;_ii--){var _ip2=_excIceParts[_ii];_ip2.x+=_ip2.vx;_ip2.y+=_ip2.vy;_ip2.life-=_dt;if(_ip2.life<=0)_excIceParts.splice(_ii,1);}
+  // Spawn new ice particles near excalibur (only if visible and cap not hit)
+  if(_excIceParts.length<40){var _ef2=dflData[dfl];if(_ef2){for(var _ri2=0;_ri2<_ef2.rocks.length;_ri2++){var _er=_ef2.rocks[_ri2];if(_er.isExcalibur&&!_er.done&&dtk%4===0){_excIceParts.push({x:_er.x+(Math.random()-0.5)*50,y:_er.y-10-Math.random()*50,vx:(Math.random()-0.5)*0.5,vy:-0.4-Math.random()*0.6,life:60+Math.random()*60,maxLife:120,r:1+Math.random()*2});break;}}}}
   dDraw();drawMinimap();
   requestAnimationFrame(dLoop);
 }
@@ -4347,17 +4351,14 @@ function dDraw(){
       var iw=64,ih=80;
       var _cy=r.y-ih+36;
       var _pulse=0.32+Math.sin(dtk*.08+r.x)*.10;
-      // Spawn ice particles
-      if(dtk%4===0){_excIceParts.push({x:r.x+(Math.random()-0.5)*50,y:r.y-10-Math.random()*50,vx:(Math.random()-0.5)*0.5,vy:-0.4-Math.random()*0.6,life:60+Math.random()*60,maxLife:120,r:1+Math.random()*2});}
-      // Update & draw ice particles
-      for(var _ip=_excIceParts.length-1;_ip>=0;_ip--){
-        var _p=_excIceParts[_ip];_p.x+=_p.vx;_p.y+=_p.vy;_p.life-=1;
-        if(_p.life<=0){_excIceParts.splice(_ip,1);continue;}
-        var _pf=_p.life/_p.maxLife;
+      // Draw ice particles (updated in main loop)
+      for(var _ip=0;_ip<_excIceParts.length;_ip++){
+        var _p=_excIceParts[_ip];
+        var _pf=Math.max(0,_p.life/_p.maxLife);
         var _px=_p.x-dcam;if(_px<-20||_px>W+20)continue;
         DC.globalAlpha=_pf*0.85;
         DC.fillStyle=_pf>0.5?'#b0f0ff':'#00d4ff';
-        DC.beginPath();DC.arc(_px,_p.y,_p.r,0,6.28);DC.fill();
+        DC.beginPath();DC.arc(_px,_p.y,Math.max(0.5,_p.r),0,6.28);DC.fill();
       }
       DC.globalAlpha=1;
       // Outer wide glow
