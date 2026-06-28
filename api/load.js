@@ -144,6 +144,29 @@ export default async function handler(req, res) {
     return res.status(200).json(result);
   }
 
+  // ---------- SIGNATURE STATUS CHECK ----------
+  if (req.query.sig) {
+    const sig = req.query.sig;
+    const rpcs = ['https://api.mainnet-beta.solana.com','https://rpc.ankr.com/solana'];
+    for (const rpc of rpcs) {
+      try {
+        const r = await fetch(rpc, {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({jsonrpc:'2.0',id:1,method:'getSignatureStatuses',params:[[sig],{searchTransactionHistory:true}]})
+        });
+        const d = await r.json();
+        const status = d.result?.value?.[0];
+        if (!status) { await new Promise(r=>setTimeout(r,1000)); continue; }
+        return res.json({
+          confirmed: status.confirmationStatus==='confirmed'||status.confirmationStatus==='finalized',
+          finalized: status.confirmationStatus==='finalized',
+          err: status.err||null
+        });
+      } catch(e) { continue; }
+    }
+    return res.json({ confirmed: false, finalized: false });
+  }
+
   // ---------- USDC BALANCE CHECK ----------
   if (req.query.usdc_balance) {
     const wallet = req.query.usdc_balance;
