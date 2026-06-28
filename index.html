@@ -4362,15 +4362,25 @@ function _setSignedOutUI(){
   if(btn){btn.className='home-btn-secondary home-btn-signin';}
   if(lbl){lbl.textContent='Sign In';}
 }
-// Handle Twitter OAuth callback — picks up ?username=&name=&token= from /api/callback redirect
+// Handle Twitter OAuth callback — picks up ?username=&name=&token=&streak=&bonus= from /api/callback redirect
 (function(){
   var _p=new URLSearchParams(window.location.search);
   var _u=_p.get('username'),_n=_p.get('name'),_t=_p.get('token');
+  var _streak=parseInt(_p.get('streak')||'0');
+  var _bonus=parseFloat(_p.get('bonus')||'0');
   if(_u){
     var authData={username:_u,name:_n||_u,token:_t||'',linkedAt:Date.now()};
     localStorage.setItem(_xAuthKey,JSON.stringify(authData));
     try{var gs=JSON.parse(localStorage.getItem('extraction_v1')||'{}');gs.xUsername=_u;localStorage.setItem('extraction_v1',JSON.stringify(gs));}catch(e){}
     _setSignedInUI(_u);
+    // Show streak bonus notification
+    if(_streak>0){
+      setTimeout(function(){
+        var _msg=_streak>1?'🔥 '+_streak+' day streak! +'+_bonus.toFixed(2)+' $EXT bonus':'Welcome back!';
+        showAchieve('📅','Daily Login',_msg);
+        if(_bonus>0){tokens+=_bonus;saveGame();uiAll();}
+      },1500);
+    }
     // Clean the URL
     window.history.replaceState({},'',window.location.pathname);
   }
