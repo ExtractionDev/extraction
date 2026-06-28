@@ -1,5 +1,5 @@
-
 import { createClient } from '@supabase/supabase-js';
+
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
 async function verifyToken(username, token) {
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { action, username, token, item, price, lid } = req.body || {};
+  const { action, username, token, item, price, lid, seller_wallet } = req.body || {};
   if (!username || !token) return res.status(400).json({ error: 'Missing credentials' });
 
   const player = await verifyToken(username, token);
@@ -35,13 +35,20 @@ export default async function handler(req, res) {
 
   // LIST — add a pickaxe listing
   if (action === 'list') {
-    if (!item || !price || price < 1) return res.status(400).json({ error: 'Invalid listing' });
+    const safePrice = parseFloat(price);
+    if (!item || !safePrice || safePrice < 0.01) {
+      return res.status(400).json({ error: 'Invalid listing — price must be at least $0.01 USDC' });
+    }
+    if (!seller_wallet) {
+      return res.status(400).json({ error: 'Phantom wallet not connected — connect wallet before listing' });
+    }
     const { data, error } = await supabase.from('listings').insert({
-      seller: username,
-      item_data: item,
-      price: Math.floor(price),
-      status: 'active',
-      listed_at: new Date().toISOString()
+      seller:        username,
+      item_data:     item,
+      price:         parseFloat(safePrice.toFixed(6)),
+      seller_wallet: seller_wallet,
+      status:        'active',
+      listed_at:     new Date().toISOString()
     }).select().single();
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json({ ok: true, lid: data.id });
@@ -59,25 +66,9 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, item: listing.item_data });
   }
 
-  // BUY — purchase a listing
+  // BUY — now handled by /api/market-usdc-buy (USDC on-chain)
   if (action === 'buy') {
-    if (!lid) return res.status(400).json({ error: 'Missing lid' });
-    const { data: listing, error: fetchErr } = await supabase
-      .from('listings').select('*').eq('id', lid).single();
-    if (fetchErr || !listing) return res.status(404).json({ error: 'Listing not found' });
-    if (listing.status !== 'active') return res.status(400).json({ error: 'Already sold' });
-    if (listing.seller === username) return res.status(400).json({ error: 'Cannot buy own listing' });
-    if (player.tokens < listing.price) return res.status(400).json({ error: 'Insufficient EXT' });
-
-    // Mark sold
-    await supabase.from('listings').update({ status: 'sold', buyer: username }).eq('id', lid);
-    // Deduct from buyer
-    await supabase.from('players').update({ tokens: player.tokens - listing.price }).eq('username', username);
-    // Add to seller
-    const { data: seller } = await supabase.from('players').select('tokens').eq('username', listing.seller).single();
-    if (seller) await supabase.from('players').update({ tokens: (seller.tokens || 0) + listing.price }).eq('username', listing.seller);
-
-    return res.status(200).json({ ok: true, item: listing.item_data, price: listing.price });
+    return res.status(400).json({ error: 'EXT purchases disabled — use USDC via Phantom wallet' });
   }
 
   return res.status(400).json({ error: 'Unknown action' });
