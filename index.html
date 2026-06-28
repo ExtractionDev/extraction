@@ -2089,6 +2089,20 @@ var _DEV_WALLET='B8ubxUGnvhDTGGRkkN8DkyAfnoLEfnjTPdXfQn3TnVQa';
 var _TOKEN_PROG='TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 var _ASSOC_PROG='ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe1bRS';
 
+async function _pollConfirm(signature){
+  // Poll via server instead of WebSocket — avoids wss:// connection failures
+  for(var _i=0;_i<20;_i++){
+    await new Promise(function(r){setTimeout(r,2000);});
+    try{
+      var _cr=await fetch('/api/load?sig='+encodeURIComponent(signature));
+      var _cd=await _cr.json();
+      if(_cd.confirmed||_cd.finalized)return;
+      if(_cd.err)throw new Error('Transaction failed on-chain: '+JSON.stringify(_cd.err));
+    }catch(e){if(e.message&&e.message.includes('Transaction failed'))throw e;}
+  }
+  // Timed out but tx may still confirm — not fatal
+  console.warn('Confirmation polling timed out — tx may still be processing');
+}
 async function _fetchBlockhash(){
   // Proxy through our own server — no CORS issues, server-side RPC calls
   var r=await fetch('/api/load?blockhash=1');
@@ -2152,7 +2166,7 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
     }catch(e){console.warn('Balance check failed, proceeding anyway:',e.message);}
     if(btn){btn.textContent='Sending...';}
     var _bhResult=await _fetchBlockhash();
-    var conn=new solanaWeb3.Connection(_bhResult.rpc,'confirmed');
+    var conn=new solanaWeb3.Connection(_bhResult.rpc,{commitment:'confirmed',disableRetryOnRateLimit:true,httpHeaders:{'Content-Type':'application/json'}});
     var bh={blockhash:_bhResult.blockhash};
     var buyerPk=new solanaWeb3.PublicKey(walletAddress);
     var sellerPk=new solanaWeb3.PublicKey(sellerWallet);
@@ -2174,7 +2188,7 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
     var signed=await provider.signAndSendTransaction(tx);
     if(btn){btn.textContent='Confirming...';}
-    await conn.confirmTransaction(signed.signature,'confirmed');
+    await _pollConfirm(signed.signature);
     // Tell server to transfer the item
     var r=await fetch('/api/market-usdc-buy',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({username:_xd.username,token:_xd.token||'',lid:lid,signature:signed.signature})});
@@ -2420,7 +2434,7 @@ async function buyOreWithUSDC(lid,sellerWallet,pricePerUnit,qty){
     }catch(e){console.warn('Balance check failed, proceeding anyway:',e.message);}
     if(btn){btn.textContent='Sending...';}
     var _bhResult=await _fetchBlockhash();
-    var conn=new solanaWeb3.Connection(_bhResult.rpc,'confirmed');
+    var conn=new solanaWeb3.Connection(_bhResult.rpc,{commitment:'confirmed',disableRetryOnRateLimit:true,httpHeaders:{'Content-Type':'application/json'}});
     var bh={blockhash:_bhResult.blockhash};
     var buyerPk=new solanaWeb3.PublicKey(walletAddress);
     var sellerPk=new solanaWeb3.PublicKey(sellerWallet);
@@ -2442,7 +2456,7 @@ async function buyOreWithUSDC(lid,sellerWallet,pricePerUnit,qty){
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
     var signed=await provider.signAndSendTransaction(tx);
     if(btn){btn.textContent='Confirming...';}
-    await conn.confirmTransaction(signed.signature,'confirmed');
+    await _pollConfirm(signed.signature);
     var r=await fetch('/api/ore-usdc-buy',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({username:_xd.username,token:_xd.token||'',lid:lid,signature:signed.signature})});
     var d=await r.json();
