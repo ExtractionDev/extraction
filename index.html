@@ -1436,7 +1436,7 @@ function saveGame(){
     localStorage.setItem(_getSaveKey(),JSON.stringify(data));
     // Save to Supabase if signed in
     try{var _xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');if(_xd&&_xd.username){
-      fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:_xd.username,data:data})});
+      fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:_xd.username,token:_xd.token||'',data:data})});
     }}catch(e){}
   }catch(e){}
 }
@@ -4359,12 +4359,12 @@ function _setSignedOutUI(){
   if(btn){btn.className='home-btn-secondary home-btn-signin';}
   if(lbl){lbl.textContent='Sign In';}
 }
-// Handle Twitter OAuth callback — picks up ?username=&name= from /api/callback redirect
+// Handle Twitter OAuth callback — picks up ?username=&name=&token= from /api/callback redirect
 (function(){
   var _p=new URLSearchParams(window.location.search);
-  var _u=_p.get('username'),_n=_p.get('name');
+  var _u=_p.get('username'),_n=_p.get('name'),_t=_p.get('token');
   if(_u){
-    var authData={username:_u,name:_n||_u,linkedAt:Date.now()};
+    var authData={username:_u,name:_n||_u,token:_t||'',linkedAt:Date.now()};
     localStorage.setItem(_xAuthKey,JSON.stringify(authData));
     try{var gs=JSON.parse(localStorage.getItem('extraction_v1')||'{}');gs.xUsername=_u;localStorage.setItem('extraction_v1',JSON.stringify(gs));}catch(e){}
     _setSignedInUI(_u);
