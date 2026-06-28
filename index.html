@@ -1279,7 +1279,7 @@ function itemIcon(rar,size){
   var c=rar.c;
   return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 20 20" style="image-rendering:pixelated"><rect x="8" y="1" width="4" height="2" fill="'+c+'"/><rect x="6" y="2" width="3" height="2" fill="'+c+'"/><rect x="11" y="2" width="3" height="2" fill="'+c+'"/><rect x="5" y="3" width="2" height="2" fill="'+c+'"/><rect x="13" y="3" width="2" height="2" fill="'+c+'"/><rect x="9" y="5" width="2" height="10" fill="#7a6040"/><rect x="9" y="6" width="1" height="8" fill="#8a7050"/></svg>';
 }
-var marketItems=[];for(var i=0;i<100;i++)marketItems.push(genItem());
+var marketItems=[];
 var mkFilter='common';
 var oreFilter='all'; // ore-type filter for the ores market tab
 // ── Market sort state (composable: rarity primary, cheapest secondary) ──
@@ -1876,14 +1876,13 @@ function renderMarket(filter){
   var mw=document.getElementById('mkMyListingsWrap'),mg=document.getElementById('mkMyListingsGrid');
   if(!listedItems.length){mw.style.display='none';}
   else{mw.style.display='block';mg.innerHTML=listedItems.map(function(li){var it=li.item;var afxH=it.affixes.map(function(a){return'<div class="mk-afx"><i class="ti '+a.t.i+'"></i> +'+a.v+'% '+a.t.n+'</div>'}).join('');return'<div style="background:var(--bg4);border:1.5px solid '+it.rar.c+';border-radius:10px;padding:10px 14px;min-width:180px;max-width:240px">'+'<div style="font-size:10px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>'+'<div style="display:flex;align-items:center;gap:8px">'+itemIcon(it.rar,40)+'<div><div style="color:'+it.rar.c+';font-size:13px;font-weight:700;line-height:1.2">'+it.mat+' '+it.type+'</div><div style="color:'+it.rar.c+';font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.85">'+it.rar.n+'</div></div></div>'+'<div class="mk-affixes">'+afxH+'</div>'+'<div style="color:#a070ff;font-size:11px;font-weight:700">'+li.price+' EXT</div>'+'<div onclick="withdrawListing(\''+li.lid+'\')" style="margin-top:6px;font-size:9px;color:var(--text4);cursor:pointer;text-decoration:underline">Withdraw</div>'+'</div>';}).join('');}
-  var allItems=filter==='all'?marketItems:marketItems.filter(function(it){return it.rar.n.toLowerCase()===filter});
+  var allItems=[];
   var pv=filter==='all'?listedItems:listedItems.filter(function(li){return li.item.rar.n.toLowerCase()===filter});
-  document.getElementById('mkCount').textContent=(allItems.length+pv.length)+' items listed';
+  document.getElementById('mkCount').textContent=pv.length+' items listed';
   var grid=document.getElementById('mkGrid'),html='';
-  if(!allItems.length&&!pv.length){grid.innerHTML='<span style="font-size:11px;color:var(--text4)">No items match this filter.</span>';return;}
+  if(!pv.length){grid.innerHTML='<div style="text-align:center;padding:40px 20px;color:var(--text3);font-size:11px">No listings yet — be the first to list a pickaxe!</div>';return;}
   var combined=[];
   pv.forEach(function(li){combined.push({kind:'pv',it:li.item,price:li.price,lid:li.lid});});
-  allItems.forEach(function(it){combined.push({kind:'mk',it:it,price:it.price,id:it.id});});
   if(mkSortRarity||mkSortCheap){
     combined.sort(function(a,b){
       if(mkSortRarity){var d=pickRarRank(b.it)-pickRarRank(a.it);if(d)return d;}
@@ -1910,7 +1909,7 @@ function filterMk(f,el){
   if(el)el.classList.add('on');
   renderMarket(f);
 }
-function buyMkItem(id){var it=marketItems.find(function(x){return x.id===id});if(!it||tokens<it.price)return;tokens-=it.price;inventory.push(it);marketItems=marketItems.filter(function(x){return x.id!==id});marketItems.push(genItem());renderMarket(mkFilter);uiAll();}
+function buyMkItem(id){/* fake items removed */}
 
 // ── Ore Marketplace ────────────────────────────────────────────────────────
 var mkActiveTab='pickaxe'; // 'pickaxe' or 'ores'
@@ -1918,19 +1917,7 @@ var oreListedItems=[]; // {lid, oreName, qty, price}
 var _oreListingName=null;
 // Simulated ore market listings from other players (price in EXT)
 var oreMarketListings=[];
-function _genOreMarket(){
-  oreMarketListings=[];
-  var prices={Coal:2,Copper:1.5,Iron:3,Silver:8,Gold:25,Mystrile:150};
-  DORES.forEach(function(ore){
-    var count=Math.floor(Math.random()*3)+1;
-    for(var i=0;i<count;i++){
-      var base=prices[ore.n]||5;
-      var qty=Math.floor(Math.random()*15)+3;
-      var price=parseFloat((base*(0.85+Math.random()*0.3)).toFixed(2));
-      oreMarketListings.push({lid:'OM'+ore.n+i,oreName:ore.n,qty:qty,price:price,player:['Miner#'+Math.floor(Math.random()*9999),'DungCrawler','OreKing','DeepDigger','StoneFace'][Math.floor(Math.random()*5)]});
-    }
-  });
-}
+function _genOreMarket(){ oreMarketListings=[]; }
 _genOreMarket();
 function switchMkTab(tab){
   mkActiveTab=tab;
@@ -1983,23 +1970,19 @@ function renderOreMarket(){
       return '<div class="mk-ore-listing" style="background:var(--bg4);border:1.5px solid '+ore.c+';border-radius:10px;padding:10px 14px;min-width:160px">'+'<div style="font-size:10px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>'+'<div style="display:flex;align-items:center;gap:8px">'+oreSprite(ore,32)+'<span style="color:'+ore.tc+';font-size:12px;font-weight:700">'+li.oreName+'</span>'+'</div>'+'<div style="color:var(--text3);font-size:10px;margin:3px 0">×'+li.qty+' units</div>'+'<div style="color:#a070ff;font-size:11px;font-weight:700">'+li.price+' EXT</div>'+'<div onclick="withdrawOreListing(\''+li.lid+'\')" style="margin-top:6px;font-size:9px;color:var(--text4);cursor:pointer;text-decoration:underline">Withdraw</div>'+'</div>';
     }).join('');
   }
-  // All market listings
+  // All market listings — real player listings only
   var allGrid=document.getElementById('mkOreGrid');
   if(allGrid){
-    var all=oreMarketListings.concat(oreListedItems.map(function(li){return{lid:li.lid,oreName:li.oreName,qty:li.qty,price:li.price,player:'You',isOwn:true};}));
+    var all=oreListedItems.map(function(li){return{lid:li.lid,oreName:li.oreName,qty:li.qty,price:li.price,player:'You',isOwn:true};});
     if(oreFilter!=='all'){ all=all.filter(function(li){return li.oreName===oreFilter;}); }
-    if(oreSortRarity||oreSortCheap){
-      all.sort(function(a,b){
-        if(oreSortRarity){var d=oreRarRank(b.oreName)-oreRarRank(a.oreName);if(d)return d;}
-        if(oreSortCheap){var p=a.price-b.price;if(p)return p;}
-        return 0;
-      });
+    if(oreSortCheap){
+      all.sort(function(a,b){return a.price-b.price;});
     }
     allGrid.innerHTML=all.length?all.map(function(li){
       var ore=DORES.find(function(o){return o.n===li.oreName;})||DORES[0];
       var canBuy=!li.isOwn&&tokens>=li.price;
-      return '<div style="background:var(--bg4);border:1.5px solid '+ore.c+';border-radius:10px;padding:10px 14px;min-width:180px">'+(li.isOwn?'<div style="font-size:10px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>':li.player?'<div style="font-size:9px;color:var(--blue);margin-bottom:4px">'+li.player+'</div>':'')+'<div style="display:flex;align-items:center;gap:8px">'+oreSprite(ore,32)+'<span style="color:'+ore.tc+';font-size:12px;font-weight:700">'+li.oreName+'</span>'+'</div>'+'<div style="color:var(--text3);font-size:10px;margin:3px 0">×'+li.qty+' units</div>'+'<div style="color:#a070ff;font-size:11px;font-weight:700">'+li.price+' EXT each</div>'+'<button onclick="buyOreItem(\''+li.lid+'\')" style="margin-top:6px;width:100%;background:'+(canBuy?'#4a2060':'var(--bg3)')+';border:1px solid '+(canBuy?'#a070ff':'var(--border2)')+';border-radius:5px;color:'+(canBuy?'#c090ff':'var(--text4)')+';padding:4px;cursor:'+(canBuy?'pointer':'default')+';font-size:9px;font-family:\'Space Mono\',monospace">'+(li.isOwn?'Listed':'Buy '+li.qty+' ore')+'</button></div>';
-    }).join(''):'<span style="font-size:11px;color:var(--text4)">No ore listings yet.</span>';
+      return '<div style="background:var(--bg4);border:1.5px solid '+ore.c+';border-radius:10px;padding:10px 14px;min-width:180px">'+(li.isOwn?'<div style="font-size:10px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>':li.player?'<div style="font-size:9px;color:var(--blue);margin-bottom:4px">@'+li.player+'</div>':'')+'<div style="display:flex;align-items:center;gap:8px">'+oreSprite(ore,32)+'<span style="color:'+ore.tc+';font-size:12px;font-weight:700">'+li.oreName+'</span>'+'</div>'+'<div style="color:var(--text3);font-size:10px;margin:3px 0">×'+li.qty+' units</div>'+'<div style="color:#a070ff;font-size:11px;font-weight:700">'+li.price+' EXT each</div>'+'<button onclick="buyOreItem(\''+li.lid+'\')" style="margin-top:6px;width:100%;background:'+(canBuy?'#4a2060':'var(--bg3)')+';border:1px solid '+(canBuy?'#a070ff':'var(--border2)')+';border-radius:5px;color:'+(canBuy?'#c090ff':'var(--text4)')+';padding:4px;cursor:'+(canBuy?'pointer':'default')+';font-size:9px;font-family:\'Space Mono\',monospace">'+(li.isOwn?'Listed':'Buy '+li.qty+' ore')+'</button></div>';
+    }).join(''):'<div style="text-align:center;padding:40px 20px;color:var(--text3);font-size:11px">No ore listings yet — be the first to list!</div>';
   }
 }
 function openOreListModal(oreName){
