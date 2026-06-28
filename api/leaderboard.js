@@ -8,15 +8,21 @@ const supabase = createClient(
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
+  // First try simple query with no filters
   const { data, error } = await supabase
     .from('players')
-    .select('username, gc_extracted, runs, game_stats')
+    .select('username, gc_extracted, runs, game_stats, is_banned')
     .order('gc_extracted', { ascending: false })
     .limit(50);
 
   if (error) {
-    console.error('Leaderboard error:', error);
-    return res.status(500).json({ error: error.message });
+    // Return error message in response so we can see it in browser
+    return res.status(500).json({ 
+      error: error.message, 
+      code: error.code,
+      details: error.details,
+      hint: error.hint
+    });
   }
 
   const rows = (data || [])
