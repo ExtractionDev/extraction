@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Extraction — on SOL</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Serif+Display&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
@@ -1227,6 +1228,8 @@ var starterGiven=false; // one-time flag — starter pickaxe can only ever be gi
 var equippedSlots={pickaxe:null,head:null,ring:null,amulet:null};
 // Excalibur prize pool (in $EXT)
 var excPool=0;var EXC_POOL_MAX=10; // prize pool (in $EXT), fills visually at 10
+var globalPool=0;       // shared server-side prize pool (all players' 10% contributions)
+var lifetimeExt=0;      // monotonic: total $EXT ever mined, never decreases (drives pool contribution)
 var extBurned=0,devCut=0; // running totals: $EXT burned & dev cut (simulated)
 // Free mode daily tracking
 var FREE_MAX_DAILY=10;
@@ -1427,9 +1430,11 @@ function updExcPool(){
   var odds=Math.min(50,Math.round(extFee/1000));
   var poolEl=document.getElementById('excPoolAmt');
   var oddsEl=document.getElementById('excPoolOdds');
-  if(poolEl)poolEl.textContent=excPool.toFixed(3);
+  // Display the shared global pool (all players' 10% contributions)
+  var displayPool=globalPool>0?globalPool:excPool;
+  if(poolEl)poolEl.textContent=displayPool.toFixed(3);
   var jackOdds=1.0; // jackpot pull odds always 1% once found
-  if(oddsEl)oddsEl.textContent='⚔ Stone appears: '+odds.toFixed(1)+'% this run  ·  Jackpot pull: 1% if found  ·  Pool: '+excPool.toFixed(3)+' $EXT';
+  if(oddsEl)oddsEl.textContent='⚔ Stone appears: '+odds.toFixed(1)+'% this run  ·  Jackpot pull: 1% if found  ·  Pool: '+displayPool.toFixed(3)+' $EXT';
   var bl=document.getElementById('excBurnTxt');if(bl)bl.textContent='🔥 '+extBurned.toFixed(2)+' $EXT burned  ·  '+devCut.toFixed(2)+' to dev  ·  80% feeds the prize pool';
 }
 function getItemBonus(k){var t=0;['pickaxe','head','ring','amulet'].forEach(function(s){if(equippedSlots[s])equippedSlots[s].affixes.forEach(function(a){if(a.t.k===k)t+=a.v;});});return t;}
@@ -1550,7 +1555,7 @@ function _buildSaveData(){
   // Include equipped items in inventory so they can be found on reload
   var _allItems=inventory.slice();
   Object.values(equippedSlots).forEach(function(it){if(it)_allItems.push(it);});
-  return{gold:gold,tokens:tokens,totalRocks:totalRocks,runs:runs,chests:chests,ups:ups,excPool:excPool,extBurned:extBurned,devCut:devCut,starterGiven:starterGiven,
+  return{gold:gold,tokens:tokens,totalRocks:totalRocks,runs:runs,chests:chests,ups:ups,excPool:excPool,lifetimeExt:lifetimeExt,extBurned:extBurned,devCut:devCut,starterGiven:starterGiven,
     inventory:_allItems.map(function(it){return{id:it.id,slot:it.slot||'pickaxe',slotIcon:it.slotIcon||'ti-pickaxe',mat:it.mat,type:it.type,rarN:it.rar.n,affixes:it.affixes.map(function(a){return{tk:a.t.k,v:a.v};}),price:it.price};}),
     oreStash:oreStash,
     eqSlots:{pickaxe:equippedSlots.pickaxe?equippedSlots.pickaxe.id:null,head:equippedSlots.head?equippedSlots.head.id:null,ring:equippedSlots.ring?equippedSlots.ring.id:null,amulet:equippedSlots.amulet?equippedSlots.amulet.id:null},
@@ -1592,7 +1597,7 @@ function loadGame(){
     var d=JSON.parse(s);
     gold=d.gold||50;tokens=d.tokens||0;totalRocks=d.totalRocks||0;
     runs=d.runs||0;chests=d.chests||0;
-    if(d.excPool)excPool=d.excPool;if(d.extBurned)extBurned=d.extBurned;if(d.devCut)devCut=d.devCut;if(d.starterGiven)starterGiven=d.starterGiven;
+    if(d.excPool)excPool=d.excPool;if(d.lifetimeExt)lifetimeExt=d.lifetimeExt;if(d.extBurned)extBurned=d.extBurned;if(d.devCut)devCut=d.devCut;if(d.starterGiven)starterGiven=d.starterGiven;
     if(d.ups)ups=Object.assign(ups,d.ups);
     if(d.oreStash)oreStash=d.oreStash;
     inventory=(d.inventory||[]).map(_relinkItem).filter(Boolean);
@@ -1620,12 +1625,22 @@ function loadGame(){
       var _offSecs=Math.min((Date.now()-d.lastSaved)/1000, 8*3600);
       var _offRate=getSell()*getSpd()/60; // EXT per second
       var _offEarned=_offSecs*_offRate;
-      if(_offEarned>0){tokens+=_offEarned;excPool+=_offEarned*0.1;showAchieve('⛏️','Welcome back!','Offline earnings: +'+_offEarned.toFixed(4)+' $EXT');}
+      if(_offEarned>0){tokens+=_offEarned;lifetimeExt+=_offEarned;excPool+=_offEarned*0.1;showAchieve('⛏️','Welcome back!','Offline earnings: +'+_offEarned.toFixed(4)+' $EXT');}
     }
   }catch(e){console.warn('Load failed',e);}
 }
 // Auto-save every 20s
 setInterval(saveGame,20000);
+
+// Fetch the shared global Excalibur pool every 2.5 minutes
+function _fetchGlobalPool(){
+  fetch('/api/pool')
+    .then(function(r){return r.ok?r.json():null;})
+    .then(function(d){if(d&&typeof d.pool==='number'){globalPool=d.pool;updExcPool();}})
+    .catch(function(){});
+}
+_fetchGlobalPool();
+setInterval(_fetchGlobalPool,150000); // 2.5 min
 
 var _soundOn=true;
 function openSettings(){document.getElementById('settingsModal').classList.add('open');}
@@ -2401,7 +2416,7 @@ function mHitRock(){
   var d=getPow();mRockHP-=d;mSwAnim=14;if(activeTab===2)sndMineHit();
   for(var i=0;i<3;i++)mParts.push({x:340+Math.random()*14-7,y:MGY-25+Math.random()*14-7,vx:(Math.random()-.5)*3,vy:-1.5-Math.random()*2.5,life:16+Math.random()*8,c:['#3a3440','#4a4450','#2e2838'][i],s:2+Math.random()*2});
   var pct=1-mRockHP/mRockMax;for(var i=0;i<mCracks.length;i++)if(!mCracks[i].on&&pct>(i+1)*.12)mCracks[i].on=true;
-  if(mRockHP<=0){mRockHP=0;var tv=getSell()*mRockType.multi;tokens+=tv;excPool+=tv*0.1;totalRocks++;if(activeTab===2){if(mRockType.multi>1)sndRareBreak();else sndRockBreak();}
+  if(mRockHP<=0){mRockHP=0;var tv=getSell()*mRockType.multi;tokens+=tv;lifetimeExt+=tv;excPool+=tv*0.1;totalRocks++;if(activeTab===2){if(mRockType.multi>1)sndRareBreak();else sndRockBreak();}
     saveGame(); // save immediately so EXT isn't lost on refresh
     // Confirm multi payouts: Silver=3x, Gold=5x, Mystrile=25x
     for(var i=0;i<12;i++)mParts.push({x:340+Math.random()*50-25,y:MGY-25+Math.random()*40-20,vx:(Math.random()-.5)*7,vy:-2-Math.random()*5,life:25+Math.random()*18,c:['#4a4450','#5a5460','#c8a040','#3a3440','#6050a0'][Math.floor(Math.random()*5)],s:2+Math.random()*4});
