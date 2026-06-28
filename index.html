@@ -1547,8 +1547,11 @@ function _doApiSave(data){
   }}catch(e){}
 }
 function _buildSaveData(){
+  // Include equipped items in inventory so they can be found on reload
+  var _allItems=inventory.slice();
+  Object.values(equippedSlots).forEach(function(it){if(it)_allItems.push(it);});
   return{gold:gold,tokens:tokens,totalRocks:totalRocks,runs:runs,chests:chests,ups:ups,excPool:excPool,extBurned:extBurned,devCut:devCut,starterGiven:starterGiven,
-    inventory:inventory.map(function(it){return{id:it.id,slot:it.slot||'pickaxe',slotIcon:it.slotIcon||'ti-pickaxe',mat:it.mat,type:it.type,rarN:it.rar.n,affixes:it.affixes.map(function(a){return{tk:a.t.k,v:a.v};}),price:it.price};}),
+    inventory:_allItems.map(function(it){return{id:it.id,slot:it.slot||'pickaxe',slotIcon:it.slotIcon||'ti-pickaxe',mat:it.mat,type:it.type,rarN:it.rar.n,affixes:it.affixes.map(function(a){return{tk:a.t.k,v:a.v};}),price:it.price};}),
     oreStash:oreStash,
     eqSlots:{pickaxe:equippedSlots.pickaxe?equippedSlots.pickaxe.id:null,head:equippedSlots.head?equippedSlots.head.id:null,ring:equippedSlots.ring?equippedSlots.ring.id:null,amulet:equippedSlots.amulet?equippedSlots.amulet.id:null},
     gameStats:gameStats,_achiev:_achiev,lastSaved:Date.now()
