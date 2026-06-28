@@ -33,6 +33,9 @@ export default async function handler(req, res) {
   if (isNaN(safeAmount) || safeAmount <= 0) {
     return res.status(400).json({ error: 'Invalid amount.' });
   }
+  if (safeAmount < 25000) {
+    return res.status(400).json({ error: 'Minimum withdrawal is 25,000 $EXT.' });
+  }
 
   // Verify session token and check balance
   const { data: player, error: fetchErr } = await supabase
