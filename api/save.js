@@ -25,7 +25,7 @@ export default async function handler(req, res) {
   // Verify session token
   const { data: player, error: fetchErr } = await supabase
     .from('players')
-    .select('session_token, gold, tokens, total_rocks, runs, chests, ups, ore_stash')
+    .select('session_token, gold, tokens, total_rocks, runs, chests, ups, ore_stash, lifetime_ext')
     .eq('username', username)
     .single();
 
@@ -34,7 +34,7 @@ export default async function handler(req, res) {
 
   // Extract from data object
   const { gold, tokens, totalRocks, runs, chests, ups, oreStash,
-          inventory, eqSlots, gameStats, _achiev } = data;
+          inventory, eqSlots, gameStats, _achiev, lifetimeExt } = data;
 
   // Sanity caps
   const safeGold   = Math.min(Math.max(0, Math.floor(gold || 0)), MAX_GOLD);
@@ -72,6 +72,26 @@ export default async function handler(req, res) {
     });
   }
 
+  // ── Global pool contribution (server-derived, cheat-resistant) ──────────────
+  // lifetime_ext is monotonic (never decreases). The pool grows by 10% of each
+  // player's NEW mining since their last save. A cheater can't inflate the pool
+  // because the delta is capped and lifetime_ext can only move up.
+  const prevLifetime = parseFloat(player.lifetime_ext) || 0;
+  const newLifetime  = Math.max(prevLifetime, parseFloat(lifetimeExt) || 0);
+  let delta = newLifetime - prevLifetime;
+
+  // Sanity cap: ignore absurd jumps (e.g. >1,000,000 EXT in one save = tampering)
+  if (delta < 0) delta = 0;
+  if (delta > 1000000) delta = 0;
+
+  const poolContribution = delta * 0.10;
+
+  if (poolContribution > 0) {
+    // Atomically add to the shared global pool via RPC (handles concurrent writes)
+    const { error: poolErr } = await supabase.rpc('add_to_pool', { amount: poolContribution });
+    if (poolErr) console.error('Pool contribution error:', poolErr);
+  }
+
   // FIX: use upsert instead of update so it never silently does nothing
   // if the row doesn't exist yet it gets created; if it does it gets updated
   const { error: updateErr } = await supabase
@@ -85,6 +105,7 @@ export default async function handler(req, res) {
       chests:         safeChests,
       ups:            safeUps,
       ore_stash:      safeOreStash,
+      lifetime_ext:   newLifetime,
       inventory:      safeInventory,
       equipped_slots: eqSlots   || {},
       game_stats:     gameStats || {},
