@@ -1343,6 +1343,11 @@ function toggleOreSort(which){
 }
 
 function goTab(n){
+  // Auth gate: must be signed in with Twitter to leave the home page
+  if(n!==0){
+    var _ga=null;try{_ga=JSON.parse(localStorage.getItem(_xAuthKey)||'null');}catch(e){}
+    if(!_ga||!_ga.username){openXAuth();return;}
+  }
   activeTab=n;
   var _tabExtras={1:'noscroll dung',2:'noscroll miner-tab',3:'market-tab',4:'bp-tab',5:'docs-tab',7:'lb-full-tab'};
   for(var i=0;i<8;i++){
@@ -4745,8 +4750,10 @@ function xAuthLoad(){
     var d=JSON.parse(localStorage.getItem(_xAuthKey)||'null');
     if(d&&d.username){
       _setSignedInUI(d.username);
+    } else {
+      _setSignedOutUI(); // lock nav until signed in
     }
-  }catch(e){}
+  }catch(e){_setSignedOutUI();}
 }
 function openXAuth(){
   var d=null;
@@ -4844,6 +4851,7 @@ function _setSignedInUI(username){
   var lbl=document.getElementById('homeSignInLabel');
   if(btn){btn.className='home-btn-secondary home-btn-signin signedin';}
   if(lbl){lbl.textContent='@'+username;}
+  if(typeof _unlockNav==='function')_unlockNav();
   // Show streak widget — read streak from saved auth data
   setTimeout(function(){
     try{
@@ -4907,6 +4915,11 @@ function _setSignedOutUI(){
   var lbl=document.getElementById('homeSignInLabel');
   if(btn){btn.className='home-btn-secondary home-btn-signin';}
   if(lbl){lbl.textContent='Sign In';}
+  // Lock the bottom nav visually — only Home is accessible until signed in
+  for(var i=1;i<8;i++){var nb=document.getElementById('nb'+i);if(nb){nb.style.opacity='0.4';nb.style.cursor='not-allowed';}}
+}
+function _unlockNav(){
+  for(var i=1;i<8;i++){var nb=document.getElementById('nb'+i);if(nb){nb.style.opacity='';nb.style.cursor='';}}
 }
 // Handle Twitter OAuth callback — picks up ?username=&name=&token=&streak=&bonus= from /api/callback redirect
 (function(){
