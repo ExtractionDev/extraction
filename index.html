@@ -2609,7 +2609,7 @@ var EXCIMG=null;
 
 // ── Chest System (v2) ─────────────────────────────────────────────────────
 // Loot rates: Common 60%, Uncommon 20%, Rare 12%, Epic 6%, Legendary 2%
-var CHEST_LOOT_RATES=[{rarIdx:0,chance:0.60},{rarIdx:1,chance:0.20},{rarIdx:2,chance:0.12},{rarIdx:3,chance:0.06},{rarIdx:4,chance:0.02}];
+var CHEST_LOOT_RATES=[{rarIdx:0,chance:0.60},{rarIdx:1,chance:0.30},{rarIdx:2,chance:0.08},{rarIdx:3,chance:0.019},{rarIdx:4,chance:0.001}];
 var _chestLootPending=null;
 // Pre-cache pickaxe images for canvas drawing (avoids creating Image per frame)
 var _pickImgCache={};
@@ -2994,7 +2994,7 @@ function dBuildFloors(){
     if(boss){if(fi===9){boss.hp=1200;boss.hpMax=1200;boss.name='INFERNO GUARDIAN';}enemies.push(boss);}
     // Chest: 1% spawn per floor (paid modes only)
     var floorChest=null;
-    if(!isFree&&Math.random()<0.25){ // TEST: 25% chest chance (revert: 0.01)
+    if(!isFree&&Math.random()<0.02){ // 2% chest spawn chance per floor
       for(var _ca=0;_ca<30;_ca++){
         var _cpi=2+Math.floor(Math.random()*Math.max(1,plats.length-3));
         if(_cpi>=plats.length)_cpi=plats.length-1;
