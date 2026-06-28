@@ -54,7 +54,17 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 .home-btn-wallet{border-color:var(--sol);color:var(--sol);background:var(--bg4)}
 .home-btn-wallet:hover{background:#0c0520}
 .home-btn-wallet.connected{border-color:var(--green);color:#90c848}
-.home-btn-signin{border-color:#1d9bf0;color:#1d9bf0;background:var(--bg4)}
+.home-streak{background:linear-gradient(135deg,#0a0a18,#0d0d20);border:1.5px solid #2a2a50;border-radius:12px;padding:12px 16px;margin:0 0 18px;width:100%;max-width:420px;box-sizing:border-box}
+.home-streak-title{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;text-align:center}
+.home-streak-days{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+.home-streak-day{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:44px}
+.home-streak-circle{width:36px;height:36px;border-radius:50%;border:2px solid #333;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text3);background:var(--bg3);transition:all .3s}
+.home-streak-circle.done{border-color:#1dbc8f;background:#051a14;color:#1dbc8f}
+.home-streak-circle.today{border-color:#ffd700;background:#1a1200;color:#ffd700;box-shadow:0 0 8px rgba(255,215,0,.3)}
+.home-streak-circle.future{border-color:#333;color:#444}
+.home-streak-label{font-size:8px;color:var(--text3);letter-spacing:.05em}
+.home-streak-label.today{color:#ffd700}
+.home-streak-reward{font-size:8px;color:var(--purple);margin-top:1px}
 .home-btn-signin:hover{background:#050d14}
 .home-btn-signin.signedin{border-color:#1dbc8f;color:#1dbc8f}
 /* Twitter / X Auth Modal */
@@ -476,6 +486,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
       <button class="home-btn-secondary" onclick="goTab(2)" style="border-color:var(--green);color:#90c848;background:var(--bg4)"><i class="ti ti-pickaxe"></i> Idle Miner</button>
       <button class="home-btn-secondary" onclick="goTab(5)" style="border-color:var(--purple);color:var(--purple);background:var(--bg4)"><i class="ti ti-book-2"></i> Docs</button>
       <button class="home-btn-secondary" onclick="window.open('https://twitter.com/ExtractionSOL','_blank')" style="border-color:#1d9bf0;color:#1d9bf0;background:var(--bg4)"><i class="ti ti-brand-x"></i> Follow</button>
+    </div>
+
+    <!-- Daily Login Streak -->
+    <div class="home-streak" id="homeStreakWidget" style="display:none">
+      <div class="home-streak-title">🔥 Daily Login Streak</div>
+      <div class="home-streak-days" id="homeStreakDays"></div>
     </div>
 
     <!-- Player stats -->
@@ -4312,6 +4328,41 @@ function xAuthLogout(){
   _setSignedOutUI();
   closeXAuth();
 }
+function _renderStreak(streakDay){
+  // Reward schedule
+  var rewards={1:0.5,2:1,3:2,4:3,5:5,6:7,7:10,14:25,30:100};
+  function getReward(day){return rewards[day]||+(day*0.5).toFixed(1);}
+  // Show widget
+  var widget=document.getElementById('homeStreakWidget');
+  var container=document.getElementById('homeStreakDays');
+  if(!widget||!container)return;
+  widget.style.display='';
+  // Build 7-day view centered on today
+  var days=[];
+  for(var i=1;i<=7;i++)days.push(i);
+  // If streak > 7, shift window to show current day
+  if(streakDay>7){
+    days=[];
+    for(var i=streakDay-3;i<=streakDay+3;i++)days.push(i>0?i:1);
+  }
+  var html='';
+  days.forEach(function(d){
+    var isDone=d<streakDay;
+    var isToday=d===streakDay;
+    var isFuture=d>streakDay;
+    var circleClass=isDone?'done':isToday?'today':'future';
+    var labelClass=isToday?'today':'';
+    var icon=isDone?'✓':isToday?'★':d;
+    var reward=getReward(d);
+    html+='<div class="home-streak-day">';
+    html+='<div class="home-streak-circle '+circleClass+'">'+icon+'</div>';
+    html+='<div class="home-streak-label '+labelClass+'">Day '+d+'</div>';
+    html+='<div class="home-streak-reward">+'+reward+' $EXT</div>';
+    html+='</div>';
+  });
+  container.innerHTML=html;
+}
+
 function _setSignedInUI(username){
   var btn=document.getElementById('homeSignInBtn');
   var lbl=document.getElementById('homeSignInLabel');
@@ -4369,10 +4420,11 @@ function _setSignedOutUI(){
   var _streak=parseInt(_p.get('streak')||'0');
   var _bonus=parseFloat(_p.get('bonus')||'0');
   if(_u){
-    var authData={username:_u,name:_n||_u,token:_t||'',linkedAt:Date.now()};
+    var authData={username:_u,name:_n||_u,token:_t||'',linkedAt:Date.now(),streak:_streak||1};
     localStorage.setItem(_xAuthKey,JSON.stringify(authData));
     try{var gs=JSON.parse(localStorage.getItem('extraction_v1')||'{}');gs.xUsername=_u;localStorage.setItem('extraction_v1',JSON.stringify(gs));}catch(e){}
     _setSignedInUI(_u);
+    _renderStreak(_streak||1);
     // Show streak bonus notification
     if(_streak>0){
       setTimeout(function(){
@@ -4383,6 +4435,12 @@ function _setSignedOutUI(){
     }
     // Clean the URL
     window.history.replaceState({},'',window.location.pathname);
+  } else {
+    // Page load — restore streak from saved auth data
+    try{
+      var _saved=JSON.parse(localStorage.getItem(_xAuthKey)||'null');
+      if(_saved&&_saved.streak){setTimeout(function(){_renderStreak(_saved.streak);},300);}
+    }catch(e){}
   }
 })();
 // Init X auth state on load
