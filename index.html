@@ -167,7 +167,36 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 .lb-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid var(--border)}
 .lb-title{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:700}
 .lb-reset{font-size:9px;color:var(--text3);text-align:right}
-.lb-row{display:flex;align-items:center;gap:5px;padding:4px 0;font-size:11px;color:var(--text);line-height:1.6;border-bottom:1px solid var(--border)}
+.lb-full-tab{padding:0;overflow-y:auto;background:var(--bg);min-height:100%}
+.lb-full-hero{background:radial-gradient(ellipse at 50% 0%,#1a0f00,var(--bg) 70%);padding:28px 20px 20px;text-align:center;border-bottom:1px solid var(--border2)}
+.lb-full-title{font-size:26px;font-family:'DM Serif Display',serif;color:var(--gold);margin-bottom:4px}
+.lb-full-sub{font-size:11px;color:var(--text3);letter-spacing:.15em;text-transform:uppercase;margin-bottom:18px}
+.lb-full-prize{background:linear-gradient(135deg,#140e06,#0e0a00);border:2px solid var(--gold);border-radius:16px;padding:16px 32px;display:inline-block;margin-bottom:6px;position:relative;overflow:hidden}
+.lb-full-prize::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(200,160,40,.1),transparent 70%);pointer-events:none}
+.lb-full-prize-label{font-size:9px;letter-spacing:.25em;text-transform:uppercase;color:var(--gold);margin-bottom:4px}
+.lb-full-prize-val{font-size:38px;color:var(--gold2);font-family:'DM Serif Display',serif;line-height:1}
+.lb-full-prize-note{font-size:9px;color:var(--text3);margin-top:4px}
+.lb-full-body{padding:16px 12px;max-width:600px;margin:0 auto}
+.lb-full-section-title{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--text3);margin:16px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.lb-entry{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;margin-bottom:6px;background:var(--bg3);border:1px solid var(--border);transition:all .2s}
+.lb-entry.me{background:linear-gradient(135deg,#1a1200,#100c00);border-color:var(--gold)}
+.lb-entry.top1{background:linear-gradient(135deg,#1a1200,#100c00);border-color:#ffd700}
+.lb-entry.top2{background:linear-gradient(135deg,#0e1218,#090d12);border-color:#c0c0c0}
+.lb-entry.top3{background:linear-gradient(135deg,#160c00,#0e0800);border-color:#cd7f32}
+.lb-rank-badge{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;background:var(--bg4);color:var(--text3);flex-shrink:0}
+.lb-rank-badge.top1{background:#3a2c00;color:#ffd700;font-size:18px}
+.lb-rank-badge.top2{background:#1a1e22;color:#c0c0c0;font-size:18px}
+.lb-rank-badge.top3{background:#2a1800;color:#cd7f32;font-size:18px}
+.lb-info{flex:1;min-width:0}
+.lb-player-name{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb-player-name.me{color:var(--gold)}
+.lb-player-sub{font-size:10px;color:var(--text3);margin-top:2px}
+.lb-gc{text-align:right;flex-shrink:0}
+.lb-gc-val{font-size:14px;font-weight:700;color:var(--gold2);font-family:'Space Mono',monospace}
+.lb-gc-label{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em}
+.lb-empty{text-align:center;padding:40px 20px;color:var(--text3);font-size:12px}
+.lb-refresh-btn{display:flex;align-items:center;justify-content:center;gap:6px;font-size:10px;color:var(--text3);cursor:pointer;padding:8px;margin-top:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg4);letter-spacing:.1em;text-transform:uppercase;transition:all .18s}
+.lb-refresh-btn:hover{color:var(--text);border-color:var(--text2)}
 .lb-rank{width:22px;text-align:center;flex-shrink:0;font-size:12px}
 .lb-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lb-rocks{font-size:10px;color:var(--gold2);white-space:nowrap;font-weight:700}
@@ -453,6 +482,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     <div class="nav-btn" id="nb3" onclick="goTab(3)"><i class="ti ti-shopping-bag"></i><span>Market</span></div>
     <div class="nav-btn" id="nb4" onclick="goTab(4)"><i class="ti ti-backpack"></i><span>Backpack</span></div>
     <div class="nav-btn" id="nb6" onclick="goTab(6)"><i class="ti ti-hammer"></i><span>Smith</span></div>
+    <div class="nav-btn" id="nb7" onclick="goTab(7)"><i class="ti ti-trophy"></i><span>Ranks</span></div>
   </div>
   <button class="nav-wallet" id="walletBtn" onclick="connectPhantom()" style="padding:14px 24px;font-size:18px;gap:10px;border-radius:10px"><i class="ti ti-wallet" style="font-size:22px"></i><span>Connect</span></button>
   <button class="nav-wallet" onclick="openSettings()" style="margin-left:6px;padding:14px 18px;border-radius:10px"><i class="ti ti-settings" style="font-size:22px"></i></button>
@@ -1076,6 +1106,27 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
   </div>
 
 </div>
+
+<!-- Tab 7: Full Leaderboard -->
+<div class="tab lb-full-tab" id="t7">
+  <!-- Hero -->
+  <div class="lb-full-hero">
+    <div class="lb-full-title">🏆 Hall of Miners</div>
+    <div class="lb-full-sub">Total GC Safely Extracted</div>
+    <div class="lb-full-prize">
+      <div class="lb-full-prize-label">⚔ Jackpot Prizepool</div>
+      <div class="lb-full-prize-val" id="lbHeroJackpot">0.000 $EXT</div>
+      <div class="lb-full-prize-note">Mine the Excalibur Stone to claim the pool</div>
+    </div>
+  </div>
+
+  <!-- Rankings -->
+  <div class="lb-full-body">
+    <div class="lb-full-section-title">📊 Global Rankings</div>
+    <div id="lbFullList"><div class="lb-empty"><i class="ti ti-loader" style="font-size:20px;display:block;margin-bottom:8px"></i>Loading rankings...</div></div>
+    <div class="lb-refresh-btn" onclick="_lbFullFetch()"><i class="ti ti-refresh"></i> Refresh</div>
+  </div>
+</div>
 <script>
 // ── Embedded sprite / ore images ──────────────────────────────────────────
 var _B64={
@@ -1244,8 +1295,8 @@ function toggleOreSort(which){
 
 function goTab(n){
   activeTab=n;
-  var _tabExtras={1:'noscroll dung',2:'noscroll miner-tab',3:'market-tab',4:'bp-tab',5:'docs-tab'};
-  for(var i=0;i<7;i++){
+  var _tabExtras={1:'noscroll dung',2:'noscroll miner-tab',3:'market-tab',4:'bp-tab',5:'docs-tab',7:'lb-full-tab'};
+  for(var i=0;i<8;i++){
     var t=document.getElementById('t'+i),nb=document.getElementById('nb'+i);
     if(!t||!nb)continue;
     var extras=_tabExtras[i]?(' '+_tabExtras[i]):'';
@@ -1258,7 +1309,7 @@ function goTab(n){
     if(de)de.style.display='flex';
     if(dg)dg.style.display='none';
   }
-  uiAll();if(n===3){if(mkActiveTab==='ores')renderOreMarket();else renderMarket(mkFilter);}if(n===4){scaleBpLayout();renderBackpack();}if(n===6)renderSmith();
+  uiAll();if(n===3){if(mkActiveTab==='ores')renderOreMarket();else renderMarket(mkFilter);}if(n===4){scaleBpLayout();renderBackpack();}if(n===6)renderSmith();if(n===7)_lbFullFetch();
 }
 
 async function connectPhantom(){
@@ -1546,6 +1597,57 @@ function closeTutorial(){document.getElementById('tutOverlay').style.display='no
   setInterval(_lbFetch,30000);
   window._lbRefresh=_lbFetch;
 })();
+
+// Full leaderboard tab (tab 7)
+function _lbFullFetch(){
+  var el=document.getElementById('lbFullList');
+  if(!el)return;
+  el.innerHTML='<div class="lb-empty"><i class="ti ti-loader" style="font-size:20px;display:block;margin-bottom:8px"></i>Loading rankings...</div>';
+  // Also update jackpot display
+  var jEl=document.getElementById('lbHeroJackpot');
+  var homeJP=document.getElementById('homeJackpotAmt');
+  if(jEl&&homeJP)jEl.textContent=homeJP.textContent;
+  fetch('/api/leaderboard?v='+Date.now())
+    .then(function(r){return r.ok?r.json():{rows:[]};})
+    .then(function(data){
+      var rows=Array.isArray(data)?data:(data.rows||[]);
+      _lbFullRender(rows);
+    })
+    .catch(function(){
+      if(el)el.innerHTML='<div class="lb-empty">Failed to load — tap Refresh to try again</div>';
+    });
+}
+function _lbFullRender(rows){
+  var el=document.getElementById('lbFullList');
+  if(!el)return;
+  var myUser='';
+  try{var _xd=JSON.parse(localStorage.getItem('extraction_xauth')||'null');if(_xd)myUser=_xd.username;}catch(e){}
+  if(!rows.length){
+    el.innerHTML='<div class="lb-empty">🏴 No extractions yet — be the first to claim the top spot!</div>';
+    return;
+  }
+  var medals=['🥇','🥈','🥉'];
+  var topClass=['top1','top2','top3'];
+  el.innerHTML=rows.map(function(p,i){
+    var isMe=p.username===myUser;
+    var tc=topClass[i]||'';
+    var rc=tc||'';
+    var nameClass=isMe?'lb-player-name me':'lb-player-name';
+    var entryClass='lb-entry'+(tc?' '+tc:'')+(isMe?' me':'');
+    var badge=i<3?(medals[i]):'#'+(i+1);
+    var badgeClass='lb-rank-badge'+(tc?' '+tc:'');
+    var gc=Math.floor(p.gc_extracted||0).toLocaleString();
+    var floor=p.deepest_floor?'Deepest: Floor '+p.deepest_floor:'';
+    var runs=p.runs?p.runs+' runs':'';
+    var sub=[runs,floor].filter(Boolean).join(' · ');
+    return'<div class="'+entryClass+'">'
+      +'<div class="'+badgeClass+'">'+badge+'</div>'
+      +'<div class="lb-info"><div class="'+nameClass+'">@'+p.username+(isMe?' ⭐':'')+'</div>'
+      +(sub?'<div class="lb-player-sub">'+sub+'</div>':'')+'</div>'
+      +'<div class="lb-gc"><div class="lb-gc-val">'+gc+'</div><div class="lb-gc-label">GC extracted</div></div>'
+      +'</div>';
+  }).join('');
+}
 function bpEquip(idx){if(inventory[idx])equipItem(inventory[idx].id);}
 function unequipSlot(sl){
   if(!equippedSlots[sl])return;
