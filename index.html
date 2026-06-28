@@ -818,6 +818,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
       <button class="toggle-btn on" id="soundToggle" onclick="toggleSound()"></button></div>
     <div class="settings-row"><span class="settings-label"><i class="ti ti-moon"></i> Mute music (future)</span>
       <button class="toggle-btn" id="musicToggle"></button></div>
+    <div class="settings-row"><span class="settings-label"><i class="ti ti-download"></i> Deposit $EXT</span>
+      <button class="reset-btn" style="background:#051a0a;border-color:var(--green);color:#90c848" onclick="openDeposit()">Deposit</button></div>
     <div class="settings-row"><span class="settings-label"><i class="ti ti-wallet"></i> Withdraw $EXT</span>
       <button class="reset-btn" style="background:#0c0520;border-color:var(--sol);color:var(--sol)" onclick="openWithdraw()">Withdraw</button></div>
     <div style="font-size:8px;color:var(--text4);margin-top:12px;text-align:center">Extraction v0.1 · Built on Solana</div>
@@ -841,6 +843,29 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     <button onclick="submitWithdraw()" style="width:100%;padding:12px;border-radius:8px;border:1.5px solid var(--sol);background:#0c0520;color:var(--sol);font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.1em;cursor:pointer;text-transform:uppercase">Submit Request</button>
   </div>
 </div>
+<!-- DEPOSIT MODAL -->
+<div class="settings-modal" id="depositModal" onclick="if(event.target===this)closeDeposit()">
+  <div class="settings-box" style="width:340px">
+    <div class="settings-title"><i class="ti ti-download" style="color:#90c848"></i> Deposit $EXT <i class="ti ti-x" style="cursor:pointer;font-size:14px;color:var(--text3);float:right" onclick="closeDeposit()"></i></div>
+    <div style="font-size:11px;color:var(--text2);margin:10px 0">Send $EXT to the address below, then submit your transaction hash. Your balance will be updated within 24 hours after verification.</div>
+    <div style="background:var(--bg4);border:1px solid var(--border3);border-radius:8px;padding:10px 12px;margin-bottom:14px">
+      <div style="font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Deposit Address</div>
+      <div id="depositAddress" style="font-family:'Space Mono',monospace;font-size:10px;color:#90c848;word-break:break-all">Loading...</div>
+      <div onclick="copyDepositAddress()" style="margin-top:6px;font-size:9px;color:var(--text3);cursor:pointer;text-decoration:underline" id="depositCopyBtn">Copy address</div>
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Amount Sent ($EXT)</div>
+      <input id="depositAmt" type="number" min="1" placeholder="How much $EXT did you send?" style="width:100%;box-sizing:border-box;background:var(--bg4);border:1px solid var(--border3);border-radius:8px;color:var(--text);padding:8px 10px;font-family:'Space Mono',monospace;font-size:11px">
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Transaction Hash</div>
+      <input id="depositTx" type="text" placeholder="Solana TX hash..." style="width:100%;box-sizing:border-box;background:var(--bg4);border:1px solid var(--border3);border-radius:8px;color:var(--text);padding:8px 10px;font-family:'Space Mono',monospace;font-size:11px">
+    </div>
+    <div id="depositMsg" style="font-size:11px;min-height:16px;margin-bottom:10px;color:var(--red)"></div>
+    <button onclick="submitDeposit()" style="width:100%;padding:12px;border-radius:8px;border:1.5px solid #90c848;background:#051a0a;color:#90c848;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.1em;cursor:pointer;text-transform:uppercase">Submit Deposit Request</button>
+  </div>
+</div>
+
 <!-- BACKPACK -->
 <div class="tab bp-tab" id="t4"><div class="bp-inner">
   <div class="bp-layout">
@@ -1591,6 +1616,49 @@ function openWithdraw(){
   document.getElementById('withdrawModal').classList.add('open');
 }
 function closeWithdraw(){document.getElementById('withdrawModal').classList.remove('open');}
+
+// Deposit address — change this to your actual Solana wallet
+var DEPOSIT_ADDRESS='B8ubxUGnvhDTGGRkkN8DkyAfnoLEfnjTPdXfQn3TnVQa';
+function openDeposit(){
+  closeSettings();
+  var _xd=null;try{_xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');}catch(e){}
+  if(!_xd||!_xd.username){alert('You must be signed in to deposit.');return;}
+  document.getElementById('depositAddress').textContent=DEPOSIT_ADDRESS;
+  document.getElementById('depositAmt').value='';
+  document.getElementById('depositTx').value='';
+  document.getElementById('depositMsg').textContent='';
+  document.getElementById('depositCopyBtn').textContent='Copy address';
+  document.getElementById('depositModal').classList.add('open');
+}
+function closeDeposit(){document.getElementById('depositModal').classList.remove('open');}
+function copyDepositAddress(){
+  navigator.clipboard.writeText(DEPOSIT_ADDRESS).then(function(){
+    document.getElementById('depositCopyBtn').textContent='✓ Copied!';
+    setTimeout(function(){document.getElementById('depositCopyBtn').textContent='Copy address';},2000);
+  });
+}
+function submitDeposit(){
+  var amt=parseFloat(document.getElementById('depositAmt').value);
+  var tx=document.getElementById('depositTx').value.trim();
+  var msg=document.getElementById('depositMsg');
+  if(!amt||amt<=0){msg.textContent='Please enter a valid amount.';return;}
+  if(!tx||tx.length<20){msg.textContent='Please enter a valid transaction hash.';return;}
+  var _xd=null;try{_xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');}catch(e){}
+  if(!_xd||!_xd.username){msg.textContent='Not signed in.';return;}
+  msg.style.color='var(--text3)';msg.textContent='Submitting...';
+  fetch('/api/deposit',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username:_xd.username,token:_xd.token||'',amount:amt,tx_hash:tx})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){
+      msg.style.color='var(--green)';
+      msg.textContent='✓ Request submitted! Your balance will be updated within 24 hours.';
+      setTimeout(closeDeposit,3000);
+    } else {
+      msg.style.color='var(--red)';
+      msg.textContent=d.error||'Something went wrong. Try again.';
+    }
+  }).catch(function(){msg.style.color='var(--red)';msg.textContent='Network error. Try again.';});
+}
 function submitWithdraw(){
   var wallet=document.getElementById('withdrawWallet').value.trim();
   var amt=parseFloat(document.getElementById('withdrawAmt').value);
