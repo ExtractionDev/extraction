@@ -7,7 +7,7 @@ const supabase = createClient(
 
 const RATE_LIMIT_MS = 4000;
 const _rateLimits = {};
-const VALID_ORES = ['Iron','Steel','Gold','Mithril','Adamant','Rune','Dragon'];
+const VALID_ORES = ['Coal','Copper','Iron','Silver','Gold','Mystrile'];
 const VALID_TYPES = ['Pickaxe'];
 const VALID_RARITIES = ['Common','Uncommon','Rare','Epic','Legendary'];
 const VALID_UPS = ['speed','power','sell','luck'];
