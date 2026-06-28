@@ -1197,6 +1197,7 @@ var gameStats={bestGC:0,deepestFloor:0,enemiesKilled:0,totalDmg:0,rareRocks:0,go
 var ups={speed:0,power:0,sell:0,luck:0};
 var inventory=[],equipped=null;
 var oreStash={}; // stackable ore storage: {Coal:5, Iron:3, ...}
+var starterGiven=false; // one-time flag — starter pickaxe can only ever be given once
 var equippedSlots={pickaxe:null,head:null,ring:null,amulet:null};
 // Excalibur prize pool (in $EXT)
 var excPool=0;var EXC_POOL_MAX=10; // prize pool (in $EXT), fills visually at 10
@@ -1511,7 +1512,7 @@ function _getSaveKey(){
 }
 function saveGame(){
   try{
-    var data={gold:gold,tokens:tokens,totalRocks:totalRocks,runs:runs,chests:chests,ups:ups,excPool:excPool,extBurned:extBurned,devCut:devCut,
+    var data={gold:gold,tokens:tokens,totalRocks:totalRocks,runs:runs,chests:chests,ups:ups,excPool:excPool,extBurned:extBurned,devCut:devCut,starterGiven:starterGiven,
       inventory:inventory.map(function(it){return{id:it.id,slot:it.slot||'pickaxe',slotIcon:it.slotIcon||'ti-pickaxe',mat:it.mat,type:it.type,rarN:it.rar.n,affixes:it.affixes.map(function(a){return{tk:a.t.k,v:a.v};}),price:it.price};}),
       oreStash:oreStash,
       eqSlots:{pickaxe:equippedSlots.pickaxe?equippedSlots.pickaxe.id:null,head:equippedSlots.head?equippedSlots.head.id:null,ring:equippedSlots.ring?equippedSlots.ring.id:null,amulet:equippedSlots.amulet?equippedSlots.amulet.id:null},
@@ -1534,16 +1535,19 @@ function _relinkItem(raw){
 function loadGame(){
   try{
     var s=localStorage.getItem(_getSaveKey());if(!s){
-      // Fresh game — start with an Iron (Common) pickaxe already equipped (+1% mining speed)
-      var starter={id:'starter',slot:'pickaxe',slotIcon:'ti-pickaxe',mat:'Iron',type:'Pickaxe',
-        rar:RARS[0],affixes:[{t:ATYPES[0],v:1}],price:50};
-      equippedSlots.pickaxe=starter;equipped=starter;
+      // Fresh game — only give starter once ever
+      if(!starterGiven){
+        var starter={id:'starter',slot:'pickaxe',slotIcon:'ti-pickaxe',mat:'Iron',type:'Pickaxe',
+          rar:RARS[0],affixes:[{t:ATYPES[0],v:1}],price:50};
+        equippedSlots.pickaxe=starter;equipped=starter;
+        starterGiven=true;
+      }
       return;
     }
     var d=JSON.parse(s);
     gold=d.gold||50;tokens=d.tokens||0;totalRocks=d.totalRocks||0;
     runs=d.runs||0;chests=d.chests||0;
-    if(d.excPool)excPool=d.excPool;if(d.extBurned)extBurned=d.extBurned;if(d.devCut)devCut=d.devCut;
+    if(d.excPool)excPool=d.excPool;if(d.extBurned)extBurned=d.extBurned;if(d.devCut)devCut=d.devCut;if(d.starterGiven)starterGiven=d.starterGiven;
     if(d.ups)ups=Object.assign(ups,d.ups);
     if(d.oreStash)oreStash=d.oreStash;
     inventory=(d.inventory||[]).map(_relinkItem).filter(Boolean);
@@ -2383,9 +2387,10 @@ var _chestLootPending=null;
 var _pickImgCache={};
 // Ensure a Common pickaxe is always equipped (for older saves with an empty pickaxe slot)
 function ensureStarterPick(){
-  if(!equippedSlots.pickaxe){
+  if(!starterGiven){
     var st={id:'starter'+Math.floor(Math.random()*1e6),slot:'pickaxe',slotIcon:'ti-pickaxe',mat:'Iron',type:'Pickaxe',rar:RARS[0],affixes:[{t:ATYPES[0],v:1}],price:50};
     equippedSlots.pickaxe=st;equipped=st;
+    starterGiven=true;saveGame();
   }
 }
 // Mouse position over each game canvas, in that canvas's internal pixel coords (for pickaxe aim)
