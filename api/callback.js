@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     body: new URLSearchParams({
       code,
       grant_type: 'authorization_code',
-      redirect_uri: 'https://extraction.online/callback',
+      redirect_uri: 'https://extraction.one/callback',
       code_verifier: 'challenge'
     })
   });
