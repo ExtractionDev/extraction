@@ -1608,6 +1608,11 @@ function loadGame(){
       });
       equipped=equippedSlots.pickaxe;
     }
+    // Safety: if no pickaxe equipped but we have one in inventory, equip it (prevents empty-hand bug)
+    if(!equippedSlots.pickaxe){
+      var _firstPick=inventory.find(function(x){return (x.slot||'pickaxe')==='pickaxe';});
+      if(_firstPick){equippedSlots.pickaxe=_firstPick;equipped=_firstPick;inventory=inventory.filter(function(x){return x.id!==_firstPick.id;});}
+    }
     if(d.gameStats)Object.assign(gameStats,d.gameStats);
     if(d._achiev)Object.assign(_achiev,d._achiev);
     // Offline earnings — calculate EXT earned while away (capped at 8 hours)
