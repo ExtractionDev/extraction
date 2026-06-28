@@ -1950,7 +1950,7 @@ function confirmList(){
   fetch('/api/listings',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({action:'list',username:_xd.username,token:_xd.token||'',item:itemData,price:price,seller_wallet:walletAddress})
   }).then(function(r){return r.json();}).then(function(d){
-    if(d.ok){if(activeTab===3)renderMarket(mkFilter);}
+    if(d.ok){setTimeout(function(){if(activeTab===3)renderMarket(mkFilter);},600);}
     else{inventory.push(it);saveGame();uiAll();alert('Listing failed: '+(d.error||'Try again'));}
   }).catch(function(){inventory.push(it);saveGame();uiAll();});
 }
@@ -1961,9 +1961,10 @@ function withdrawListing(lid){
   }).then(function(r){return r.json();}).then(function(d){
     if(d.ok&&d.item){
       inventory.push(_relinkItem(d.item));
-      saveGame(true); // force immediate API save so refresh doesn't wipe item
+      saveGame(true);
     }
-    if(activeTab===3)renderMarket(mkFilter);uiAll();
+    uiAll();
+    setTimeout(function(){if(activeTab===3)renderMarket(mkFilter);},600);
   }).catch(function(){if(activeTab===3)renderMarket(mkFilter);});
 }
 function buyListedItem(lid){
