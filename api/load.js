@@ -6,10 +6,56 @@ export default async function handler(req, res) {
 
   // ── POST: dungeon entry fee → 80% to shared pool, 20% removed ──────────────
   if (req.method === 'POST') {
-    const { username, token, entryFee } = req.body || {};
-    if (!username || !token || !entryFee) {
+    const { username, token, entryFee, action } = req.body || {};
+    if (!username || !token) {
       return res.status(400).json({ error: 'Missing fields' });
     }
+
+    // ===== JACKPOT PULL — server decides the win, not the client =====
+    if (action === 'jackpot') {
+      // TEST MODE: true = find+win are 100% for testing. Set false for live 1% odds.
+      const TEST_MODE = true;
+      const WIN_CHANCE = TEST_MODE ? 1.0 : 0.01;
+
+      const { data: jp, error: jErr } = await supabase
+        .from('players')
+        .select('session_token, tokens')
+        .eq('username', username)
+        .single();
+      if (jErr || !jp) return res.status(403).json({ error: 'Player not found' });
+      if (jp.session_token !== token) return res.status(403).json({ error: 'Invalid session' });
+
+      const won = Math.random() < WIN_CHANCE;
+      if (!won) return res.status(200).json({ ok: true, won: false });
+
+      // WIN — read pool, reset it FIRST (prevents double-pay), then credit player
+      const poolRes = await fetch(`${process.env.SUPABASE_URL}/rest/v1/global_pool?id=eq.1&select=pool`, {
+        headers: {
+          'apikey': process.env.SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`
+        }
+      });
+      const poolRows = await poolRes.json();
+      const wonAmount = (poolRows && poolRows.length) ? parseFloat(poolRows[0].pool) || 0 : 0;
+
+      const { error: resetErr } = await supabase.rpc('reset_pool');
+      if (resetErr) {
+        console.error('Pool reset error:', resetErr);
+        return res.status(500).json({ error: 'Payout failed, try again' });
+      }
+
+      const newBalance = (jp.tokens || 0) + wonAmount;
+      await supabase.from('players').update({ tokens: newBalance }).eq('username', username);
+
+      await supabase.from('jackpot_wins').insert({
+        username, amount: wonAmount, won_at: new Date().toISOString()
+      }).catch(() => {});
+
+      return res.status(200).json({ ok: true, won: true, amount: wonAmount, newTokens: newBalance });
+    }
+
+    // ===== DUNGEON ENTRY FEE =====
+    if (!entryFee) return res.status(400).json({ error: 'Missing entry fee' });
     const fee = parseFloat(entryFee);
     if (isNaN(fee) || fee <= 0) return res.status(400).json({ error: 'Invalid entry fee' });
 
