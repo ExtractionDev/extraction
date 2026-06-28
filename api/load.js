@@ -13,6 +13,33 @@ async function getPoolAmount() {
   return (rows && rows.length) ? (parseFloat(rows[0].pool) || 0) : 0;
 }
 
+// Helper: get latest Solana blockhash server-side (no CORS issues)
+async function getSolanaBlockhash() {
+  const rpcs = [
+    'https://api.mainnet-beta.solana.com',
+    'https://rpc.ankr.com/solana',
+    'https://solana-mainnet.rpc.extrnode.com',
+    'https://solana.public-rpc.com'
+  ];
+  const body = JSON.stringify({
+    jsonrpc: '2.0', id: 1,
+    method: 'getLatestBlockhash',
+    params: [{ commitment: 'confirmed' }]
+  });
+  for (const rpc of rpcs) {
+    try {
+      const r = await fetch(rpc, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+      if (!r.ok) continue;
+      const d = await r.json();
+      if (d.error || !d.result) continue;
+      return { blockhash: d.result.value.blockhash, rpc };
+    } catch (e) {
+      console.warn('Blockhash RPC failed:', rpc, e.message);
+    }
+  }
+  return null;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
@@ -107,8 +134,16 @@ export default async function handler(req, res) {
   }
 
   // =====================================================================
-  // GET — handles: pool amount, player load
+  // GET — handles: blockhash proxy, pool amount, player load
   // =====================================================================
+
+  // ---------- BLOCKHASH PROXY ----------
+  if (req.query.blockhash) {
+    const result = await getSolanaBlockhash();
+    if (!result) return res.status(503).json({ error: 'All Solana RPC endpoints unavailable. Try again shortly.' });
+    return res.status(200).json(result);
+  }
+
   if (req.query.pool) {
     const pool = await getPoolAmount();
     return res.status(200).json({ pool });
