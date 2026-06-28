@@ -1446,6 +1446,7 @@ function equipItem(id){
   equippedSlots[sl]=it;
   equipped=equippedSlots.pickaxe; // pickaxe backward-compat
   inventory=inventory.filter(function(x){return x.id!==id});
+  saveGame(true); // force immediate save so refresh keeps equip state
   renderBackpack();uiAll();
 }
 
@@ -1795,6 +1796,7 @@ function unequipSlot(sl){
   if(inventory.length>=20){alert('Backpack is full! (20/20)');return;}
   inventory.push(equippedSlots[sl]);equippedSlots[sl]=null;
   equipped=equippedSlots.pickaxe;
+  saveGame(true); // force immediate save so refresh keeps unequip state
   renderBackpack();uiAll();
 }
 function scaleBpLayout(){
