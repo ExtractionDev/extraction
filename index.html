@@ -2112,9 +2112,8 @@ async function _fetchBlockhash(){
   console.log('Blockhash via:',d.rpc);
   return {blockhash:d.blockhash,rpc:d.rpc||'https://api.mainnet-beta.solana.com'};
 }
-async function _getSolanaConn(){
-  return new solanaWeb3.Connection('https://rpc.ankr.com/solana','confirmed');
-}
+
+
 function _getATA(walletPk,mintPk){
   return solanaWeb3.PublicKey.findProgramAddressSync(
     [walletPk.toBytes(),new solanaWeb3.PublicKey(_TOKEN_PROG).toBytes(),mintPk.toBytes()],
@@ -2166,7 +2165,6 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
     }catch(e){console.warn('Balance check failed, proceeding anyway:',e.message);}
     if(btn){btn.textContent='Sending...';}
     var _bhResult=await _fetchBlockhash();
-    var conn=new solanaWeb3.Connection(_bhResult.rpc,{commitment:'confirmed',disableRetryOnRateLimit:true,httpHeaders:{'Content-Type':'application/json'}});
     var bh={blockhash:_bhResult.blockhash};
     var buyerPk=new solanaWeb3.PublicKey(walletAddress);
     var sellerPk=new solanaWeb3.PublicKey(sellerWallet);
@@ -2434,7 +2432,6 @@ async function buyOreWithUSDC(lid,sellerWallet,pricePerUnit,qty){
     }catch(e){console.warn('Balance check failed, proceeding anyway:',e.message);}
     if(btn){btn.textContent='Sending...';}
     var _bhResult=await _fetchBlockhash();
-    var conn=new solanaWeb3.Connection(_bhResult.rpc,{commitment:'confirmed',disableRetryOnRateLimit:true,httpHeaders:{'Content-Type':'application/json'}});
     var bh={blockhash:_bhResult.blockhash};
     var buyerPk=new solanaWeb3.PublicKey(walletAddress);
     var sellerPk=new solanaWeb3.PublicKey(sellerWallet);
