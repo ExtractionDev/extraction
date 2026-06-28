@@ -609,32 +609,36 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 
     <!-- CONTROLS CARD -->
     <div class="dung-entry-right">
-      <div class="dctrl-card">
-        <div class="dctrl-title"><i class="ti ti-device-gamepad-2" style="font-size:13px"></i> Controls</div>
-
-        <div class="dctrl-row">
-          <div class="dctrl-keys"><span class="dctrl-key" style="color:var(--text2)">A</span><span class="dctrl-key" style="color:var(--text2)">←</span></div>
-          <span class="dctrl-desc">Move left</span>
-        </div>
-        <div class="dctrl-row">
-          <div class="dctrl-keys"><span class="dctrl-key" style="color:var(--text2)">D</span><span class="dctrl-key" style="color:var(--text2)">→</span></div>
-          <span class="dctrl-desc">Move right</span>
-        </div>
-        <div class="dctrl-row">
-          <div class="dctrl-keys"><span class="dctrl-key" style="color:#90c848">W</span><span class="dctrl-key" style="color:#90c848">↑</span><span class="dctrl-key" style="color:#90c848;font-size:8px">SPC</span></div>
-          <span class="dctrl-desc">Jump</span>
-        </div>
-        <div class="dctrl-row">
-          <div class="dctrl-keys"><span class="dctrl-key" style="color:var(--purple)">S</span><span class="dctrl-key" style="color:var(--purple)">↓</span></div>
-          <span class="dctrl-desc">Drop floor</span>
-        </div>
-        <div class="dctrl-row">
-          <div class="dctrl-keys"><span class="dctrl-key" style="color:var(--gold);border-color:#3a3020;border-bottom-color:#2a2010">E</span></div>
-          <span class="dctrl-desc">Mine · Attack · Interact</span>
-        </div>
-        <div class="dctrl-row">
-          <div class="dctrl-keys"><span class="dctrl-key" style="color:var(--gold);border-color:#3a3020;border-bottom-color:#2a2010;font-size:9px;white-space:nowrap">🖱 LMB</span></div>
-          <span class="dctrl-desc">Mine ore</span>
+      <div class="ctrl-helper" style="position:static;box-shadow:none">
+        <div class="ctrl-helper-title"><i class="ti ti-device-gamepad-2" style="font-size:13px"></i> Controls</div>
+        <div style="display:flex;flex-direction:column">
+          <div class="ctrl-row">
+            <div class="ctrl-keys"><span class="ctrl-key" style="color:var(--text2)">A</span><span class="ctrl-key" style="color:var(--text2)">←</span></div>
+            <span class="ctrl-desc">Move left</span>
+          </div>
+          <div class="ctrl-row">
+            <div class="ctrl-keys"><span class="ctrl-key" style="color:var(--text2)">D</span><span class="ctrl-key" style="color:var(--text2)">→</span></div>
+            <span class="ctrl-desc">Move right</span>
+          </div>
+          <div class="ctrl-row">
+            <div class="ctrl-keys"><span class="ctrl-key" style="color:#90c848">W</span><span class="ctrl-key" style="color:#90c848">↑</span><span class="ctrl-key" style="color:#90c848;font-size:8px">SPC</span></div>
+            <span class="ctrl-desc">Jump <span style="color:var(--text4);font-size:9px">(hold Space to charge)</span></span>
+          </div>
+          <div class="ctrl-row">
+            <div class="ctrl-keys"><span class="ctrl-key" style="color:var(--purple)">S</span><span class="ctrl-key" style="color:var(--purple)">↓</span></div>
+            <span class="ctrl-desc">Drop to next floor</span>
+          </div>
+          <div class="ctrl-row">
+            <div class="ctrl-keys"><span class="ctrl-key" style="color:var(--gold);border-color:#3a3020;border-bottom-color:#2a2010">E</span></div>
+            <span class="ctrl-desc">Mine · Attack · Interact</span>
+          </div>
+          <div class="ctrl-row">
+            <div class="ctrl-keys"><span class="ctrl-key" style="color:var(--gold);border-color:#3a3020;border-bottom-color:#2a2010;font-size:9px;white-space:nowrap">🖱 LMB</span></div>
+            <span class="ctrl-desc">Mine ore block</span>
+          </div>
+          <div class="ctrl-row" style="margin-top:8px;padding-top:10px;border-top:1px solid var(--border2)">
+            <span style="font-size:9px;color:var(--text4);letter-spacing:.08em;line-height:1.7">Touch buttons available<br>in the bar below the screen</span>
+          </div>
         </div>
       </div>
     </div><!-- end dung-entry-right -->
