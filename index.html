@@ -837,7 +837,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     </div>
     <div style="margin-bottom:14px">
       <div style="font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Amount <span id="withdrawMaxLabel" style="color:var(--sol)"></span></div>
-      <input id="withdrawAmt" type="number" min="1" placeholder="Amount of $EXT..." style="width:100%;box-sizing:border-box;background:var(--bg4);border:1px solid var(--border3);border-radius:8px;color:var(--text);padding:8px 10px;font-family:'Space Mono',monospace;font-size:11px">
+      <input id="withdrawAmt" type="number" min="25000" placeholder="Min 25,000 $EXT..." style="width:100%;box-sizing:border-box;background:var(--bg4);border:1px solid var(--border3);border-radius:8px;color:var(--text);padding:8px 10px;font-family:'Space Mono',monospace;font-size:11px">
     </div>
     <div id="withdrawMsg" style="font-size:11px;min-height:16px;margin-bottom:10px;color:var(--red)"></div>
     <button onclick="submitWithdraw()" style="width:100%;padding:12px;border-radius:8px;border:1.5px solid var(--sol);background:#0c0520;color:var(--sol);font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.1em;cursor:pointer;text-transform:uppercase">Submit Request</button>
@@ -1595,6 +1595,7 @@ function submitWithdraw(){
   var msg=document.getElementById('withdrawMsg');
   if(!wallet||wallet.length<32){msg.textContent='Please enter a valid Solana wallet address.';return;}
   if(!amt||amt<=0){msg.textContent='Please enter a valid amount.';return;}
+  if(amt<25000){msg.textContent='Minimum withdrawal is 25,000 $EXT.';return;}
   if(amt>tokens){msg.textContent='Amount exceeds your balance of '+tokens.toFixed(4)+' $EXT.';return;}
   var _xd=null;try{_xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');}catch(e){}
   if(!_xd||!_xd.username){msg.textContent='Not signed in.';return;}
