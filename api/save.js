@@ -54,14 +54,23 @@ export default async function handler(req, res) {
   const safeRocks = Math.max(current.total_rocks || 0, data.totalRocks || 0);
   const safeRuns = Math.max(current.runs || 0, data.runs || 0);
 
-  // SECURITY: Validate inventory items
+  // SECURITY: Validate inventory items and affix values
   const VALID_MATS = ['Iron','Steel','Gold','Mithril','Adamant','Rune','Dragon'];
   const VALID_TYPES = ['Pickaxe'];
   const VALID_RARS = ['Common','Uncommon','Rare','Epic','Legendary'];
   const safeInventory = (data.inventory || []).filter(function(item) {
-    return VALID_MATS.includes(item.mat) && 
-           VALID_TYPES.includes(item.type) && 
-           VALID_RARS.includes(item.rarN);
+    if(!VALID_MATS.includes(item.mat)) return false;
+    if(!VALID_TYPES.includes(item.type)) return false;
+    if(!VALID_RARS.includes(item.rarN)) return false;
+    // Validate affix values are reasonable
+    if(item.affixes && Array.isArray(item.affixes)) {
+      for(const a of item.affixes) {
+        if(typeof a.v !== 'number') return false;
+        if(a.v > 100) return false;
+        if(a.v < 0) return false;
+      }
+    }
+    return true;
   });
 
   const response = await fetch(
