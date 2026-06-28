@@ -1,0 +1,1 @@
+var DEPOSIT_ADDRESS='B8ubxUGnvhDTGGRkkN8DkyAfnoLEfnjTPdXfQn3TnVQa';
