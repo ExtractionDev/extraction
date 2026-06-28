@@ -4498,20 +4498,22 @@ function _setSignedInUI(username){
   var _localData=null;
   try{_localData=JSON.parse(localStorage.getItem(_localKey)||'null');}catch(e){}
   if(_localData){
-    // We have local data — use it immediately, don't wait for Supabase
+    // We have local data — use it immediately, never let Supabase overwrite with lower values
     loadGame();uiAll();
-    // Still fetch Supabase in background to sync if local is somehow older
+    // Only sync from Supabase if it has MORE progress than local (protects against data wipe)
     fetch('/api/load?username='+username)
       .then(function(r){return r.ok?r.json():null;})
       .then(function(d){
         if(d&&d.updated_at){
-          var _sbTime=new Date(d.updated_at).getTime();
-          var _localTime=_localData.lastSaved||0;
-          // Only use Supabase data if it's newer than local
-          if(_sbTime>_localTime){
+          var _sbGold=d.gold||0;
+          var _sbTokens=d.tokens||0;
+          var _localGold=_localData.gold||0;
+          var _localTokens=_localData.tokens||0;
+          // Only use Supabase if it has MORE gold AND tokens — never downgrade
+          if(_sbGold>_localGold&&_sbTokens>=_localTokens){
             var mapped={gold:d.gold,tokens:d.tokens,totalRocks:d.total_rocks,runs:d.runs,chests:d.chests,
               ups:d.ups,oreStash:d.ore_stash,inventory:d.inventory,eqSlots:d.equipped_slots,
-              gameStats:d.game_stats,_achiev:d.achievements,lastSaved:_sbTime};
+              gameStats:d.game_stats,_achiev:d.achievements,lastSaved:new Date(d.updated_at).getTime()};
             localStorage.setItem(_localKey,JSON.stringify(mapped));
             loadGame();uiAll();
           }
