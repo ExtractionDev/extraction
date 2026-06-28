@@ -116,7 +116,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 .dung{flex:1;display:flex;flex-direction:column;background:var(--bg);overflow:hidden}
 .dung-entry{flex:1;display:flex;flex-direction:row;overflow:hidden;align-items:stretch}
 .dung-entry-left{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;zoom:1.45}
-.dung-entry-right{width:270px;flex-shrink:0;display:flex;flex-direction:column;justify-content:center;padding:24px 22px;border-left:1px solid var(--border2);background:var(--bg2)}
+.dung-entry-right{flex:1;display:flex;align-items:center;justify-content:center}
+.dctrl-card{background:var(--bg4);border:1.5px solid var(--border2);border-radius:10px;padding:16px 18px;width:210px;display:flex;flex-direction:column;gap:0}
 .dctrl-title{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);font-weight:700;display:flex;align-items:center;gap:7px;margin-bottom:18px;padding-bottom:10px;border-bottom:1px solid var(--border2)}
 .dctrl-section{font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--text4);margin-bottom:8px;margin-top:14px}
 .dctrl-section:first-of-type{margin-top:0}
@@ -606,40 +607,35 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     </div>
     </div><!-- end dung-entry-left -->
 
-    <!-- CONTROLS PANEL -->
+    <!-- CONTROLS CARD -->
     <div class="dung-entry-right">
-      <div class="dctrl-title"><i class="ti ti-device-gamepad-2" style="font-size:14px"></i> Controls</div>
+      <div class="dctrl-card">
+        <div class="dctrl-title"><i class="ti ti-device-gamepad-2" style="font-size:13px"></i> Controls</div>
 
-      <div class="dctrl-section">Keyboard</div>
-      <div class="dctrl-row">
-        <div class="dctrl-keys"><span class="dctrl-key" style="color:var(--text2)">A</span><span class="dctrl-key" style="color:var(--text2)">←</span></div>
-        <span class="dctrl-desc">Move left</span>
-      </div>
-      <div class="dctrl-row">
-        <div class="dctrl-keys"><span class="dctrl-key" style="color:var(--text2)">D</span><span class="dctrl-key" style="color:var(--text2)">→</span></div>
-        <span class="dctrl-desc">Move right</span>
-      </div>
-      <div class="dctrl-row">
-        <div class="dctrl-keys"><span class="dctrl-key" style="color:#90c848">W</span><span class="dctrl-key" style="color:#90c848">↑</span><span class="dctrl-key" style="color:#90c848;font-size:8px">SPC</span></div>
-        <span class="dctrl-desc">Jump <span style="color:var(--text4);font-size:9px">(hold Space to charge)</span></span>
-      </div>
-      <div class="dctrl-row">
-        <div class="dctrl-keys"><span class="dctrl-key" style="color:var(--purple)">S</span><span class="dctrl-key" style="color:var(--purple)">↓</span></div>
-        <span class="dctrl-desc">Drop to next floor</span>
-      </div>
-      <div class="dctrl-row">
-        <div class="dctrl-keys"><span class="dctrl-key" style="color:var(--gold);border-color:#3a3020;border-bottom-color:#2a2010">E</span></div>
-        <span class="dctrl-desc">Mine · Attack · Interact</span>
-      </div>
-
-      <div class="dctrl-section" style="margin-top:16px">Mouse</div>
-      <div class="dctrl-row">
-        <div class="dctrl-keys"><span class="dctrl-key" style="color:var(--gold);border-color:#3a3020;border-bottom-color:#2a2010;font-size:9px;white-space:nowrap">🖱 LMB</span></div>
-        <span class="dctrl-desc">Mine ore block</span>
-      </div>
-
-      <div style="margin-top:18px;padding:10px 12px;background:var(--bg4);border:1px solid var(--border2);border-radius:8px;border-left:2px solid var(--border3)">
-        <span style="font-size:9px;color:var(--text4);line-height:1.7;letter-spacing:.04em">Touch buttons are available in<br>the control bar below the screen</span>
+        <div class="dctrl-row">
+          <div class="dctrl-keys"><span class="dctrl-key" style="color:var(--text2)">A</span><span class="dctrl-key" style="color:var(--text2)">←</span></div>
+          <span class="dctrl-desc">Move left</span>
+        </div>
+        <div class="dctrl-row">
+          <div class="dctrl-keys"><span class="dctrl-key" style="color:var(--text2)">D</span><span class="dctrl-key" style="color:var(--text2)">→</span></div>
+          <span class="dctrl-desc">Move right</span>
+        </div>
+        <div class="dctrl-row">
+          <div class="dctrl-keys"><span class="dctrl-key" style="color:#90c848">W</span><span class="dctrl-key" style="color:#90c848">↑</span><span class="dctrl-key" style="color:#90c848;font-size:8px">SPC</span></div>
+          <span class="dctrl-desc">Jump</span>
+        </div>
+        <div class="dctrl-row">
+          <div class="dctrl-keys"><span class="dctrl-key" style="color:var(--purple)">S</span><span class="dctrl-key" style="color:var(--purple)">↓</span></div>
+          <span class="dctrl-desc">Drop floor</span>
+        </div>
+        <div class="dctrl-row">
+          <div class="dctrl-keys"><span class="dctrl-key" style="color:var(--gold);border-color:#3a3020;border-bottom-color:#2a2010">E</span></div>
+          <span class="dctrl-desc">Mine · Attack · Interact</span>
+        </div>
+        <div class="dctrl-row">
+          <div class="dctrl-keys"><span class="dctrl-key" style="color:var(--gold);border-color:#3a3020;border-bottom-color:#2a2010;font-size:9px;white-space:nowrap">🖱 LMB</span></div>
+          <span class="dctrl-desc">Mine ore</span>
+        </div>
       </div>
     </div><!-- end dung-entry-right -->
   </div>
