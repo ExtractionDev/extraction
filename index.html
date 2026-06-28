@@ -1634,7 +1634,7 @@ setInterval(saveGame,20000);
 
 // Fetch the shared global Excalibur pool every 2.5 minutes
 function _fetchGlobalPool(){
-  fetch('/api/pool')
+  fetch('/api/load?pool=1')
     .then(function(r){return r.ok?r.json():null;})
     .then(function(d){if(d&&typeof d.pool==='number'){globalPool=d.pool;updExcPool();}})
     .catch(function(){});
