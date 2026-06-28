@@ -3797,7 +3797,7 @@ function drawMinerFrame(ctx,state,frame,dx,dy,dw,dh,flipX,glowColor,aimX,aimY){
       var _bx=0.042*PW, _by=0.865*PH, _hx=0.747*PW, _hy=0.28*PH; // butt & head in pickaxe px
       var pANG=Math.atan2(_hy-_by,_hx-_bx), pLEN=Math.hypot(_hx-_bx,_hy-_by);
       // left-hand anchor in canvas coords (mirrors with which way he faces)
-      var handX=fx+(flipX?0.271:-0.271)*nw, handY=fy-0.317*nh;
+      var handX=fx+(flipX?0.310:-0.310)*nw, handY=fy-0.340*nh;
       var f=(flipX?-1:1), theta;
       if(state==='mine'){
         // hit swing: head rises to eye level then comes down to hand level
@@ -3810,7 +3810,7 @@ function drawMinerFrame(ctx,state,frame,dx,dy,dw,dh,flipX,glowColor,aimX,aimY){
         theta=(flipX?Math.PI:0)-0.5;
       }
       var unit=nh/pLEN;                       // proportional to character height
-      var scLen=unit*0.65, scWid=unit*0.56;   // wider than before (less thin)
+      var scLen=unit*0.85, scWid=unit*0.60;   // longer handle
       ctx.save();
       ctx.globalAlpha=alpha;
       ctx.translate(handX,handY);
