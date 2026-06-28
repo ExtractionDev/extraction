@@ -5,8 +5,6 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY
 );
 
-const MAX_EXT_PER_SEC = 5;
-const MAX_GOLD_PER_SEC = 50;
 const RATE_LIMIT_MS = 4000;
 const _rateLimits = {};
 const VALID_ORES = ['Iron','Steel','Gold','Mithril','Adamant','Rune','Dragon'];
@@ -15,6 +13,10 @@ const VALID_RARITIES = ['Common','Uncommon','Rare','Epic','Legendary'];
 const VALID_UPS = ['speed','power','sell','luck'];
 const MAX_UP_LEVEL = 500;
 const MAX_UP_GAIN = 10;
+
+// Max values that can ever exist (sanity cap, not time-based)
+const MAX_GOLD = 9999999999;
+const MAX_TOKENS = 9999999999;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -32,20 +34,24 @@ export default async function handler(req, res) {
 
   const { data: player, error: fetchErr } = await supabase
     .from('players')
-    .select('session_token, gold, tokens, total_rocks, runs, chests, ups, ore_stash, updated_at')
+    .select('session_token, gold, tokens, total_rocks, runs, chests, ups, ore_stash')
     .eq('username', username)
     .single();
 
   if (fetchErr || !player) return res.status(403).json({ error: 'Player not found' });
   if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session token' });
 
-  const lastSaved = player.updated_at ? new Date(player.updated_at).getTime() : now - 60000;
-  const elapsedSec = Math.max(1, (now - lastSaved) / 1000);
-  const safeGold = Math.min(gold || 0, (player.gold || 0) + Math.floor(elapsedSec * MAX_GOLD_PER_SEC));
-  const safeTokens = Math.min(tokens || 0, (player.tokens || 0) + elapsedSec * MAX_EXT_PER_SEC);
+  // Simple sanity caps — never allow negative or absurd values
+  // Take the MAX of Supabase and client values (client always wins if higher)
+  const safeGold = Math.min(Math.max(0, Math.floor(gold || 0)), MAX_GOLD);
+  const safeTokens = Math.min(Math.max(0, tokens || 0), MAX_TOKENS);
+
+  // Monotonic values — can only go up
   const safeRocks = Math.max(player.total_rocks || 0, total_rocks || 0);
   const safeRuns = Math.max(player.runs || 0, runs || 0);
+  const safeChests = Math.max(player.chests || 0, chests || 0);
 
+  // Validate upgrades — can only go up, capped per save
   const safeUps = {};
   if (ups && typeof ups === 'object') {
     VALID_UPS.forEach(k => {
@@ -54,6 +60,7 @@ export default async function handler(req, res) {
     });
   }
 
+  // Validate inventory
   let safeInventory = [];
   if (Array.isArray(inventory)) {
     safeInventory = inventory.filter(item =>
@@ -63,6 +70,7 @@ export default async function handler(req, res) {
     ).slice(0, 50);
   }
 
+  // Validate ore stash — can only go up
   let safeOreStash = {};
   if (ore_stash && typeof ore_stash === 'object') {
     VALID_ORES.forEach(ore => {
@@ -74,11 +82,11 @@ export default async function handler(req, res) {
   const { error: updateErr } = await supabase
     .from('players')
     .update({
-      gold: Math.round(safeGold),
+      gold: safeGold,
       tokens: safeTokens,
       total_rocks: safeRocks,
       runs: safeRuns,
-      chests: Math.max(player.chests || 0, chests || 0),
+      chests: safeChests,
       ups: safeUps,
       ore_stash: safeOreStash,
       inventory: safeInventory,
