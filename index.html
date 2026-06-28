@@ -3115,30 +3115,42 @@ function _runDeathAnim(final,runLootItems,excMsg){
   requestAnimationFrame(deathTick);
 }
 // TEST MODE: true = Excalibur stone always spawns (for testing payout). Set false for live odds.
-var EXC_TEST_MODE=true;
+var EXC_TEST_MODE=false;
 function _placeExcalibur(){
   if(mode==='free')return;
-  // Roll ONCE for the whole dungeon: 1% at 0.02 $EXT up to 25% at 1.00 $EXT
-  var chance=Math.min(0.50, extFee/100000); // linear: 1% at 1K, 2% at 2K, 50% at 50K+
-  if(!EXC_TEST_MODE && Math.random()>chance)return; // no Excalibur this run (skipped in test mode)
-  // Pick a random rock across all floors that is not on floor 0 (too easy)
+  // Per-floor spawn chance: floor 3 = 3%, floor 4 = 4%, floor 5+ = 5%
+  // (floor index is 0-based: floor 3 = index 2, floor 4 = index 3, floor 5 = index 4)
+  function floorChance(fi){
+    var floorNum=fi+1; // convert 0-based index to 1-based floor number
+    if(floorNum<3)return 0;        // floors 1-2: no spawn
+    if(floorNum===3)return 0.03;   // floor 3: 3%
+    if(floorNum===4)return 0.04;   // floor 4: 4%
+    return 0.05;                   // floor 5+: 5%
+  }
+  // Roll each eligible floor independently; collect floors that "hit"
+  var hitFloors=[];
+  for(var fi=0;fi<dflData.length;fi++){
+    var ch=floorChance(fi);
+    if(ch<=0)continue;
+    if(EXC_TEST_MODE || Math.random()<ch)hitFloors.push(fi);
+  }
+  if(!hitFloors.length)return; // no Excalibur this run
+  // Place on ONE of the floors that hit (only one stone per run)
+  var chosenFi=EXC_TEST_MODE?hitFloors[0]:hitFloors[Math.floor(Math.random()*hitFloors.length)];
+  // Pick a ground-level rock on that floor
   var candidates=[];
-  for(var fi=1;fi<dflData.length;fi++){
-    for(var ri=0;ri<dflData[fi].rocks.length;ri++){
-      if(dflData[fi].rocks[ri].y>=DGY-20){
-        var _excBonus=dflData[fi].mod&&dflData[fi].mod.excBonus?2:1; // jackpot seam doubles weight
-        for(var _ew=0;_ew<_excBonus;_ew++)candidates.push({fi:fi,ri:ri});
-      }
+  for(var ri=0;ri<dflData[chosenFi].rocks.length;ri++){
+    if(dflData[chosenFi].rocks[ri].y>=DGY-20){
+      var _excBonus=dflData[chosenFi].mod&&dflData[chosenFi].mod.excBonus?2:1;
+      for(var _ew=0;_ew<_excBonus;_ew++)candidates.push(ri);
     }
   }
   if(!candidates.length)return;
-  var pick;
-  if(EXC_TEST_MODE){
-    pick=candidates[0]; // earliest floor — easy to find for testing
-  } else {
-    pick=candidates[Math.floor(Math.random()*candidates.length)];
-  }
-  dflData[pick.fi].rocks[pick.ri].isExcalibur=true;
+  var pickRi=EXC_TEST_MODE?candidates[0]:candidates[Math.floor(Math.random()*candidates.length)];
+  var _excRock=dflData[chosenFi].rocks[pickRi];
+  _excRock.isExcalibur=true;
+  // Lift it up so the larger golden-rock sprite doesn't clip into the floor
+  _excRock.y-=14;
 }
 function startDungeon(){
   // Must be signed in with Twitter to play
@@ -4246,32 +4258,36 @@ function dDraw(){
   }}
   for(var i=0;i<f.rocks.length;i++){var r=f.rocks[i];if(r.done)continue;var rx=r.x-dcam;if(rx<-30||rx>W+30)continue;
     if(r.isExcalibur){
-      // Excalibur Stone — large glowing rock with Ancient Pickaxe embedded in it
-      // Pulsing outer glow
+      // Golden rock with an Ancient Pickaxe embedded upside-down
       var gp=0.25+Math.sin(dtk*.1+r.x)*.18;
-      DC.globalAlpha=gp;DC.fillStyle='#c8a040';DC.beginPath();DC.arc(rx,r.y-6,30,0,Math.PI*2);DC.fill();
-      DC.globalAlpha=gp*0.5;DC.fillStyle='#FFD700';DC.beginPath();DC.arc(rx,r.y-6,38,0,Math.PI*2);DC.fill();
+      DC.globalAlpha=gp;DC.fillStyle='#FFD700';DC.beginPath();DC.arc(rx,r.y-6,30,0,Math.PI*2);DC.fill();
+      DC.globalAlpha=gp*0.5;DC.fillStyle='#ffe680';DC.beginPath();DC.arc(rx,r.y-6,38,0,Math.PI*2);DC.fill();
       DC.globalAlpha=1;
-      // Stone body — larger than normal, dark gold-veined
-      DC.fillStyle='#3a2e18';DC.beginPath();DC.moveTo(rx-20,r.y+24);DC.lineTo(rx-28,r.y+8);DC.lineTo(rx-22,r.y-8);DC.lineTo(rx-8,r.y-20);DC.lineTo(rx+8,r.y-20);DC.lineTo(rx+22,r.y-8);DC.lineTo(rx+28,r.y+8);DC.lineTo(rx+20,r.y+24);DC.closePath();DC.fill();
-      // Gold veins in rock
-      DC.strokeStyle='rgba(200,160,40,0.5)';DC.lineWidth=1;
-      DC.beginPath();DC.moveTo(rx-10,r.y);DC.lineTo(rx+5,r.y+12);DC.stroke();
-      DC.beginPath();DC.moveTo(rx+8,r.y-8);DC.lineTo(rx,r.y+6);DC.stroke();
-      DC.beginPath();DC.moveTo(rx-18,r.y+10);DC.lineTo(rx-6,r.y+20);DC.stroke();
-      // Ancient Pickaxe sprite embedded in the rock — centred
-      if(!EXCIMG){EXCIMG=new Image();EXCIMG.src='data:image/png;base64,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';}
-      if(EXCIMG.complete&&EXCIMG.naturalWidth>0){
-        DC.save();DC.globalAlpha=0.92;
-        // Rock clip so pickaxe looks embedded
-        DC.beginPath();DC.moveTo(rx-20,r.y+24);DC.lineTo(rx-28,r.y+8);DC.lineTo(rx-22,r.y-8);DC.lineTo(rx-8,r.y-20);DC.lineTo(rx+8,r.y-20);DC.lineTo(rx+22,r.y-8);DC.lineTo(rx+28,r.y+8);DC.lineTo(rx+20,r.y+24);DC.closePath();DC.clip();
-        DC.drawImage(EXCIMG,rx-18,r.y-18,36,36);
-        DC.restore();
-      }
+      // Golden rock body
+      DC.fillStyle='#d4a830';DC.beginPath();DC.moveTo(rx-20,r.y+24);DC.lineTo(rx-28,r.y+8);DC.lineTo(rx-22,r.y-8);DC.lineTo(rx-8,r.y-20);DC.lineTo(rx+8,r.y-20);DC.lineTo(rx+22,r.y-8);DC.lineTo(rx+28,r.y+8);DC.lineTo(rx+20,r.y+24);DC.closePath();DC.fill();
+      // Lighter gold facets for depth
+      DC.fillStyle='#e8c860';DC.beginPath();DC.moveTo(rx-8,r.y-20);DC.lineTo(rx+8,r.y-20);DC.lineTo(rx+4,r.y-2);DC.lineTo(rx-6,r.y-2);DC.closePath();DC.fill();
+      DC.fillStyle='#c89820';DC.beginPath();DC.moveTo(rx+8,r.y+24);DC.lineTo(rx+20,r.y+24);DC.lineTo(rx+24,r.y+6);DC.lineTo(rx+12,r.y+4);DC.closePath();DC.fill();
+      // Shine highlights
+      DC.fillStyle='rgba(255,255,240,0.6)';DC.beginPath();DC.arc(rx-6,r.y-10,2.5,0,Math.PI*2);DC.fill();
+      DC.fillStyle='rgba(255,255,240,0.4)';DC.beginPath();DC.arc(rx+8,r.y-4,1.8,0,Math.PI*2);DC.fill();
+      // Ancient Pickaxe drawn UPSIDE-DOWN, embedded in the rock
+      DC.save();
+      DC.translate(rx,r.y-2);
+      DC.rotate(Math.PI);
+      DC.strokeStyle='#6b4a28';DC.lineWidth=3.5;DC.lineCap='round';
+      DC.beginPath();DC.moveTo(0,-10);DC.lineTo(0,12);DC.stroke();
+      DC.strokeStyle='#8a5e34';DC.lineWidth=1.2;
+      DC.beginPath();DC.moveTo(0,-10);DC.lineTo(0,12);DC.stroke();
+      DC.strokeStyle='#8a7a55';DC.lineWidth=4;DC.lineCap='round';
+      DC.beginPath();DC.moveTo(-12,-14);DC.quadraticCurveTo(0,-19,12,-14);DC.stroke();
+      DC.strokeStyle='#c8b878';DC.lineWidth=2;
+      DC.beginPath();DC.moveTo(-12,-14);DC.quadraticCurveTo(0,-19,12,-14);DC.stroke();
+      DC.restore();
       // Gold rim highlight around rock edge
-      DC.strokeStyle='#c8a040';DC.lineWidth=1.5;
+      DC.strokeStyle='#fff0b0';DC.lineWidth=1.5;
       DC.beginPath();DC.moveTo(rx-20,r.y+24);DC.lineTo(rx-28,r.y+8);DC.lineTo(rx-22,r.y-8);DC.lineTo(rx-8,r.y-20);DC.lineTo(rx+8,r.y-20);DC.lineTo(rx+22,r.y-8);DC.lineTo(rx+28,r.y+8);DC.lineTo(rx+20,r.y+24);DC.closePath();DC.stroke();
-      // JACKPOT label below
+      // Label below
       DC.font='bold 8px "Space Mono"';DC.textAlign='center';
       DC.fillStyle='#FFD700';DC.fillText('EXCALIBUR',rx,r.y+36);
       DC.fillStyle='rgba(200,160,40,0.7)';DC.font='6px "Space Mono"';DC.fillText('JACKPOT STONE',rx,r.y+46);
