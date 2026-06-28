@@ -1,5 +1,6 @@
 export default async function handler(req, res) {
   const { code } = req.query;
+
   const response = await fetch('https://api.twitter.com/2/oauth2/token', {
     method: 'POST',
     headers: {
@@ -15,10 +16,26 @@ export default async function handler(req, res) {
       code_verifier: 'challenge'
     })
   });
+
   const tokens = await response.json();
+
   const userResponse = await fetch('https://api.twitter.com/2/users/me', {
     headers: { 'Authorization': `Bearer ${tokens.access_token}` }
   });
+
   const { data } = await userResponse.json();
+
+  // Create player in Supabase if they don't exist yet
+  await fetch(`${process.env.SUPABASE_URL}/rest/v1/players`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': process.env.SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`,
+      'Prefer': 'resolution=ignore-duplicates'
+    },
+    body: JSON.stringify({ username: data.username, name: data.name })
+  });
+
   res.redirect(`/?username=${data.username}&name=${data.name}`);
 }
