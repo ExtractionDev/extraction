@@ -4259,14 +4259,8 @@ function closeXAuth(){
   document.getElementById('xAuthOverlay').classList.remove('open');
 }
 function xAuthConnect(){
-  // Simulate OAuth redirect returning – in real implementation this would
-  // open twitter.com/i/oauth2/authorize and receive a callback.
-  // For now we move directly to the username pick step.
-  document.getElementById('xAuthStep1').style.display='none';
-  document.getElementById('xAuthStep2').classList.add('show');
-  document.getElementById('xAuthNameInput').value='';
-  document.getElementById('xAuthNameHint').textContent='3–18 characters, letters/numbers/underscore';
-  document.getElementById('xAuthSaveBtn').disabled=false;
+  // Redirect to real Twitter OAuth via our Vercel API
+  window.location.href='/api/twitter';
 }
 function xAuthNameInput(el){
   var v=el.value.replace(/[^a-zA-Z0-9_]/g,'');
@@ -4312,6 +4306,19 @@ function _setSignedOutUI(){
   if(btn){btn.className='home-btn-secondary home-btn-signin';}
   if(lbl){lbl.textContent='Sign In';}
 }
+// Handle Twitter OAuth callback — picks up ?username=&name= from /api/callback redirect
+(function(){
+  var _p=new URLSearchParams(window.location.search);
+  var _u=_p.get('username'),_n=_p.get('name');
+  if(_u){
+    var authData={username:_u,name:_n||_u,linkedAt:Date.now()};
+    localStorage.setItem(_xAuthKey,JSON.stringify(authData));
+    try{var gs=JSON.parse(localStorage.getItem('extraction_v1')||'{}');gs.xUsername=_u;localStorage.setItem('extraction_v1',JSON.stringify(gs));}catch(e){}
+    _setSignedInUI(_u);
+    // Clean the URL
+    window.history.replaceState({},'',window.location.pathname);
+  }
+})();
 // Init X auth state on load
 xAuthLoad();
 </script>
