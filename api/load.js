@@ -28,7 +28,7 @@ export default async function handler(req, res) {
       const won = Math.random() < WIN_CHANCE;
       if (!won) return res.status(200).json({ ok: true, won: false });
 
-      // WIN — read pool, reset it FIRST (prevents double-pay), then credit player
+      // WIN — read the current pool amount
       const poolRes = await fetch(`${process.env.SUPABASE_URL}/rest/v1/global_pool?id=eq.1&select=pool`, {
         headers: {
           'apikey': process.env.SUPABASE_ANON_KEY,
@@ -38,15 +38,29 @@ export default async function handler(req, res) {
       const poolRows = await poolRes.json();
       const wonAmount = (poolRows && poolRows.length) ? parseFloat(poolRows[0].pool) || 0 : 0;
 
-      const { error: resetErr } = await supabase.rpc('reset_pool');
-      if (resetErr) {
-        console.error('Pool reset error:', resetErr);
-        return res.status(500).json({ error: 'Payout failed, try again' });
+      if (wonAmount <= 0) {
+        return res.status(200).json({ ok: true, won: true, amount: 0, newTokens: jp.tokens || 0 });
       }
 
+      // 1. Credit the player FIRST — if this fails, pool stays intact
       const newBalance = (jp.tokens || 0) + wonAmount;
-      await supabase.from('players').update({ tokens: newBalance }).eq('username', username);
+      const { error: creditErr } = await supabase
+        .from('players')
+        .update({ tokens: newBalance })
+        .eq('username', username);
+      if (creditErr) {
+        console.error('Jackpot credit error:', creditErr);
+        return res.status(500).json({ error: 'Payout failed — pool preserved, try again' });
+      }
 
+      // 2. Only AFTER the player is paid, reset the pool
+      const { error: resetErr } = await supabase.rpc('reset_pool');
+      if (resetErr) {
+        // Player got paid but pool didn't reset — log it, but the win is valid
+        console.error('Pool reset error (player WAS paid):', resetErr);
+      }
+
+      // 3. Log the win
       await supabase.from('jackpot_wins').insert({
         username, amount: wonAmount, won_at: new Date().toISOString()
       }).catch(() => {});
