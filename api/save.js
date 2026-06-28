@@ -54,13 +54,14 @@ export default async function handler(req, res) {
     });
   }
 
+  const VALID_MATS = ['Iron','Adamant','Crystal','Myatrile','Ancient','Copper','Steel','Obsidian','Dragonscale','Tin','Silver','Gold','Ruby','Voidstone','Bone','Sapphire','Ethereal','Linen','Chainmail','Plate','Shadowweave','Leather','Voidwalker','Slime','Bat','Fox','Drake','Phoenix'];
   // Validate inventory
   let safeInventory = [];
   if (Array.isArray(inventory)) {
     safeInventory = inventory.filter(item =>
       item &&
-      VALID_ORES.includes(item.mat) &&
-      VALID_TYPES.includes(item.type) &&
+      VALID_MATS.includes(item.mat) &&
+      item.type &&
       VALID_RARITIES.includes(item.rarN)
     ).slice(0, 50);
   }
