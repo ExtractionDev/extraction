@@ -2092,18 +2092,15 @@ var _ASSOC_PROG='ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe1bRS';
 async function _getSolanaConn(){
   var rpcs=[
     'https://rpc.ankr.com/solana',
-    'https://mainnet.helius-rpc.com/?api-key=public',
-    'https://solana-mainnet.g.alchemy.com/v2/public',
     'https://api.mainnet-beta.solana.com'
   ];
   for(var i=0;i<rpcs.length;i++){
     try{
-      var c=new solanaWeb3.Connection(rpcs[i],'confirmed');
-      await c.getLatestBlockhash();
+      var c=new solanaWeb3.Connection(rpcs[i],{commitment:'confirmed',disableRetryOnRateLimit:false});
       return c;
-    }catch(e){console.warn('RPC failed:',rpcs[i],e.message);}
+    }catch(e){console.warn('RPC init failed:',rpcs[i],e.message);}
   }
-  throw new Error('All Solana RPC endpoints failed. Check your connection and try again.');
+  return new solanaWeb3.Connection('https://api.mainnet-beta.solana.com','confirmed');
 }
 function _getATA(walletPk,mintPk){
   return solanaWeb3.PublicKey.findProgramAddressSync(
@@ -2128,7 +2125,13 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
   var btn=document.getElementById('ubtn_'+lid);
   try{
     if(btn){btn.disabled=true;btn.textContent='Sending...';}
-    var conn=await _getSolanaConn();
+    var _rpcs=['https://rpc.ankr.com/solana','https://api.mainnet-beta.solana.com'];
+    var conn=null,bh=null;
+    for(var _ri=0;_ri<_rpcs.length;_ri++){
+      try{conn=new solanaWeb3.Connection(_rpcs[_ri],'confirmed');bh=await conn.getLatestBlockhash('confirmed');break;}
+      catch(e){console.warn('RPC blockhash failed:',_rpcs[_ri],e.message);conn=null;bh=null;}
+    }
+    if(!bh)throw new Error('Network busy — please try again in a few seconds.');
     var buyerPk=new solanaWeb3.PublicKey(walletAddress);
     var sellerPk=new solanaWeb3.PublicKey(sellerWallet);
     var devPk=new solanaWeb3.PublicKey(_DEV_WALLET);
@@ -2143,7 +2146,6 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
     tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
     tx.add(_usdcIx(buyerATA,devATA,buyerPk,devUnits));
     tx.feePayer=buyerPk;
-    var bh=await conn.getLatestBlockhash();
     tx.recentBlockhash=bh.blockhash;
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
     var signed=await provider.signAndSendTransaction(tx);
@@ -2383,7 +2385,13 @@ async function buyOreWithUSDC(lid,sellerWallet,pricePerUnit,qty){
   var btn=document.getElementById('orebtn_'+lid);
   try{
     if(btn){btn.disabled=true;btn.textContent='Sending...';}
-    var conn=await _getSolanaConn();
+    var _rpcs=['https://rpc.ankr.com/solana','https://api.mainnet-beta.solana.com'];
+    var conn=null,bh=null;
+    for(var _ri=0;_ri<_rpcs.length;_ri++){
+      try{conn=new solanaWeb3.Connection(_rpcs[_ri],'confirmed');bh=await conn.getLatestBlockhash('confirmed');break;}
+      catch(e){console.warn('RPC blockhash failed:',_rpcs[_ri],e.message);conn=null;bh=null;}
+    }
+    if(!bh)throw new Error('Network busy — please try again in a few seconds.');
     var buyerPk=new solanaWeb3.PublicKey(walletAddress);
     var sellerPk=new solanaWeb3.PublicKey(sellerWallet);
     var devPk=new solanaWeb3.PublicKey(_DEV_WALLET);
@@ -2398,7 +2406,6 @@ async function buyOreWithUSDC(lid,sellerWallet,pricePerUnit,qty){
     tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
     tx.add(_usdcIx(buyerATA,devATA,buyerPk,devUnits));
     tx.feePayer=buyerPk;
-    var bh=await conn.getLatestBlockhash();
     tx.recentBlockhash=bh.blockhash;
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
     var signed=await provider.signAndSendTransaction(tx);
