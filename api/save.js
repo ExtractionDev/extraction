@@ -1,8 +1,18 @@
+// Rate limiting — max 1 save per 4 seconds per user
+const _rateLimits = {};
+
 export default async function handler(req, res) {
   if(req.method !== 'POST') return res.status(405).end();
   
   const { username, token, data } = req.body;
   if(!username || !token || !data) return res.status(400).json({ error: 'Missing data' });
+
+  // Rate limit check
+  const now = Date.now();
+  if(_rateLimits[username] && now - _rateLimits[username] < 4000) {
+    return res.status(429).json({ error: 'Too many requests' });
+  }
+  _rateLimits[username] = now;
 
   // Fetch current server state
   const currentRes = await fetch(
@@ -12,7 +22,6 @@ export default async function handler(req, res) {
   const rows = await currentRes.json();
   const current = rows[0];
 
-  // SECURITY: Reject if no player found
   if(!current) return res.status(403).json({ error: 'Player not found' });
 
   // SECURITY: Validate session token
@@ -45,7 +54,7 @@ export default async function handler(req, res) {
   const safeRocks = Math.max(current.total_rocks || 0, data.totalRocks || 0);
   const safeRuns = Math.max(current.runs || 0, data.runs || 0);
 
-  // SECURITY: Validate inventory items (no fake legendaries)
+  // SECURITY: Validate inventory items
   const VALID_MATS = ['Iron','Steel','Gold','Mithril','Adamant','Rune','Dragon'];
   const VALID_TYPES = ['Pickaxe'];
   const VALID_RARS = ['Common','Uncommon','Rare','Epic','Legendary'];
