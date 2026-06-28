@@ -3210,18 +3210,22 @@ function _placeExcalibur(){
   }
   var fl=dflData[targetFi];if(!fl)return;
   var spikes=fl.spikes||[];var torches=fl.torches||[];var rocks=fl.rocks||[];
-  // Try to find a clear x on the main ground (DGY) — scan in steps, avoid rocks/spikes/torches
+  // Only use ground-level platforms (y===DGY) so crystal is never over a gap
+  var groundPlats=fl.plats.filter(function(p){return p.y===DGY&&p.w>80;});
+  if(!groundPlats.length)return;
   var clearX=null;
-  var attempts=[300,400,500,600,250,550,450,350,650,200];
-  for(var ai=0;ai<attempts.length;ai++){
-    var cx=attempts[ai];var ok=true;
-    for(var ri=0;ri<rocks.length;ri++){if(!rocks[ri].done&&Math.abs(rocks[ri].x-cx)<70)ok=false;}
-    for(var si=0;si<spikes.length;si++){if(Math.abs(spikes[si].x-cx)<80)ok=false;}
-    for(var ti=0;ti<torches.length;ti++){if(Math.abs(torches[ti].x-cx)<80)ok=false;}
-    if(ok){clearX=cx;break;}
+  // Try each ground platform, scan for a clear interior spot
+  for(var pi=0;pi<groundPlats.length&&clearX===null;pi++){
+    var gp=groundPlats[pi];
+    for(var step=40;step<gp.w-40;step+=20){
+      var cx=gp.x+step;var ok=true;
+      for(var ri=0;ri<rocks.length;ri++){if(!rocks[ri].done&&Math.abs(rocks[ri].x-cx)<70)ok=false;}
+      for(var si=0;si<spikes.length;si++){if(Math.abs(spikes[si].x-cx)<80)ok=false;}
+      for(var ti=0;ti<torches.length;ti++){if(Math.abs(torches[ti].x-cx)<80)ok=false;}
+      if(ok){clearX=cx;break;}
+    }
   }
-  if(clearX===null)clearX=750; // fallback far right
-  // Push a new rock object at ground level — no y offset adjustment needed
+  if(clearX===null)return; // no safe spot found this run
   fl.rocks.push({x:clearX,y:DGY-9,done:false,ore:{n:'Coal',v:1,c:'#666',tc:'#888',ch:1},nodeMulti:1,isExcalibur:true,hp:3,hitT:0});
 }
 function startDungeon(){
@@ -4340,7 +4344,7 @@ function dDraw(){
   for(var i=0;i<f.rocks.length;i++){var r=f.rocks[i];if(r.done)continue;var rx=r.x-dcam;if(rx<-30||rx>W+30)continue;
     if(r.isExcalibur){
       var iw=64,ih=80;
-      var _cy=r.y-ih+20; // sink slightly into ground
+      var _cy=r.y-ih+36; // embed crystal base into ground ground
       var _pulse=0.18+Math.sin(dtk*.08+r.x)*.06;
       // Outer wide glow
       var _gr2=DC.createRadialGradient(rx,_cy+ih*0.35,0,rx,_cy+ih*0.35,iw*2.2);
