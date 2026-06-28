@@ -1411,6 +1411,11 @@ function checkAchieves(){
 
 // ── Save / Load ────────────────────────────────────────────────────────────
 var _saveKey='extraction_v1';
+function _getSaveKey(){
+  // If signed in, save is keyed to their Twitter username
+  try{var _xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');if(_xd&&_xd.username)return'extraction_v1_'+_xd.username;}catch(e){}
+  return _saveKey; // fallback for guests (but they can't play anyway)
+}
 function saveGame(){
   try{
     var data={gold:gold,tokens:tokens,totalRocks:totalRocks,runs:runs,chests:chests,ups:ups,excPool:excPool,extBurned:extBurned,devCut:devCut,
@@ -1419,7 +1424,12 @@ function saveGame(){
       eqSlots:{pickaxe:equippedSlots.pickaxe?equippedSlots.pickaxe.id:null,head:equippedSlots.head?equippedSlots.head.id:null,ring:equippedSlots.ring?equippedSlots.ring.id:null,amulet:equippedSlots.amulet?equippedSlots.amulet.id:null},
       gameStats:gameStats,_achiev:_achiev
     };
-    localStorage.setItem(_saveKey,JSON.stringify(data));
+    // Save to localStorage as backup
+    localStorage.setItem(_getSaveKey(),JSON.stringify(data));
+    // Save to Supabase if signed in
+    try{var _xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');if(_xd&&_xd.username){
+      fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:_xd.username,data:data})});
+    }}catch(e){}
   }catch(e){}
 }
 function _relinkItem(raw){
@@ -1430,7 +1440,7 @@ function _relinkItem(raw){
 }
 function loadGame(){
   try{
-    var s=localStorage.getItem(_saveKey);if(!s){
+    var s=localStorage.getItem(_getSaveKey());if(!s){
       tokens=100000; // TEST: 100K EXT on fresh start (revert: remove this line)
       // Fresh game — start with an Iron (Common) pickaxe already equipped (+1% mining speed)
       var starter={id:'starter',slot:'pickaxe',slotIcon:'ti-pickaxe',mat:'Iron',type:'Pickaxe',
@@ -2637,6 +2647,8 @@ function _placeExcalibur(){
   dflData[pick.fi].rocks[pick.ri].isExcalibur=true;
 }
 function startDungeon(){
+  // Must be signed in with Twitter to play
+  try{var _xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');if(!_xd||!_xd.username){openXAuth();return;}}catch(e){openXAuth();return;}
   if(mode==='free'){
     var left=getFreeUsesLeft();
     if(left<=0){alert('No free runs left today! Come back tomorrow or spend $EXT to enter.');return;}
@@ -4299,6 +4311,20 @@ function _setSignedInUI(username){
   var lbl=document.getElementById('homeSignInLabel');
   if(btn){btn.className='home-btn-secondary home-btn-signin signedin';}
   if(lbl){lbl.textContent='@'+username;}
+  // Try loading from Supabase first, fall back to localStorage
+  fetch('/api/load?username='+username)
+    .then(function(r){return r.ok?r.json():null;})
+    .then(function(d){
+      if(d){
+        // Map Supabase columns back to game format
+        var mapped={gold:d.gold,tokens:d.tokens,totalRocks:d.total_rocks,runs:d.runs,chests:d.chests,
+          ups:d.ups,oreStash:d.ore_stash,inventory:d.inventory,eqSlots:d.equipped_slots,
+          gameStats:d.game_stats,_achiev:d.achievements};
+        localStorage.setItem(_getSaveKey(),JSON.stringify(mapped));
+      }
+      loadGame();uiAll();
+    })
+    .catch(function(){loadGame();uiAll();});
 }
 function _setSignedOutUI(){
   var btn=document.getElementById('homeSignInBtn');
