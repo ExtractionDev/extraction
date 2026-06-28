@@ -4350,7 +4350,18 @@ function dDraw(){
     if(r.isExcalibur){
       var iw=64,ih=80;
       var _cy=r.y-ih+36;
-      var _pulse=0.32+Math.sin(dtk*.08+r.x)*.10;
+      // Single circular pulsing light — full canvas height rect so it NEVER clips at top
+      var _glowCX=rx,_glowCY=_cy+ih*0.38;
+      var _glowR=180+Math.sin(dtk*.06+r.x)*18;
+      var _pulse=0.30+Math.sin(dtk*.08+r.x)*0.10;
+      var _glowGrd=DC.createRadialGradient(_glowCX,_glowCY,0,_glowCX,_glowCY,_glowR);
+      _glowGrd.addColorStop(0,'rgba(210,250,255,'+(_pulse*0.95).toFixed(3)+')');
+      _glowGrd.addColorStop(0.15,'rgba(0,225,255,'+(_pulse*0.80).toFixed(3)+')');
+      _glowGrd.addColorStop(0.40,'rgba(0,185,255,'+(_pulse*0.35).toFixed(3)+')');
+      _glowGrd.addColorStop(0.70,'rgba(0,140,220,'+(_pulse*0.10).toFixed(3)+')');
+      _glowGrd.addColorStop(1,'rgba(0,100,180,0)');
+      DC.fillStyle=_glowGrd;
+      DC.fillRect(_glowCX-_glowR-10,0,(_glowR+10)*2,400);
       // Draw ice particles (updated in main loop)
       for(var _ip=0;_ip<_excIceParts.length;_ip++){
         var _p=_excIceParts[_ip];
@@ -4361,18 +4372,6 @@ function dDraw(){
         DC.beginPath();DC.arc(_px,_p.y,Math.max(0.5,_p.r),0,6.28);DC.fill();
       }
       DC.globalAlpha=1;
-      // Outer wide glow
-      var _gr2=DC.createRadialGradient(rx,_cy+ih*0.35,0,rx,_cy+ih*0.35,iw*2.8);
-      _gr2.addColorStop(0,'rgba(0,220,255,'+(_pulse*0.80).toFixed(3)+')');
-      _gr2.addColorStop(0.4,'rgba(0,180,255,'+(_pulse*0.35).toFixed(3)+')');
-      _gr2.addColorStop(1,'rgba(0,120,200,0)');
-      DC.fillStyle=_gr2;DC.fillRect(rx-iw*3,_cy-ih*0.9,iw*6,ih*3);
-      // Bright inner core
-      var _gr=DC.createRadialGradient(rx,_cy+ih*0.35,0,rx,_cy+ih*0.35,iw*1.0);
-      _gr.addColorStop(0,'rgba(200,250,255,'+(_pulse*1.0).toFixed(3)+')');
-      _gr.addColorStop(0.35,'rgba(0,220,255,'+(_pulse*0.75).toFixed(3)+')');
-      _gr.addColorStop(1,'rgba(0,180,255,0)');
-      DC.fillStyle=_gr;DC.fillRect(rx-iw*2,_cy-ih*0.6,iw*4,ih*2.4);
       if(_excImg.complete&&_excImg.naturalWidth>0){
         DC.drawImage(_excImg,rx-iw/2,_cy,iw,ih);
       }
