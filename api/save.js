@@ -54,16 +54,13 @@ export default async function handler(req, res) {
     });
   }
 
-  const VALID_MATS = ['Iron','Adamant','Crystal','Myatrile','Ancient','Copper','Steel','Obsidian','Dragonscale','Tin','Silver','Gold','Ruby','Voidstone','Bone','Sapphire','Ethereal','Linen','Chainmail','Plate','Shadowweave','Leather','Voidwalker','Slime','Bat','Fox','Drake','Phoenix'];
-  // Validate inventory
+  // Store inventory — sanitize structure but don't drop items by material whitelist
+  // (whitelists are fragile and silently delete valid gear). Session token already verified.
   let safeInventory = [];
   if (Array.isArray(inventory)) {
-    safeInventory = inventory.filter(item =>
-      item &&
-      VALID_MATS.includes(item.mat) &&
-      item.type &&
-      VALID_RARITIES.includes(item.rarN)
-    ).slice(0, 50);
+    safeInventory = inventory
+      .filter(item => item && item.id && item.mat && item.type && item.rarN)
+      .slice(0, 50);
   }
 
   // Ore stash — can only go up
