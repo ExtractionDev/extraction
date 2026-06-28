@@ -3123,7 +3123,12 @@ function _placeExcalibur(){
     }
   }
   if(!candidates.length)return;
-  var pick=candidates[Math.floor(Math.random()*candidates.length)];
+  var pick;
+  if(EXC_TEST_MODE){
+    pick=candidates[0]; // earliest floor — easy to find for testing
+  } else {
+    pick=candidates[Math.floor(Math.random()*candidates.length)];
+  }
   dflData[pick.fi].rocks[pick.ri].isExcalibur=true;
 }
 function startDungeon(){
