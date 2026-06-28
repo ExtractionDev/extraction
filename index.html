@@ -4813,27 +4813,34 @@ function _setSignedInUI(username){
   var _localData=null;
   try{_localData=JSON.parse(localStorage.getItem(_localKey)||'null');}catch(e){}
   if(_localData){
-    // We have local data — use it immediately, never let Supabase overwrite with lower values
+    // We have local data — use it immediately
     loadGame();uiAll();
-    // Only sync from Supabase if it has MORE progress than local (protects against data wipe)
+    // Sync tokens/gold from Supabase if higher, but NEVER overwrite local inventory or equipment
+    // Items only move via explicit actions (buy, loot, withdraw) which force-save immediately
     fetch('/api/load?username='+username)
       .then(function(r){return r.ok?r.json():null;})
       .then(function(d){
         if(d&&d.updated_at){
-          var _sbGold=d.gold||0;
           var _sbTokens=d.tokens||0;
-          var _localGold=_localData.gold||0;
+          var _sbGold=d.gold||0;
           var _localTokens=_localData.tokens||0;
-          // Count items in local vs Supabase — never overwrite if local has more items
-          var _localItems=(_localData.inventory||[]).length+Object.values(_localData.eqSlots||{}).filter(Boolean).length;
-          var _sbItems=(d.inventory||[]).length+Object.values(d.equipped_slots||{}).filter(Boolean).length;
-          // Only use Supabase if it has MORE tokens/gold AND at least as many items
-          if((_sbTokens>_localTokens||(_sbGold>_localGold&&_sbTokens>=_localTokens))&&_sbItems>=_localItems){
-            var mapped={gold:d.gold,tokens:d.tokens,totalRocks:d.total_rocks,runs:d.runs,chests:d.chests,
-              ups:d.ups,oreStash:d.ore_stash,inventory:d.inventory,eqSlots:d.equipped_slots,
-              gameStats:d.game_stats,_achiev:d.achievements,lastSaved:new Date(d.updated_at).getTime()};
-            localStorage.setItem(_localKey,JSON.stringify(mapped));
-            loadGame();uiAll();
+          var _localGold=_localData.gold||0;
+          if(_sbTokens>_localTokens||(_sbGold>_localGold&&_sbTokens>=_localTokens)){
+            // Only update tokens/gold/stats — keep local inventory and equipment untouched
+            var _cur=null;
+            try{_cur=JSON.parse(localStorage.getItem(_localKey)||'null');}catch(e){}
+            if(_cur){
+              _cur.tokens=_sbTokens;
+              _cur.gold=_sbGold;
+              _cur.totalRocks=d.total_rocks||_cur.totalRocks;
+              _cur.runs=d.runs||_cur.runs;
+              _cur.chests=d.chests||_cur.chests;
+              _cur.ups=d.ups||_cur.ups;
+              _cur.gameStats=d.game_stats||_cur.gameStats;
+              _cur._achiev=d.achievements||_cur._achiev;
+              localStorage.setItem(_localKey,JSON.stringify(_cur));
+              loadGame();uiAll();
+            }
           }
         }
       }).catch(function(){});
