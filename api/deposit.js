@@ -18,7 +18,7 @@ export default async function handler(req, res) {
 
   // Rate limit: 1 deposit request per 10 minutes
   const now = Date.now();
-  if (_rateLimits[username] && now - _rateLimits[username] < 600000) {
+  if (_rateLimits[username] && now - _rateLimits[username] < 60000) {
     return res.status(429).json({ error: 'Please wait before submitting another deposit.' });
   }
   _rateLimits[username] = now;
