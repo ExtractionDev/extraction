@@ -2824,27 +2824,34 @@ function dMine(){
     if(!r.done&&_rdist<30){var ore=r.ore;
     if(r.isExcalibur){
       r.done=true;
-      var jackpotChancePull=0.01;
       dtoasts.push({x:r.x,y:r.y-20,t:'⚔ EXCALIBUR STONE!',c:'#FFD700',life:90});
       sndRareBreak();sndPickaxeDrop();
-      if(Math.random()<jackpotChancePull){
-        var wonPool=excPool;
-        tokens+=wonPool;
-        var legRar=RARS[RARS.length-1];
-        var legAffixes=_buildAffixes(legRar);
-        var legPrice=Math.floor(9500*(0.85+Math.random()*0.3));
-        var jItem={mat:'Ancient',type:'Pickaxe',slot:'pickaxe',slotIcon:'ti-pickaxe',rar:legRar,affixes:legAffixes,price:legPrice,id:Math.random().toString(36).substr(2,8)};
-        if(inventory.length<20)inventory.push(jItem);
-        chests++;
-        excPool=0;
-        var _wins=JSON.parse(localStorage.getItem('excJackpotWins')||'[]');
-        _wins.push({amount:wonPool,ts:new Date().toISOString(),wallet:window._solWallet||'unknown'});
-        localStorage.setItem('excJackpotWins',JSON.stringify(_wins));
-        saveGame();renderBackpack();updExt();uiAll();
-        excMsg='⚔ JACKPOT! You won '+wonPool.toFixed(3)+' $EXT + Ancient Legendary Pickaxe!';
-        dtoasts.push({x:r.x,y:r.y-50,t:'💰 JACKPOT! +'+wonPool.toFixed(1)+' $EXT',c:'#FFD700',life:120});
-        dtoasts.push({x:r.x,y:r.y-80,t:'⛏ ANCIENT PICKAXE!',c:'#c8a040',life:120});
-        dFlash=30;dShake=15;
+      // Server decides the win — client cannot fake a payout
+      var _xdJ=_getAuth();
+      if(_xdJ&&_xdJ.username){
+        fetch('/api/load',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({action:'jackpot',username:_xdJ.username,token:_xdJ.token||''})
+        }).then(function(r2){return r2.json();}).then(function(d){
+          if(d&&d.won){
+            var wonPool=d.amount||0;
+            if(typeof d.newTokens==='number')tokens=d.newTokens; // server truth
+            globalPool=0; // pool was reset server-side
+            // Award the Ancient Legendary pickaxe
+            var legRar=RARS[RARS.length-1];
+            var legAffixes=_buildAffixes(legRar);
+            var legPrice=Math.floor(9500*(0.85+Math.random()*0.3));
+            var jItem={mat:'Ancient',type:'Pickaxe',slot:'pickaxe',slotIcon:'ti-pickaxe',rar:legRar,affixes:legAffixes,price:legPrice,id:Math.random().toString(36).substr(2,8)};
+            if(inventory.length<20)inventory.push(jItem);
+            chests++;
+            saveGame(true);renderBackpack();updExt();uiAll();_fetchGlobalPool();
+            excMsg='⚔ JACKPOT! You won '+wonPool.toFixed(3)+' $EXT + Ancient Legendary Pickaxe!';
+            dtoasts.push({x:r.x,y:r.y-50,t:'💰 JACKPOT! +'+wonPool.toFixed(1)+' $EXT',c:'#FFD700',life:120});
+            dtoasts.push({x:r.x,y:r.y-80,t:'⛏ ANCIENT PICKAXE!',c:'#c8a040',life:120});
+            dFlash=30;dShake=15;
+          } else {
+            excMsg='⚔ Excalibur Stone mined — no jackpot this time!';
+          }
+        }).catch(function(){excMsg='⚔ Excalibur mined, but payout check failed. Try again.';});
       }
       var excVal=Math.round(ore.v*(r.nodeMulti||1)*(mode==='free'?1:(1+19*(Math.log10(extFee)-3)/2))*10);
       if(dfl>=5)excVal*=2;
@@ -3098,11 +3105,13 @@ function _runDeathAnim(final,runLootItems,excMsg){
   }
   requestAnimationFrame(deathTick);
 }
+// TEST MODE: true = Excalibur stone always spawns (for testing payout). Set false for live odds.
+var EXC_TEST_MODE=true;
 function _placeExcalibur(){
   if(mode==='free')return;
   // Roll ONCE for the whole dungeon: 1% at 0.02 $EXT up to 25% at 1.00 $EXT
   var chance=Math.min(0.50, extFee/100000); // linear: 1% at 1K, 2% at 2K, 50% at 50K+
-  if(Math.random()>chance)return; // no Excalibur this run
+  if(!EXC_TEST_MODE && Math.random()>chance)return; // no Excalibur this run (skipped in test mode)
   // Pick a random rock across all floors that is not on floor 0 (too easy)
   var candidates=[];
   for(var fi=1;fi<dflData.length;fi++){
