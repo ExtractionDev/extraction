@@ -4824,8 +4824,11 @@ function _setSignedInUI(username){
           var _sbTokens=d.tokens||0;
           var _localGold=_localData.gold||0;
           var _localTokens=_localData.tokens||0;
-          // Only use Supabase if it has MORE gold AND tokens — never downgrade
-          if(_sbTokens>_localTokens||(_sbGold>_localGold&&_sbTokens>=_localTokens)){
+          // Count items in local vs Supabase — never overwrite if local has more items
+          var _localItems=(_localData.inventory||[]).length+Object.values(_localData.eqSlots||{}).filter(Boolean).length;
+          var _sbItems=(d.inventory||[]).length+Object.values(d.equipped_slots||{}).filter(Boolean).length;
+          // Only use Supabase if it has MORE tokens/gold AND at least as many items
+          if((_sbTokens>_localTokens||(_sbGold>_localGold&&_sbTokens>=_localTokens))&&_sbItems>=_localItems){
             var mapped={gold:d.gold,tokens:d.tokens,totalRocks:d.total_rocks,runs:d.runs,chests:d.chests,
               ups:d.ups,oreStash:d.ore_stash,inventory:d.inventory,eqSlots:d.equipped_slots,
               gameStats:d.game_stats,_achiev:d.achievements,lastSaved:new Date(d.updated_at).getTime()};
