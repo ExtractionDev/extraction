@@ -2761,6 +2761,7 @@ var dPickHeadWorld=null; // {x,y} world-coords of pickaxe head tip — updated e
 var dDeathParts=[];   // enemy death particles {x,y,vx,vy,life,maxLife,c,r}
 var dChips=[];        // rock chip particles {x,y,vx,vy,life,maxLife,c}
 var dAmbientParts=[]; // ambient dust/ember motes {x,y,vx,vy,life,maxLife,r,c}
+var _excIceParts=[]; // ice particles floating around the excalibur stone
 var dHitPause=0;      // frames to freeze when landing a hit (juice)
 var fogCv=null,fogCtx=null; // offscreen canvas for fog-of-war darkness mask
 var dCombo=0,dComboTimer=0,dBestCombo=0;
@@ -3264,7 +3265,7 @@ function startDungeon(){
   _deathPenaltyActive=false;_descPending=false;
   dp={x:40,y:DGY-30,vx:0,vy:0,w:18,h:26,gnd:false,onThin:false,face:1,hp:100,inv:0,spkCd:0,dropT:0,pullSt:0,jumps:0,coyoteT:0,jumpCharge:0,chargedJump:false,burnTicks:0,burnTimer:0};
   dcam=0;dbag={};dcoins=0;dtoasts=[];dtk=0;dRunning=true;DK={l:0,r:0,jumpHeld:false};dRockBreaks=[];
-  dProjectiles=[];dDeathParts=[];dChips=[];dAmbientParts=[];dHitPause=0;dCombo=0;dComboTimer=0;dBestCombo=0;dRunKills=0;dRunRocksMined=0;dRunStartTime=Date.now();dDamageTaken=0;dFloorTransition=40;
+  dProjectiles=[];dDeathParts=[];dChips=[];dAmbientParts=[];_excIceParts=[];dHitPause=0;dCombo=0;dComboTimer=0;dBestCombo=0;dRunKills=0;dRunRocksMined=0;dRunStartTime=Date.now();dDamageTaken=0;dFloorTransition=40;
   dDeathAnim=0;dDeathDone=false;dAnim={frame:0,timer:0,state:'idle'};
   // Init minimap
   if(!mmcv){mmcv=document.getElementById('mmcv');if(mmcv)MMC=mmcv.getContext('2d');}
