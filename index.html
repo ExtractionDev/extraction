@@ -1636,7 +1636,9 @@ setInterval(saveGame,20000);
 function _fetchGlobalPool(){
   fetch('/api/load?pool=1')
     .then(function(r){return r.ok?r.json():null;})
-    .then(function(d){if(d&&typeof d.pool==='number'){globalPool=d.pool;updExcPool();}})
+    .then(function(d){if(d&&typeof d.pool==='number'){globalPool=d.pool;updExcPool();
+      var hj=document.getElementById('homeJackpotAmt');if(hj)hj.textContent=globalPool.toFixed(3)+' $EXT';
+    }})
     .catch(function(){});
 }
 _fetchGlobalPool();
@@ -3118,13 +3120,29 @@ function startDungeon(){
     if(left<=0){alert('No free runs left today! Come back tomorrow or spend $EXT to enter.');return;}
     useFreeRun();updFreeLabel();
   } else {
-    // Entry fee paid in $EXT — 80% to prize pool, 10% burned, 10% to dev (simulated; on-chain would be a contract)
+    // Entry fee paid in $EXT — 80% to shared prize pool, 20% removed (burn + dev)
     if(tokens<extFee){alert('Not enough $EXT — you need '+(extFee>=1000?(extFee/1000).toFixed(extFee%1000===0?0:1)+'K':extFee)+' $EXT to enter. Mine more with your idle miner, or lower the entry fee.');return;}
+    var _xd2=_getAuth();
+    if(!_xd2||!_xd2.username){openXAuth();return;}
+    // Deduct locally for instant feedback
     tokens-=extFee;
-    excPool+=extFee*0.80;
     extBurned+=extFee*0.10;
     devCut+=extFee*0.10;
-    updExcPool();saveGame();uiAll();
+    uiAll();
+    // Send fee to server: 80% into shared global pool, 20% removed
+    fetch('/api/load',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:_xd2.username,token:_xd2.token||'',entryFee:extFee})
+    }).then(function(r){return r.json();}).then(function(d){
+      if(d&&d.ok){
+        if(typeof d.newTokens==='number')tokens=d.newTokens; // sync to server truth
+        _fetchGlobalPool(); // refresh shared pool display
+      } else if(d&&d.error){
+        // Server rejected — refund locally
+        tokens+=extFee;extBurned-=extFee*0.10;devCut-=extFee*0.10;uiAll();
+        alert('Entry failed: '+d.error);
+      }
+    }).catch(function(){});
+    saveGame();
   }
   dGameOver=false;excMsg=null;cavMusicStart();dBuildFloors();_placeExcalibur();dfl=0;
   _deathPenaltyActive=false;_descPending=false;
