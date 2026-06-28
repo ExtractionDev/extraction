@@ -1570,7 +1570,7 @@ function loadGame(){
       var _offSecs=Math.min((Date.now()-d.lastSaved)/1000, 8*3600);
       var _offRate=getSell()*getSpd()/60; // EXT per second
       var _offEarned=_offSecs*_offRate;
-      if(_offEarned>0){tokens+=_offEarned;showAchieve('⛏️','Welcome back!','Offline earnings: +'+_offEarned.toFixed(4)+' $EXT');}
+      if(_offEarned>0){tokens+=_offEarned;excPool+=_offEarned*0.1;showAchieve('⛏️','Welcome back!','Offline earnings: +'+_offEarned.toFixed(4)+' $EXT');}
     }
   }catch(e){console.warn('Load failed',e);}
 }
@@ -2200,7 +2200,7 @@ function mHitRock(){
   var d=getPow();mRockHP-=d;mSwAnim=14;if(activeTab===2)sndMineHit();
   for(var i=0;i<3;i++)mParts.push({x:340+Math.random()*14-7,y:MGY-25+Math.random()*14-7,vx:(Math.random()-.5)*3,vy:-1.5-Math.random()*2.5,life:16+Math.random()*8,c:['#3a3440','#4a4450','#2e2838'][i],s:2+Math.random()*2});
   var pct=1-mRockHP/mRockMax;for(var i=0;i<mCracks.length;i++)if(!mCracks[i].on&&pct>(i+1)*.12)mCracks[i].on=true;
-  if(mRockHP<=0){mRockHP=0;var tv=getSell()*mRockType.multi;tokens+=tv;totalRocks++;if(activeTab===2){if(mRockType.multi>1)sndRareBreak();else sndRockBreak();}
+  if(mRockHP<=0){mRockHP=0;var tv=getSell()*mRockType.multi;tokens+=tv;excPool+=tv*0.1;totalRocks++;if(activeTab===2){if(mRockType.multi>1)sndRareBreak();else sndRockBreak();}
     saveGame(); // save immediately so EXT isn't lost on refresh
     // Confirm multi payouts: Silver=3x, Gold=5x, Mystrile=25x
     for(var i=0;i<12;i++)mParts.push({x:340+Math.random()*50-25,y:MGY-25+Math.random()*40-20,vx:(Math.random()-.5)*7,vy:-2-Math.random()*5,life:25+Math.random()*18,c:['#4a4450','#5a5460','#c8a040','#3a3440','#6050a0'][Math.floor(Math.random()*5)],s:2+Math.random()*4});
