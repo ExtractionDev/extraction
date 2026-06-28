@@ -4342,12 +4342,8 @@ function dDraw(){
       // Draw the crystal hammer image centred on the rock
       var iw=64,ih=80;
       if(_excImg.complete&&_excImg.naturalWidth>0){
-        DC.drawImage(_excImg,rx-iw/2,r.y-ih+10,iw,ih);
+        DC.drawImage(_excImg,rx-iw/2,r.y-ih,iw,ih);
       }
-      // Label below
-      DC.font='bold 8px "Space Mono"';DC.textAlign='center';
-      DC.fillStyle='#00cfff';DC.fillText('EXCALIBUR',rx,r.y+20);
-      DC.fillStyle='rgba(0,180,220,0.7)';DC.font='6px "Space Mono"';DC.fillText('JACKPOT STONE',rx,r.y+30);
       continue;
     }
     // Normal rocks — idle-miner sprites per ore type, glowing ore-colour circle behind
