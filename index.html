@@ -4700,7 +4700,7 @@ function _setSignedInUI(username){
           var _localGold=_localData.gold||0;
           var _localTokens=_localData.tokens||0;
           // Only use Supabase if it has MORE gold AND tokens — never downgrade
-          if(_sbGold>_localGold&&_sbTokens>=_localTokens){
+          if(_sbTokens>_localTokens||(_sbGold>_localGold&&_sbTokens>=_localTokens)){
             var mapped={gold:d.gold,tokens:d.tokens,totalRocks:d.total_rocks,runs:d.runs,chests:d.chests,
               ups:d.ups,oreStash:d.ore_stash,inventory:d.inventory,eqSlots:d.equipped_slots,
               gameStats:d.game_stats,_achiev:d.achievements,lastSaved:new Date(d.updated_at).getTime()};
