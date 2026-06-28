@@ -3200,7 +3200,6 @@ function _runDeathAnim(final,runLootItems,excMsg){
 var EXC_TEST_MODE=true;
 function _placeExcalibur(){
   if(mode==='free')return;
-  // TEST MODE: always place Excalibur on floor 1 (index 0)
   var targetFi=EXC_TEST_MODE?0:null;
   if(!EXC_TEST_MODE){
     function floorChance(fi){var floorNum=fi+1;if(floorNum<3)return 0;if(floorNum===3)return 0.03;if(floorNum===4)return 0.04;return 0.05;}
@@ -3209,15 +3208,21 @@ function _placeExcalibur(){
     if(!hitFloors.length)return;
     targetFi=hitFloors[Math.floor(Math.random()*hitFloors.length)];
   }
-  var candidates=[];
-  for(var ri=0;ri<dflData[targetFi].rocks.length;ri++){
-    if(dflData[targetFi].rocks[ri].y>=DGY-20){candidates.push(ri);}
+  var fl=dflData[targetFi];if(!fl)return;
+  var spikes=fl.spikes||[];var torches=fl.torches||[];var rocks=fl.rocks||[];
+  // Try to find a clear x on the main ground (DGY) — scan in steps, avoid rocks/spikes/torches
+  var clearX=null;
+  var attempts=[300,400,500,600,250,550,450,350,650,200];
+  for(var ai=0;ai<attempts.length;ai++){
+    var cx=attempts[ai];var ok=true;
+    for(var ri=0;ri<rocks.length;ri++){if(!rocks[ri].done&&Math.abs(rocks[ri].x-cx)<70)ok=false;}
+    for(var si=0;si<spikes.length;si++){if(Math.abs(spikes[si].x-cx)<80)ok=false;}
+    for(var ti=0;ti<torches.length;ti++){if(Math.abs(torches[ti].x-cx)<80)ok=false;}
+    if(ok){clearX=cx;break;}
   }
-  if(!candidates.length)return;
-  var pickRi=candidates[0];
-  var _excRock=dflData[targetFi].rocks[pickRi];
-  _excRock.isExcalibur=true;
-  _excRock.y-=14;
+  if(clearX===null)clearX=750; // fallback far right
+  // Push a new rock object at ground level — no y offset adjustment needed
+  fl.rocks.push({x:clearX,y:DGY-9,done:false,ore:{n:'Coal',v:1,c:'#666',tc:'#888',ch:1},nodeMulti:1,isExcalibur:true,hp:3,hitT:0});
 }
 function startDungeon(){
   // Must be signed in with Twitter to play
@@ -4335,13 +4340,13 @@ function dDraw(){
   for(var i=0;i<f.rocks.length;i++){var r=f.rocks[i];if(r.done)continue;var rx=r.x-dcam;if(rx<-30||rx>W+30)continue;
     if(r.isExcalibur){
       var iw=64,ih=80;
-      var _cy=r.y-ih+23; // bottom of image sits on platform surface
-      // Subtle soft glow centred on the crystal, not below it
-      var _gr=DC.createRadialGradient(rx,_cy+ih*0.45,0,rx,_cy+ih*0.45,iw*0.9);
-      var _gp=0.10+Math.sin(dtk*.08+r.x)*.04;
+      var _cy=r.y-ih+9; // r.y=DGY-9, so bottom of image lands exactly at DGY (ground)
+      // Subtle ambient glow — large enough rect so it doesn't clip at the top
+      var _gp=0.09+Math.sin(dtk*.08+r.x)*.03;
+      var _gr=DC.createRadialGradient(rx,_cy+ih*0.4,0,rx,_cy+ih*0.4,iw*1.1);
       _gr.addColorStop(0,'rgba(0,210,255,'+_gp.toFixed(3)+')');
       _gr.addColorStop(1,'rgba(0,180,255,0)');
-      DC.fillStyle=_gr;DC.fillRect(rx-iw,_cy,iw*2,ih);
+      DC.fillStyle=_gr;DC.fillRect(rx-iw*1.5,_cy-ih*0.5,iw*3,ih*2);
       if(_excImg.complete&&_excImg.naturalWidth>0){
         DC.drawImage(_excImg,rx-iw/2,_cy,iw,ih);
       }
