@@ -2139,7 +2139,18 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
   if(!sellerWallet){alert('This listing is missing a seller wallet address.');return;}
   var btn=document.getElementById('ubtn_'+lid);
   try{
-    if(btn){btn.disabled=true;btn.textContent='Sending...';}
+    if(btn){btn.disabled=true;btn.textContent='Checking balance...';}
+    // Pre-check: verify buyer has enough USDC
+    try{
+      var _balR=await fetch('/api/load?usdc_balance='+encodeURIComponent(walletAddress));
+      var _balD=await _balR.json();
+      if(!_balD.exists||_balD.balance<priceUsdc){
+        if(btn){btn.disabled=false;btn.textContent='Buy with USDC';}
+        alert('Insufficient USDC balance.\nYou have: $'+(_balD.balance||0).toFixed(2)+' USDC\nRequired: $'+priceUsdc.toFixed(2)+' USDC');
+        return;
+      }
+    }catch(e){console.warn('Balance check failed, proceeding anyway:',e.message);}
+    if(btn){btn.textContent='Sending...';}
     var _bhResult=await _fetchBlockhash();
     var conn=new solanaWeb3.Connection(_bhResult.rpc,'confirmed');
     var bh={blockhash:_bhResult.blockhash};
@@ -2397,7 +2408,17 @@ async function buyOreWithUSDC(lid,sellerWallet,pricePerUnit,qty){
   var totalUsdc=pricePerUnit*qty;
   var btn=document.getElementById('orebtn_'+lid);
   try{
-    if(btn){btn.disabled=true;btn.textContent='Sending...';}
+    if(btn){btn.disabled=true;btn.textContent='Checking balance...';}
+    try{
+      var _balR2=await fetch('/api/load?usdc_balance='+encodeURIComponent(walletAddress));
+      var _balD2=await _balR2.json();
+      if(!_balD2.exists||_balD2.balance<totalUsdc){
+        if(btn){btn.disabled=false;btn.textContent='Buy ×'+qty+' USDC';}
+        alert('Insufficient USDC balance.\nYou have: $'+(_balD2.balance||0).toFixed(2)+' USDC\nRequired: $'+totalUsdc.toFixed(2)+' USDC');
+        return;
+      }
+    }catch(e){console.warn('Balance check failed, proceeding anyway:',e.message);}
+    if(btn){btn.textContent='Sending...';}
     var _bhResult=await _fetchBlockhash();
     var conn=new solanaWeb3.Connection(_bhResult.rpc,'confirmed');
     var bh={blockhash:_bhResult.blockhash};
