@@ -4376,6 +4376,24 @@ function dDraw(){
       if(_excImg.complete&&_excImg.naturalWidth>0){
         DC.drawImage(_excImg,rx-iw/2,_cy,iw,ih);
       }
+      // Hit effects on the crystal body
+      var _eCX=rx,_eCY=_cy+ih*0.55;
+      var _eHits=3-(r.hp==null?3:r.hp);
+      if(_eHits>0){
+        DC.save();DC.strokeStyle='rgba(180,240,255,0.7)';DC.lineWidth=1.2;DC.lineCap='round';
+        var _esd=Math.floor(Math.abs(r.x));
+        for(var _eci=0;_eci<_eHits;_eci++){
+          var _eca=((_esd*13+_eci*131)%360)*Math.PI/180,_ecl=5+(_esd*7+_eci*53)%5;
+          DC.beginPath();DC.moveTo(_eCX+Math.cos(_eca)*3,_eCY+Math.sin(_eca)*3);
+          DC.lineTo(_eCX+Math.cos(_eca)*_ecl,_eCY+Math.sin(_eca)*_ecl);DC.stroke();
+        }
+        DC.restore();
+      }
+      if(r.hitT>0){
+        DC.save();DC.globalAlpha=Math.min(0.5,r.hitT/8*0.5);DC.fillStyle='#b0f0ff';
+        DC.beginPath();DC.arc(_eCX,_eCY,18,0,Math.PI*2);DC.fill();DC.restore();
+        r.hitT--;
+      }
       continue;
     }
     // Normal rocks — idle-miner sprites per ore type, glowing ore-colour circle behind
@@ -4408,7 +4426,7 @@ function dDraw(){
     // Cracks: grow larger and darker with each hit
     var _hits=3-(r.hp==null?3:r.hp);
     if(_hits>0){
-      var _clScale=1+_hits*0.5,_cw=0.9+_hits*0.5,_cAlpha=0.55+_hits*0.15;
+      var _clScale=0.6+_hits*0.15,_cw=0.8+_hits*0.3,_cAlpha=0.55+_hits*0.15;
       DC.save();DC.strokeStyle='rgba(6,4,10,'+_cAlpha+')';DC.lineWidth=_cw;DC.lineCap='round';
       var _sd=Math.floor(Math.abs(r.x));
       for(var _ci=0;_ci<_hits;_ci++){
@@ -4416,7 +4434,7 @@ function dDraw(){
         var _mx=rx+Math.cos(_ca)*2,_my=r.y-3+Math.sin(_ca)*2;
         DC.beginPath();DC.moveTo(_mx,_my);
         DC.lineTo(_mx+Math.cos(_ca)*_cl,_my+Math.sin(_ca)*_cl);
-        DC.lineTo(_mx+Math.cos(_ca)*_cl*1.7+(((_sd+_ci)%3)-1)*2,_my+Math.sin(_ca)*_cl*1.7);
+        DC.lineTo(_mx+Math.cos(_ca)*_cl*1.1+(((_sd+_ci)%3)-1)*1,_my+Math.sin(_ca)*_cl*1.1);
         DC.stroke();
       }
       DC.restore();
