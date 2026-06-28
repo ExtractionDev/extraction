@@ -10,18 +10,20 @@ export default async function handler(req, res) {
 
   const { data, error } = await supabase
     .from('players')
-    .select('username, gc_extracted, gold, runs, game_stats')
-    .or('is_banned.is.null,is_banned.eq.false')
+    .select('username, gc_extracted, runs, game_stats')
+    .not('is_banned', 'eq', true)
     .order('gc_extracted', { ascending: false })
     .limit(50);
 
-  if (error) return res.status(500).json({ error: 'Failed to load leaderboard' });
+  if (error) {
+    console.error('Leaderboard error:', error);
+    return res.status(500).json({ error: error.message });
+  }
 
   const rows = (data || []).map((p, i) => ({
     rank: i + 1,
     username: p.username,
     gc_extracted: p.gc_extracted || 0,
-    gold: p.gold || 0,
     runs: p.runs || 0,
     deepest_floor: p.game_stats ? (p.game_stats.deepestFloor || 0) : 0
   }));
