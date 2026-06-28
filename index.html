@@ -599,7 +599,15 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     <div class="m-stat"><i class="ti ti-bolt" style="color:var(--green)"></i><span class="m-val" id="mdps">0</span><span style="font-size:9px;color:var(--green)"> DPS</span></div>
   </div>
   <div class="miner-body">
-    <div class="miner-cv"><canvas id="mcv" width="560" height="400"></canvas><div class="lb-widget"><div class="lb-header"><span class="lb-title">⛏️ Top Miners (Daily)</span><span class="lb-reset" id="lbReset"></span></div><div id="lbList"></div></div></div>
+    <div class="miner-cv"><canvas id="mcv" width="560" height="400"></canvas>
+      <div class="lb-widget">
+        <div class="lb-header">
+          <span class="lb-title">🏆 Top Players</span>
+          <span class="lb-reset" id="lbCount"></span>
+        </div>
+        <div id="realLbList"><div style="color:var(--text3);font-size:11px;padding:6px 0">Loading...</div></div>
+      </div>
+    </div>
     <div class="miner-panel">
       <div class="panel-title">Equipped pickaxe</div>
       <div class="eq-card"><div id="eqDisplay" class="eq-empty">None — find one in the dungeon</div></div>
@@ -1090,7 +1098,7 @@ function iImg(k,cx,cy,w,h,dx,dy,dw,dh,ctx,smooth){
   return true;
 }
 
-var gold=50,tokens=100000,totalRocks=0,runs=0,chests=0,activeTab=0; // TEST: 100K EXT start (revert: tokens=0)
+var gold=50,tokens=0,totalRocks=0,runs=0,chests=0,activeTab=0;
 // DORES defined early: several functions (e.g. _genOreMarket) run at parse time and reference it
 var DORES=[
   {n:'Coal',    c:'#3a3a3a',tc:'#999',    ch:.25,v:3,   img:'stone_1'},
@@ -1422,7 +1430,7 @@ function saveGame(){
       inventory:inventory.map(function(it){return{id:it.id,slot:it.slot||'pickaxe',slotIcon:it.slotIcon||'ti-pickaxe',mat:it.mat,type:it.type,rarN:it.rar.n,affixes:it.affixes.map(function(a){return{tk:a.t.k,v:a.v};}),price:it.price};}),
       oreStash:oreStash,
       eqSlots:{pickaxe:equippedSlots.pickaxe?equippedSlots.pickaxe.id:null,head:equippedSlots.head?equippedSlots.head.id:null,ring:equippedSlots.ring?equippedSlots.ring.id:null,amulet:equippedSlots.amulet?equippedSlots.amulet.id:null},
-      gameStats:gameStats,_achiev:_achiev
+      gameStats:gameStats,_achiev:_achiev,lastSaved:Date.now()
     };
     // Save to localStorage as backup
     localStorage.setItem(_getSaveKey(),JSON.stringify(data));
@@ -1441,7 +1449,6 @@ function _relinkItem(raw){
 function loadGame(){
   try{
     var s=localStorage.getItem(_getSaveKey());if(!s){
-      tokens=100000; // TEST: 100K EXT on fresh start (revert: remove this line)
       // Fresh game — start with an Iron (Common) pickaxe already equipped (+1% mining speed)
       var starter={id:'starter',slot:'pickaxe',slotIcon:'ti-pickaxe',mat:'Iron',type:'Pickaxe',
         rar:RARS[0],affixes:[{t:ATYPES[0],v:1}],price:50};
@@ -1469,6 +1476,13 @@ function loadGame(){
     }
     if(d.gameStats)Object.assign(gameStats,d.gameStats);
     if(d._achiev)Object.assign(_achiev,d._achiev);
+    // Offline earnings — calculate EXT earned while away (capped at 8 hours)
+    if(d.lastSaved){
+      var _offSecs=Math.min((Date.now()-d.lastSaved)/1000, 8*3600);
+      var _offRate=getSell()*getSpd()/60; // EXT per second
+      var _offEarned=_offSecs*_offRate;
+      if(_offEarned>0){tokens+=_offEarned;showAchieve('⛏️','Welcome back!','Offline earnings: +'+_offEarned.toFixed(4)+' $EXT');}
+    }
   }catch(e){console.warn('Load failed',e);}
 }
 // Auto-save every 20s
@@ -1483,51 +1497,39 @@ function resetSave(){if(confirm('Reset ALL progress? This cannot be undone!')){l
 
 function closeTutorial(){document.getElementById('tutOverlay').style.display='none';localStorage.setItem('tut_seen','1');}
 
-// ── Daily Leaderboard ───────────────────────────────────────────────────────
-var _lbNames=['CryptoMine01','SolanaDigger','RockHunterX','ExtractorPro','GemSeeker99',
-              'CaveRunner','BlockBreaker','OreKing','DeepDigger','MineBot88',
-              'XtractorZ','NightDigger','SolMiner','GoldRush99','DarkCaver'];
-var _lbPlayers=null;
-function _lb12Key(){var n=new Date();return n.getFullYear()+'-'+n.getMonth()+'-'+n.getDate();}
-function _initLB(){
-  if(_lbPlayers)return;
-  var saved=localStorage.getItem('lb_v2');
-  var key=_lb12Key();
-  if(saved){
-    var d=JSON.parse(saved);
-    if(d.key!==key){
-      d.players.forEach(function(p){p.rocks=1+Math.floor(Math.random()*12);});
-      d.key=key;localStorage.setItem('lb_v2',JSON.stringify(d));
-    }
-    _lbPlayers=d.players;
-  }else{
-    _lbPlayers=_lbNames.slice(0,9).map(function(n,i){
-      return{name:n,rocks:5+Math.floor(Math.random()*(8+i*3)),spd:0.3+Math.random()*0.5};
-    });
-    localStorage.setItem('lb_v2',JSON.stringify({players:_lbPlayers,key:key}));
+// ── REAL LEADERBOARD v2 (fetches from Supabase via /api/leaderboard) ──
+(function(){
+  var _lb=[];
+  var _lbEl=null;
+  var _lbCnt=null;
+  function _lbRender(){
+    if(!_lbEl)_lbEl=document.getElementById('realLbList');
+    if(!_lbCnt)_lbCnt=document.getElementById('lbCount');
+    if(!_lbEl)return;
+    var myUser='';
+    try{var _xd=JSON.parse(localStorage.getItem('extraction_xauth')||'null');if(_xd)myUser=_xd.username;}catch(e){}
+    var medals=['🥇','🥈','🥉'];
+    if(!_lb.length){_lbEl.innerHTML='<div style="color:var(--text3);font-size:11px;padding:6px 0">No players yet!</div>';return;}
+    _lbEl.innerHTML=_lb.map(function(p,i){
+      var me=p.username===myUser;
+      var st=me?'color:var(--gold);font-weight:700;':'';
+      return'<div class="lb-row" style="'+st+'"><span class="lb-rank">'+(medals[i]||'#'+(i+1))+'</span>'
+        +'<span class="lb-name">@'+p.username+(me?' ⭐':'')+'</span>'
+        +'<span class="lb-rocks">'+Math.floor(p.gold||0)+' GC</span></div>';
+    }).join('');
+    if(_lbCnt)_lbCnt.textContent=_lb.length+' players';
   }
-}
-function updateLB(){
-  _initLB();
-  _lbPlayers.forEach(function(p){if(Math.random()<p.spd*0.06)p.rocks++;});
-  var all=_lbPlayers.map(function(p){return{n:p.name,r:p.rocks,you:false};});
-  all.push({n:'You ⭐',r:totalRocks,you:true});
-  all.sort(function(a,b){return b.r-a.r;});
-  var medals=['🥇','🥈','🥉'];
-  var html2=all.slice(0,10).map(function(p,i){
-    var s=p.you?'color:var(--gold);font-weight:700;':'';
-    return'<div class="lb-row" style="'+s+'"><span class="lb-rank">'+(medals[i]||('#'+(i+1)))+'</span>'
-      +'<span class="lb-name">'+p.n+'</span><span class="lb-rocks">'+p.r+'</span></div>';
-  }).join('');
-  var el=document.getElementById('lbList');if(el)el.innerHTML=html2;
-  // Reset countdown
-  var now=new Date(),next=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1,0,0,0);
-  var diff=Math.floor((next-now)/60000);
-  var re=document.getElementById('lbReset');
-  if(re)re.textContent='Resets in '+(Math.floor(diff/60))+'h'+(diff%60)+'m';
-  if(Math.random()<0.15)localStorage.setItem('lb_v2',JSON.stringify({players:_lbPlayers,key:_lb12Key()}));
-}
-setInterval(updateLB,3500);
+  function _lbFetch(){
+    fetch('/api/leaderboard?v='+Date.now())
+      .then(function(r){return r.ok?r.json():[];})
+      .then(function(data){_lb=Array.isArray(data)?data:[];_lbRender();})
+      .catch(function(){});
+  }
+  // Wait for DOM then fetch
+  setTimeout(_lbFetch,500);
+  setInterval(_lbFetch,30000);
+  window._lbRefresh=_lbFetch;
+})();
 function bpEquip(idx){if(inventory[idx])equipItem(inventory[idx].id);}
 function unequipSlot(sl){
   if(!equippedSlots[sl])return;
@@ -1960,6 +1962,7 @@ function mHitRock(){
   for(var i=0;i<3;i++)mParts.push({x:340+Math.random()*14-7,y:MGY-25+Math.random()*14-7,vx:(Math.random()-.5)*3,vy:-1.5-Math.random()*2.5,life:16+Math.random()*8,c:['#3a3440','#4a4450','#2e2838'][i],s:2+Math.random()*2});
   var pct=1-mRockHP/mRockMax;for(var i=0;i<mCracks.length;i++)if(!mCracks[i].on&&pct>(i+1)*.12)mCracks[i].on=true;
   if(mRockHP<=0){mRockHP=0;var tv=getSell()*mRockType.multi;tokens+=tv;totalRocks++;if(activeTab===2){if(mRockType.multi>1)sndRareBreak();else sndRockBreak();}
+    saveGame(); // save immediately so EXT isn't lost on refresh
     // Confirm multi payouts: Silver=3x, Gold=5x, Mystrile=25x
     for(var i=0;i<12;i++)mParts.push({x:340+Math.random()*50-25,y:MGY-25+Math.random()*40-20,vx:(Math.random()-.5)*7,vy:-2-Math.random()*5,life:25+Math.random()*18,c:['#4a4450','#5a5460','#c8a040','#3a3440','#6050a0'][Math.floor(Math.random()*5)],s:2+Math.random()*4});
     mRspTmr=18;
@@ -4238,7 +4241,7 @@ function dDraw(){
 loadGame();
 ensureStarterPick();
 (async function(){try{var pv=(window.phantom&&window.phantom.solana)?window.phantom.solana:window.solana;if(pv&&pv.isPhantom){var rc=await pv.connect({onlyIfTrusted:true});walletAddress=rc.publicKey.toString();walletConnected=true;updateWalletUI();}}catch(e){}})();
-mMakeCracks();renderMarket(mkFilter);renderBackpack();uiAll();updExt();requestAnimationFrame(minerLoop);setTimeout(updateLB,1500);
+mMakeCracks();renderMarket(mkFilter);renderBackpack();uiAll();updExt();requestAnimationFrame(minerLoop);setTimeout(function(){if(window._lbRefresh)window._lbRefresh();},1500);
 if(localStorage.getItem('tut_seen'))document.getElementById('tutOverlay').style.display='none';
 // X / TWITTER SIGN IN LOGIC
 var _xAuthKey='extraction_xauth';
@@ -4311,20 +4314,44 @@ function _setSignedInUI(username){
   var lbl=document.getElementById('homeSignInLabel');
   if(btn){btn.className='home-btn-secondary home-btn-signin signedin';}
   if(lbl){lbl.textContent='@'+username;}
-  // Try loading from Supabase first, fall back to localStorage
-  fetch('/api/load?username='+username)
-    .then(function(r){return r.ok?r.json():null;})
-    .then(function(d){
-      if(d){
-        // Map Supabase columns back to game format
-        var mapped={gold:d.gold,tokens:d.tokens,totalRocks:d.total_rocks,runs:d.runs,chests:d.chests,
-          ups:d.ups,oreStash:d.ore_stash,inventory:d.inventory,eqSlots:d.equipped_slots,
-          gameStats:d.game_stats,_achiev:d.achievements};
-        localStorage.setItem(_getSaveKey(),JSON.stringify(mapped));
-      }
-      loadGame();uiAll();
-    })
-    .catch(function(){loadGame();uiAll();});
+  // Load from localStorage first (most recent — saves happen instantly)
+  var _localKey='extraction_v1_'+username;
+  var _localData=null;
+  try{_localData=JSON.parse(localStorage.getItem(_localKey)||'null');}catch(e){}
+  if(_localData){
+    // We have local data — use it immediately, don't wait for Supabase
+    loadGame();uiAll();
+    // Still fetch Supabase in background to sync if local is somehow older
+    fetch('/api/load?username='+username)
+      .then(function(r){return r.ok?r.json():null;})
+      .then(function(d){
+        if(d&&d.updated_at){
+          var _sbTime=new Date(d.updated_at).getTime();
+          var _localTime=_localData.lastSaved||0;
+          // Only use Supabase data if it's newer than local
+          if(_sbTime>_localTime){
+            var mapped={gold:d.gold,tokens:d.tokens,totalRocks:d.total_rocks,runs:d.runs,chests:d.chests,
+              ups:d.ups,oreStash:d.ore_stash,inventory:d.inventory,eqSlots:d.equipped_slots,
+              gameStats:d.game_stats,_achiev:d.achievements,lastSaved:_sbTime};
+            localStorage.setItem(_localKey,JSON.stringify(mapped));
+            loadGame();uiAll();
+          }
+        }
+      }).catch(function(){});
+  } else {
+    // No local data — fetch from Supabase
+    fetch('/api/load?username='+username)
+      .then(function(r){return r.ok?r.json():null;})
+      .then(function(d){
+        if(d){
+          var mapped={gold:d.gold,tokens:d.tokens,totalRocks:d.total_rocks,runs:d.runs,chests:d.chests,
+            ups:d.ups,oreStash:d.ore_stash,inventory:d.inventory,eqSlots:d.equipped_slots,
+            gameStats:d.game_stats,_achiev:d.achievements};
+          localStorage.setItem(_localKey,JSON.stringify(mapped));
+        }
+        loadGame();uiAll();
+      }).catch(function(){loadGame();uiAll();});
+  }
 }
 function _setSignedOutUI(){
   var btn=document.getElementById('homeSignInBtn');
