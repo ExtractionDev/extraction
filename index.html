@@ -3218,7 +3218,7 @@ function _placeExcalibur(){
   for(var pi=0;pi<groundPlats.length&&clearX===null;pi++){
     var gp=groundPlats[pi];
     for(var step=40;step<gp.w-40;step+=20){
-      var cx=gp.x+step;var ok=true;
+      var cx=gp.x+step;if(cx<fl.w*0.25)continue;var ok=true;
       for(var ri=0;ri<rocks.length;ri++){if(!rocks[ri].done&&Math.abs(rocks[ri].x-cx)<70)ok=false;}
       for(var si=0;si<spikes.length;si++){if(Math.abs(spikes[si].x-cx)<80)ok=false;}
       for(var ti=0;ti<torches.length;ti++){if(Math.abs(torches[ti].x-cx)<80)ok=false;}
@@ -4344,20 +4344,33 @@ function dDraw(){
   for(var i=0;i<f.rocks.length;i++){var r=f.rocks[i];if(r.done)continue;var rx=r.x-dcam;if(rx<-30||rx>W+30)continue;
     if(r.isExcalibur){
       var iw=64,ih=80;
-      var _cy=r.y-ih+36; // embed crystal base into ground ground
-      var _pulse=0.18+Math.sin(dtk*.08+r.x)*.06;
+      var _cy=r.y-ih+36;
+      var _pulse=0.32+Math.sin(dtk*.08+r.x)*.10;
+      // Spawn ice particles
+      if(dtk%4===0){_excIceParts.push({x:r.x+(Math.random()-0.5)*50,y:r.y-10-Math.random()*50,vx:(Math.random()-0.5)*0.5,vy:-0.4-Math.random()*0.6,life:60+Math.random()*60,maxLife:120,r:1+Math.random()*2});}
+      // Update & draw ice particles
+      for(var _ip=_excIceParts.length-1;_ip>=0;_ip--){
+        var _p=_excIceParts[_ip];_p.x+=_p.vx;_p.y+=_p.vy;_p.life-=1;
+        if(_p.life<=0){_excIceParts.splice(_ip,1);continue;}
+        var _pf=_p.life/_p.maxLife;
+        var _px=_p.x-dcam;if(_px<-20||_px>W+20)continue;
+        DC.globalAlpha=_pf*0.85;
+        DC.fillStyle=_pf>0.5?'#b0f0ff':'#00d4ff';
+        DC.beginPath();DC.arc(_px,_p.y,_p.r,0,6.28);DC.fill();
+      }
+      DC.globalAlpha=1;
       // Outer wide glow
-      var _gr2=DC.createRadialGradient(rx,_cy+ih*0.35,0,rx,_cy+ih*0.35,iw*2.2);
-      _gr2.addColorStop(0,'rgba(0,200,255,'+(_pulse*0.55).toFixed(3)+')');
-      _gr2.addColorStop(0.5,'rgba(0,160,255,'+(_pulse*0.18).toFixed(3)+')');
+      var _gr2=DC.createRadialGradient(rx,_cy+ih*0.35,0,rx,_cy+ih*0.35,iw*2.8);
+      _gr2.addColorStop(0,'rgba(0,220,255,'+(_pulse*0.80).toFixed(3)+')');
+      _gr2.addColorStop(0.4,'rgba(0,180,255,'+(_pulse*0.35).toFixed(3)+')');
       _gr2.addColorStop(1,'rgba(0,120,200,0)');
-      DC.fillStyle=_gr2;DC.fillRect(rx-iw*2.5,_cy-ih*0.8,iw*5,ih*2.6);
-      // Bright inner core glow
-      var _gr=DC.createRadialGradient(rx,_cy+ih*0.35,0,rx,_cy+ih*0.35,iw*0.9);
-      _gr.addColorStop(0,'rgba(160,240,255,'+(_pulse*0.9).toFixed(3)+')');
-      _gr.addColorStop(0.4,'rgba(0,210,255,'+(_pulse*0.5).toFixed(3)+')');
+      DC.fillStyle=_gr2;DC.fillRect(rx-iw*3,_cy-ih*0.9,iw*6,ih*3);
+      // Bright inner core
+      var _gr=DC.createRadialGradient(rx,_cy+ih*0.35,0,rx,_cy+ih*0.35,iw*1.0);
+      _gr.addColorStop(0,'rgba(200,250,255,'+(_pulse*1.0).toFixed(3)+')');
+      _gr.addColorStop(0.35,'rgba(0,220,255,'+(_pulse*0.75).toFixed(3)+')');
       _gr.addColorStop(1,'rgba(0,180,255,0)');
-      DC.fillStyle=_gr;DC.fillRect(rx-iw*1.5,_cy-ih*0.5,iw*3,ih*2);
+      DC.fillStyle=_gr;DC.fillRect(rx-iw*2,_cy-ih*0.6,iw*4,ih*2.4);
       if(_excImg.complete&&_excImg.naturalWidth>0){
         DC.drawImage(_excImg,rx-iw/2,_cy,iw,ih);
       }
