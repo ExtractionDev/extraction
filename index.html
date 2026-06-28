@@ -4201,7 +4201,7 @@ function dLoop(){
   // Ice particle update — runs in main loop, not inside rock draw
   for(var _ii=_excIceParts.length-1;_ii>=0;_ii--){var _ip2=_excIceParts[_ii];_ip2.x+=_ip2.vx;_ip2.y+=_ip2.vy;_ip2.life-=_dt;if(_ip2.life<=0)_excIceParts.splice(_ii,1);}
   // Spawn new ice particles near excalibur (only if visible and cap not hit)
-  if(_excIceParts.length<40){var _ef2=dflData[dfl];if(_ef2){for(var _ri2=0;_ri2<_ef2.rocks.length;_ri2++){var _er=_ef2.rocks[_ri2];if(_er.isExcalibur&&!_er.done&&dtk%4===0){_excIceParts.push({x:_er.x+(Math.random()-0.5)*50,y:_er.y-10-Math.random()*50,vx:(Math.random()-0.5)*0.6,vy:-0.3-Math.random()*0.5,life:40+Math.random()*50,maxLife:90,r:0.3+Math.random()*0.9});break;}}}}
+  if(_excIceParts.length<120){var _ef2=dflData[dfl];if(_ef2){for(var _ri2=0;_ri2<_ef2.rocks.length;_ri2++){var _er=_ef2.rocks[_ri2];if(_er.isExcalibur&&!_er.done&&dtk%2===0){_excIceParts.push({x:_er.x+(Math.random()-0.5)*50,y:_er.y-10-Math.random()*50,vx:(Math.random()-0.5)*0.6,vy:-0.3-Math.random()*0.5,life:40+Math.random()*50,maxLife:90,r:0.3+Math.random()*0.9});break;}}}}
   dDraw();drawMinimap();
   requestAnimationFrame(dLoop);
 }
@@ -4367,9 +4367,10 @@ function dDraw(){
         var _p=_excIceParts[_ip];
         var _pf=Math.max(0,_p.life/_p.maxLife);
         var _px=_p.x-dcam;if(_px<-20||_px>W+20)continue;
-        DC.globalAlpha=_pf*0.85;
-        DC.fillStyle=_pf>0.5?'#b0f0ff':'#00d4ff';
-        DC.beginPath();DC.arc(_px,_p.y,Math.max(0.5,_p.r),0,6.28);DC.fill();
+        var _flash=0.5+Math.sin(dtk*0.4+_p.x*0.3)*0.5;
+        DC.globalAlpha=_pf*_flash*1.0;
+        DC.fillStyle=_flash>0.7?'#ffffff':(_pf>0.5?'#d0f8ff':'#00e5ff');
+        DC.beginPath();DC.arc(_px,_p.y,Math.max(0.3,_p.r),0,6.28);DC.fill();
       }
       DC.globalAlpha=1;
       if(_excImg.complete&&_excImg.naturalWidth>0){
