@@ -54,6 +54,22 @@ export default async function handler(req, res) {
   const safeRocks = Math.max(current.total_rocks || 0, data.totalRocks || 0);
   const safeRuns = Math.max(current.runs || 0, data.runs || 0);
 
+  // SECURITY: Validate upgrades — max level 500, only known keys allowed
+  const VALID_UPS = ['speed','power','sell','luck'];
+  const safeUps = {};
+  const currentUps = current.ups || {};
+  for(const key of VALID_UPS) {
+    const submitted = Math.floor(data.ups?.[key] || 0);
+    const existing = Math.floor(currentUps[key] || 0);
+    // Can only go up, never down, never above 500
+    safeUps[key] = Math.min(500, Math.max(existing, submitted));
+    // Can't jump more than reasonable per session (max ~10 levels per save)
+    if(safeUps[key] > existing + 10) {
+      console.warn(`CHEAT DETECTED: ${username} tried to jump ${key} from ${existing} to ${submitted}`);
+      safeUps[key] = existing + 10;
+    }
+  }
+
   // SECURITY: Validate inventory items and affix values
   const VALID_MATS = ['Iron','Steel','Gold','Mithril','Adamant','Rune','Dragon'];
   const VALID_TYPES = ['Pickaxe'];
@@ -62,16 +78,23 @@ export default async function handler(req, res) {
     if(!VALID_MATS.includes(item.mat)) return false;
     if(!VALID_TYPES.includes(item.type)) return false;
     if(!VALID_RARS.includes(item.rarN)) return false;
-    // Validate affix values are reasonable
     if(item.affixes && Array.isArray(item.affixes)) {
       for(const a of item.affixes) {
         if(typeof a.v !== 'number') return false;
-        if(a.v > 100) return false;
-        if(a.v < 0) return false;
+        if(a.v > 100 || a.v < 0) return false;
       }
     }
     return true;
   });
+
+  // SECURITY: Validate ore stash values
+  const VALID_ORES = ['Coal','Iron','Copper','Silver','Gold','Platinum','Diamond'];
+  const safeOreStash = {};
+  for(const ore of VALID_ORES) {
+    const val = Math.floor(data.oreStash?.[ore] || 0);
+    const existing = Math.floor((current.ore_stash)?.[ore] || 0);
+    safeOreStash[ore] = Math.max(0, Math.min(val, existing + 500));
+  }
 
   const response = await fetch(
     `${process.env.SUPABASE_URL}/rest/v1/players?username=eq.${username}`,
@@ -87,11 +110,11 @@ export default async function handler(req, res) {
         tokens: safeTokens,
         total_rocks: safeRocks,
         runs: safeRuns,
-        chests: data.chests || 0,
+        chests: Math.max(current.chests || 0, data.chests || 0),
         inventory: safeInventory,
         equipped_slots: data.eqSlots,
-        ore_stash: data.oreStash,
-        ups: data.ups,
+        ore_stash: safeOreStash,
+        ups: safeUps,
         game_stats: data.gameStats,
         achievements: data._achiev,
         updated_at: new Date().toISOString()
