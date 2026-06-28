@@ -3103,11 +3103,12 @@ function dEndGame(died){
     // Report safe extraction to server for leaderboard tracking
     try{
       var _xd2=JSON.parse(localStorage.getItem(_xAuthKey)||'null');
-      if(_xd2&&_xd2.username&&_xd2.token){
+      if(_xd2&&_xd2.username){
+        var _eqS={pickaxe:equippedSlots.pickaxe?equippedSlots.pickaxe.id:null,head:equippedSlots.head?equippedSlots.head.id:null,ring:equippedSlots.ring?equippedSlots.ring.id:null,amulet:equippedSlots.amulet?equippedSlots.amulet.id:null};
         fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({username:_xd2.username,token:_xd2.token,
+          body:JSON.stringify({username:_xd2.username,token:_xd2.token||'',
             gold:gold,tokens:tokens,total_rocks:gameStats.totalRocks||0,runs:runs,chests:gameStats.chestsOpened||0,
-            ups:ups,ore_stash:oreStash,inventory:inventory,equipped_slots:eqSlots,
+            ups:ups,ore_stash:oreStash,inventory:inventory,equipped_slots:_eqS,
             game_stats:gameStats,achievements:_achiev,
             extraction:{floor:dfl+1,damage_taken:dDamageTaken,gc_earned:final}
           })
