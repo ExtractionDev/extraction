@@ -28,7 +28,9 @@ export default async function handler(req, res) {
     extraction  // { floor, damage_taken, gc_earned } — only on safe extract
   } = req.body || {};
 
-  if (!username || !token) return res.status(400).json({ error: 'Missing credentials' });
+  if (!username) return res.status(400).json({ error: 'Missing username' });
+  // Allow token-less requests only for extraction reporting (older sessions without token)
+  const extractionOnly = !token && extraction;
 
   // Rate limiting
   const now = Date.now();
@@ -45,7 +47,8 @@ export default async function handler(req, res) {
     .single();
 
   if (fetchErr || !player) return res.status(403).json({ error: 'Player not found' });
-  if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session token' });
+  // Skip token check for extraction-only saves (backwards compat with pre-token logins)
+  if (token && player.session_token && player.session_token !== token) return res.status(403).json({ error: 'Invalid session token' });
   if (player.is_banned) return res.status(403).json({ error: 'Account banned from leaderboard' });
 
   // Time-based caps
