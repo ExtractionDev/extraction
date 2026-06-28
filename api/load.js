@@ -28,14 +28,16 @@ export default async function handler(req, res) {
     await supabase.from('players').update({ tokens: newTokens }).eq('username', username);
 
     // 80% to the shared pool (atomic), 20% removed (burn + dev)
-    const poolAdd = fee * 0.80;
+    const poolAdd    = fee * 0.80;
+    const removedAdd = fee * 0.20;
+
     const { error: poolErr } = await supabase.rpc('add_to_pool', { amount: poolAdd });
     if (poolErr) console.error('Pool deposit error:', poolErr);
 
-    // Track total removed (20%) for accounting
-    await supabase.rpc('add_removed', { amount: fee * 0.20 }).catch(() => {});
+    const { error: removedErr } = await supabase.rpc('add_removed', { amount: removedAdd });
+    if (removedErr) console.error('Removed tracking error:', removedErr);
 
-    return res.status(200).json({ ok: true, newTokens, pooledAdded: poolAdd });
+    return res.status(200).json({ ok: true, newTokens, pooledAdded: poolAdd, removedAdded: removedAdd });
   }
 
   // ── GET: pool mode ─────────────────────────────────────────────────────────
