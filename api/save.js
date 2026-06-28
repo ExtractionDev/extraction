@@ -1,126 +1,164 @@
-// Rate limiting — max 1 save per 4 seconds per user
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
+
+// Anti-cheat limits
+const MAX_EXT_PER_SEC = 5;
+const MAX_GOLD_PER_SEC = 50;
+const RATE_LIMIT_MS = 4000;
 const _rateLimits = {};
 
-export default async function handler(req, res) {
-  if(req.method !== 'POST') return res.status(405).end();
-  
-  const { username, token, data } = req.body;
-  if(!username || !token || !data) return res.status(400).json({ error: 'Missing data' });
+// Valid item metadata
+const VALID_ORES = ['Iron','Steel','Gold','Mithril','Adamant','Rune','Dragon'];
+const VALID_TYPES = ['Pickaxe'];
+const VALID_RARITIES = ['Common','Uncommon','Rare','Epic','Legendary'];
+const VALID_UPS = ['speed','power','sell','luck'];
+const MAX_UP_LEVEL = 500;
+const MAX_UP_GAIN = 10;
 
-  // Rate limit check
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const {
+    username, token, gold, tokens, total_rocks, runs, chests,
+    ups, ore_stash, inventory, equipped_slots, game_stats, achievements,
+    extraction  // { floor, damage_taken, gc_earned } — only on safe extract
+  } = req.body || {};
+
+  if (!username || !token) return res.status(400).json({ error: 'Missing credentials' });
+
+  // Rate limiting
   const now = Date.now();
-  if(_rateLimits[username] && now - _rateLimits[username] < 4000) {
-    return res.status(429).json({ error: 'Too many requests' });
+  if (_rateLimits[username] && now - _rateLimits[username] < RATE_LIMIT_MS) {
+    return res.status(429).json({ error: 'Rate limited' });
   }
   _rateLimits[username] = now;
 
-  // Fetch current server state
-  const currentRes = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/players?username=eq.${username}&select=*`,
-    { headers: { 'apikey': process.env.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}` }}
-  );
-  const rows = await currentRes.json();
-  const current = rows[0];
+  // Validate session token
+  const { data: player, error: fetchErr } = await supabase
+    .from('players')
+    .select('session_token, gold, tokens, total_rocks, runs, updated_at, recent_runs, suspicious_count, is_banned, gc_extracted')
+    .eq('username', username)
+    .single();
 
-  if(!current) return res.status(403).json({ error: 'Player not found' });
+  if (fetchErr || !player) return res.status(403).json({ error: 'Player not found' });
+  if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session token' });
+  if (player.is_banned) return res.status(403).json({ error: 'Account banned from leaderboard' });
 
-  // SECURITY: Validate session token
-  if(current.session_token !== token) {
-    console.warn(`INVALID TOKEN: ${username} tried to save with wrong token`);
-    return res.status(403).json({ error: 'Invalid session token' });
-  }
+  // Time-based caps
+  const lastSaved = player.updated_at ? new Date(player.updated_at).getTime() : now - 60000;
+  const elapsedSec = Math.max(1, (now - lastSaved) / 1000);
+  const maxGold = (player.gold || 0) + Math.floor(elapsedSec * MAX_GOLD_PER_SEC);
+  const maxTokens = (player.tokens || 0) + elapsedSec * MAX_EXT_PER_SEC;
 
-  const secsSinceLastSave = Math.max(0, (Date.now() - new Date(current.updated_at).getTime()) / 1000);
-  
-  // SECURITY: Validate EXT earnings
-  const MAX_EXT_PER_SEC = 5;
-  let safeTokens = data.tokens || 0;
-  const tokenIncrease = safeTokens - (current.tokens || 0);
-  if(tokenIncrease > MAX_EXT_PER_SEC * secsSinceLastSave) {
-    console.warn(`CHEAT DETECTED: ${username} tried to add ${tokenIncrease} EXT`);
-    safeTokens = current.tokens + (MAX_EXT_PER_SEC * secsSinceLastSave);
-  }
+  const safeGold = Math.min(gold || 0, maxGold);
+  const safeTokens = Math.min(tokens || 0, maxTokens);
 
-  // SECURITY: Validate gold earnings
-  const MAX_GOLD_PER_SEC = 50;
-  let safeGold = data.gold || 0;
-  const goldIncrease = safeGold - (current.gold || 0);
-  if(goldIncrease > MAX_GOLD_PER_SEC * secsSinceLastSave) {
-    console.warn(`CHEAT DETECTED: ${username} tried to add ${goldIncrease} gold`);
-    safeGold = current.gold + (MAX_GOLD_PER_SEC * secsSinceLastSave);
-  }
+  // Rocks/runs can only go up
+  const safeRocks = Math.max(player.total_rocks || 0, total_rocks || 0);
+  const safeRuns = Math.max(player.runs || 0, runs || 0);
 
-  // SECURITY: Rocks and runs can only go up
-  const safeRocks = Math.max(current.total_rocks || 0, data.totalRocks || 0);
-  const safeRuns = Math.max(current.runs || 0, data.runs || 0);
-
-  // SECURITY: Validate upgrades — max level 500, only known keys allowed
-  const VALID_UPS = ['speed','power','sell','luck'];
+  // Validate upgrades
   const safeUps = {};
-  const currentUps = current.ups || {};
-  for(const key of VALID_UPS) {
-    const submitted = Math.floor(data.ups?.[key] || 0);
-    const existing = Math.floor(currentUps[key] || 0);
-    // Can only go up, never down, never above 500
-    safeUps[key] = Math.min(500, Math.max(existing, submitted));
-    // Can't jump more than reasonable per session (max ~10 levels per save)
-    if(safeUps[key] > existing + 10) {
-      console.warn(`CHEAT DETECTED: ${username} tried to jump ${key} from ${existing} to ${submitted}`);
-      safeUps[key] = existing + 10;
-    }
+  if (ups && typeof ups === 'object') {
+    VALID_UPS.forEach(k => {
+      const prev = player.ups ? (player.ups[k] || 0) : 0;
+      const next = Math.min(ups[k] || 0, MAX_UP_LEVEL);
+      safeUps[k] = Math.max(prev, Math.min(next, prev + MAX_UP_GAIN));
+    });
   }
 
-  // SECURITY: Validate inventory items and affix values
-  const VALID_MATS = ['Iron','Steel','Gold','Mithril','Adamant','Rune','Dragon'];
-  const VALID_TYPES = ['Pickaxe'];
-  const VALID_RARS = ['Common','Uncommon','Rare','Epic','Legendary'];
-  const safeInventory = (data.inventory || []).filter(function(item) {
-    if(!VALID_MATS.includes(item.mat)) return false;
-    if(!VALID_TYPES.includes(item.type)) return false;
-    if(!VALID_RARS.includes(item.rarN)) return false;
-    if(item.affixes && Array.isArray(item.affixes)) {
-      for(const a of item.affixes) {
-        if(typeof a.v !== 'number') return false;
-        if(a.v > 100 || a.v < 0) return false;
+  // Validate inventory
+  let safeInventory = [];
+  if (Array.isArray(inventory)) {
+    safeInventory = inventory.filter(item =>
+      item && VALID_ORES.includes(item.mat) &&
+      VALID_TYPES.includes(item.type) &&
+      VALID_RARITIES.includes(item.rarity) &&
+      typeof item.affixPow === 'number' && item.affixPow >= 0 && item.affixPow <= 100
+    ).slice(0, 50);
+  }
+
+  // Validate ore stash
+  let safeOreStash = {};
+  if (ore_stash && typeof ore_stash === 'object') {
+    VALID_ORES.forEach(ore => {
+      const prev = player.ore_stash ? (player.ore_stash[ore] || 0) : 0;
+      const next = ore_stash[ore] || 0;
+      safeOreStash[ore] = Math.max(prev, Math.min(next, prev + 500));
+    });
+  }
+
+  // --- God mode detection on safe extraction ---
+  let newRecentRuns = Array.isArray(player.recent_runs) ? [...player.recent_runs] : [];
+  let newSuspiciousCount = player.suspicious_count || 0;
+  let newGcExtracted = player.gc_extracted || 0;
+  let isBanned = false;
+  let banReason = null;
+
+  if (extraction && typeof extraction === 'object') {
+    const { floor, damage_taken, gc_earned } = extraction;
+    const runRecord = {
+      floor: floor || 0,
+      damage_taken: damage_taken || 0,
+      gc_earned: gc_earned || 0,
+      ts: now
+    };
+
+    // Add to recent runs, keep last 10
+    newRecentRuns.push(runRecord);
+    if (newRecentRuns.length > 10) newRecentRuns = newRecentRuns.slice(-10);
+
+    // Check for god mode: floor 5+ with 0 damage
+    if ((floor || 0) >= 5 && (damage_taken || 0) === 0) {
+      // Count how many suspicious runs in last 10
+      const suspiciousInRecent = newRecentRuns.filter(r => r.floor >= 5 && r.damage_taken === 0).length;
+      if (suspiciousInRecent >= 3) {
+        newSuspiciousCount++;
+      }
+      if (newSuspiciousCount >= 5) {
+        isBanned = true;
+        banReason = 'god_mode_detected';
       }
     }
-    return true;
-  });
 
-  // SECURITY: Validate ore stash values
-  const VALID_ORES = ['Coal','Iron','Copper','Silver','Gold','Platinum','Diamond'];
-  const safeOreStash = {};
-  for(const ore of VALID_ORES) {
-    const val = Math.floor(data.oreStash?.[ore] || 0);
-    const existing = Math.floor((current.ore_stash)?.[ore] || 0);
-    safeOreStash[ore] = Math.max(0, Math.min(val, existing + 500));
+    // Add GC from this extraction to lifetime total
+    newGcExtracted += Math.max(0, gc_earned || 0);
   }
 
-  const response = await fetch(
-    `${process.env.SUPABASE_URL}/rest/v1/players?username=eq.${username}`,
-    {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': process.env.SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`
-      },
-      body: JSON.stringify({
-        gold: safeGold,
-        tokens: safeTokens,
-        total_rocks: safeRocks,
-        runs: safeRuns,
-        chests: Math.max(current.chests || 0, data.chests || 0),
-        inventory: safeInventory,
-        equipped_slots: data.eqSlots,
-        ore_stash: safeOreStash,
-        ups: safeUps,
-        game_stats: data.gameStats,
-        achievements: data._achiev,
-        updated_at: new Date().toISOString()
-      })
-    }
-  );
+  // Build update object
+  const updateData = {
+    gold: Math.round(safeGold),
+    tokens: safeTokens,
+    total_rocks: safeRocks,
+    runs: safeRuns,
+    chests: Math.max(player.chests || 0, chests || 0),
+    ups: safeUps,
+    ore_stash: safeOreStash,
+    inventory: safeInventory,
+    equipped_slots: equipped_slots || {},
+    game_stats: game_stats || {},
+    achievements: achievements || {},
+    updated_at: new Date().toISOString(),
+    recent_runs: newRecentRuns,
+    suspicious_count: newSuspiciousCount,
+    gc_extracted: newGcExtracted
+  };
 
-  res.status(response.ok ? 200 : 500).json({ ok: response.ok });
+  if (isBanned) {
+    updateData.is_banned = true;
+    updateData.ban_reason = banReason;
+  }
+
+  const { error: updateErr } = await supabase
+    .from('players')
+    .update(updateData)
+    .eq('username', username);
+
+  if (updateErr) return res.status(500).json({ error: 'Save failed' });
+
+  return res.status(200).json({ ok: true, banned: isBanned });
 }
