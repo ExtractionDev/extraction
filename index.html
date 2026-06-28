@@ -489,8 +489,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     <div class="nav-btn" id="nb6" onclick="goTab(6)"><i class="ti ti-hammer"></i><span>Smith</span></div>
     <div class="nav-btn" id="nb7" onclick="goTab(7)"><i class="ti ti-trophy"></i><span>Ranks</span></div>
   </div>
-  <button class="nav-wallet" id="walletBtn" onclick="connectPhantom()" style="padding:14px 24px;font-size:18px;gap:10px;border-radius:10px"><i class="ti ti-wallet" style="font-size:22px"></i><span>Connect</span></button>
-  <button class="nav-wallet" onclick="openSettings()" style="margin-left:6px;padding:14px 18px;border-radius:10px"><i class="ti ti-settings" style="font-size:22px"></i></button>
+  <button class="nav-wallet" id="walletBtn" onclick="connectPhantom()" style="padding:14px 20px;font-size:17px;gap:8px;border-radius:10px"><i class="ti ti-wallet" style="font-size:19px"></i><span>Connect</span></button>
+  <button class="nav-wallet home-btn-signin" id="navSignInBtn" onclick="openXAuth()" style="padding:14px 20px;font-size:17px;gap:8px;border-radius:10px;margin-left:0;border-color:#1d9bf0;color:#1d9bf0"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.844-8.17-10.656h6.28l4.265 5.64L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg><span id="navSignInLabel">Sign In</span></button>
+  <button class="nav-wallet" onclick="openSettings()" style="margin-left:6px;padding:14px 18px;border-radius:10px"><i class="ti ti-settings" style="font-size:19px"></i></button>
 </div>
 
 <!-- HOME -->
@@ -645,8 +646,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 <!-- MINER -->
 <div class="tab noscroll miner-tab" id="t2">
   <div class="miner-top">
-    <div class="m-stat"><i class="ti ti-coins" style="color:var(--gold)"></i><span class="m-val" id="mg">0</span><span style="font-size:9px;color:var(--gold2)"> GC</span></div>
-    <div class="m-stat"><i class="ti ti-diamond" style="color:#a070ff"></i><span class="m-val" id="mt">0</span><span style="font-size:9px;color:#a070ff"> $EXT</span></div>
+    <div class="m-stat" style="font-size:39px"><i class="ti ti-coins" style="color:var(--gold);font-size:42px"></i><span class="m-val" id="mg">0</span><span style="font-size:27px;color:var(--gold2)"> GC</span></div>
+    <div class="m-stat" style="font-size:39px"><i class="ti ti-diamond" style="color:#a070ff;font-size:42px"></i><span class="m-val" id="mt">0</span><span style="font-size:27px;color:#a070ff"> $EXT</span></div>
     <div class="m-stat"><i class="ti ti-bolt" style="color:var(--green)"></i><span class="m-val" id="mdps">0</span><span style="font-size:9px;color:var(--green)"> DPS</span></div>
   </div>
   <div class="miner-body">
@@ -4890,6 +4891,10 @@ function _setSignedInUI(username){
   var lbl=document.getElementById('homeSignInLabel');
   if(btn){btn.className='home-btn-secondary home-btn-signin signedin';}
   if(lbl){lbl.textContent='@'+username;}
+  var navBtn=document.getElementById('navSignInBtn');
+  var navLbl=document.getElementById('navSignInLabel');
+  if(navBtn){navBtn.style.borderColor='#1dbc8f';navBtn.style.color='#1dbc8f';}
+  if(navLbl){navLbl.textContent='@'+username;}
   if(typeof _unlockNav==='function')_unlockNav();
   // Show streak widget — read streak from saved auth data
   setTimeout(function(){
@@ -4954,6 +4959,10 @@ function _setSignedOutUI(){
   var lbl=document.getElementById('homeSignInLabel');
   if(btn){btn.className='home-btn-secondary home-btn-signin';}
   if(lbl){lbl.textContent='Sign In';}
+  var navBtn=document.getElementById('navSignInBtn');
+  var navLbl=document.getElementById('navSignInLabel');
+  if(navBtn){navBtn.style.borderColor='#1d9bf0';navBtn.style.color='#1d9bf0';}
+  if(navLbl){navLbl.textContent='Sign In';}
   // Lock the bottom nav visually — only Home is accessible until signed in
   for(var i=1;i<8;i++){var nb=document.getElementById('nb'+i);if(nb){nb.style.opacity='0.4';nb.style.cursor='not-allowed';}}
 }
