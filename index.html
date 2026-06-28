@@ -399,6 +399,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 /* MINIMAP */
 .minimap-wrap{position:absolute;top:4px;right:4px;width:300px;height:90px;background:rgba(4,3,8,.92);border:1.5px solid var(--border3);border-radius:8px;overflow:hidden;box-shadow:0 3px 16px rgba(0,0,0,.7)}
 .minimap-wrap canvas{display:block;width:100%;height:100%}
+/* CONTROLS HELPER */
+.ctrl-helper{position:absolute;bottom:12px;left:12px;background:rgba(6,5,10,.97);border:1.5px solid var(--border3);border-radius:14px;padding:16px 18px;z-index:60;min-width:240px;backdrop-filter:blur(10px);box-shadow:0 8px 32px rgba(0,0,0,.8);transition:opacity .2s}
+.ctrl-helper-title{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);font-weight:700;display:flex;align-items:center;gap:7px;margin-bottom:12px;padding-bottom:9px;border-bottom:1px solid var(--border2)}
+.ctrl-row{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.ctrl-row:last-child{border-bottom:none;padding-bottom:0}
+.ctrl-keys{display:flex;gap:4px;min-width:86px;flex-wrap:wrap}
+.ctrl-key{background:var(--bg4);border:1px solid var(--border3);border-bottom:3px solid var(--border2);border-radius:5px;padding:3px 8px;font-size:10px;color:var(--text);font-family:'Space Mono',monospace;font-weight:700;min-width:24px;text-align:center;line-height:1.4}
+.ctrl-desc{font-size:10px;color:var(--text2);flex:1;letter-spacing:.03em}
 
 .docs-tab.on{display:block!important}
 .docs-inner{max-width:680px;margin:0 auto}
@@ -623,9 +631,43 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
         <div class="hp-wrap" style="flex:1"><div id="bossHpB" style="height:100%;width:100%;background:#e84b4b;border-radius:3px;transition:width .15s"></div></div>
         <span style="font-size:10px;color:#e84b4b;font-weight:700" id="bossHpT">600</span>
       </div>
-      <div class="hud-g"><button id="cavMusBtn" onclick="cavMusicToggle()" style="background:none;border:1px solid var(--border2);border-radius:6px;color:var(--text2);font-size:13px;padding:2px 8px;cursor:pointer;line-height:1;transition:border-color .2s" title="Mute music">🎵</button></div>
+      <div class="hud-g"><button id="cavMusBtn" onclick="cavMusicToggle()" style="background:none;border:1px solid var(--border2);border-radius:6px;color:var(--text2);font-size:13px;padding:2px 8px;cursor:pointer;line-height:1;transition:border-color .2s" title="Mute music">🎵</button><button onclick="toggleCtrlHelper()" style="background:none;border:1px solid var(--border2);border-radius:6px;color:var(--text3);font-size:12px;padding:2px 8px;cursor:pointer;line-height:1;transition:all .2s;margin-left:4px;font-family:'Space Mono',monospace;letter-spacing:.05em" title="Controls" id="ctrlHelperBtn">? <span style="font-size:9px;letter-spacing:.1em;text-transform:uppercase">Keys</span></button></div>
     </div>
-    <div class="dung-canvas" style="position:relative"><canvas id="dcv" width="800" height="400" style="filter:brightness(1.25)"></canvas><div class="minimap-wrap"><canvas id="mmcv" width="600" height="180"></canvas></div></div>
+    <div class="dung-canvas" style="position:relative"><canvas id="dcv" width="800" height="400" style="filter:brightness(1.25)"></canvas><div class="minimap-wrap"><canvas id="mmcv" width="600" height="180"></canvas></div>
+      <!-- CONTROLS HELPER -->
+      <div class="ctrl-helper" id="ctrlHelper" style="display:none">
+        <div class="ctrl-helper-title"><i class="ti ti-device-gamepad-2" style="font-size:13px"></i> Controls<button onclick="toggleCtrlHelper()" style="margin-left:auto;background:none;border:none;color:var(--text4);font-size:15px;cursor:pointer;line-height:1;padding:0;transition:color .15s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text4)'">✕</button></div>
+        <div style="display:flex;flex-direction:column">
+          <div class="ctrl-row">
+            <div class="ctrl-keys"><span class="ctrl-key">A</span><span class="ctrl-key">←</span></div>
+            <span class="ctrl-desc">Move left</span>
+          </div>
+          <div class="ctrl-row">
+            <div class="ctrl-keys"><span class="ctrl-key">D</span><span class="ctrl-key">→</span></div>
+            <span class="ctrl-desc">Move right</span>
+          </div>
+          <div class="ctrl-row">
+            <div class="ctrl-keys"><span class="ctrl-key">W</span><span class="ctrl-key">↑</span><span class="ctrl-key" style="font-size:9px">SPC</span></div>
+            <span class="ctrl-desc">Jump <span style="color:var(--text4);font-size:9px">(hold Space to charge)</span></span>
+          </div>
+          <div class="ctrl-row">
+            <div class="ctrl-keys"><span class="ctrl-key">S</span><span class="ctrl-key">↓</span></div>
+            <span class="ctrl-desc">Drop to next floor</span>
+          </div>
+          <div class="ctrl-row">
+            <div class="ctrl-keys"><span class="ctrl-key" style="color:var(--gold);border-color:#3a3020;border-bottom-color:#2a2010">E</span></div>
+            <span class="ctrl-desc">Mine · Attack · Interact</span>
+          </div>
+          <div class="ctrl-row">
+            <div class="ctrl-keys"><span class="ctrl-key" style="font-size:9px">🖱 LMB</span></div>
+            <span class="ctrl-desc">Mine ore block</span>
+          </div>
+          <div class="ctrl-row" style="margin-top:8px;padding-top:10px;border-top:1px solid var(--border2)">
+            <span style="font-size:9px;color:var(--text4);letter-spacing:.08em;line-height:1.7">Touch buttons available<br>in the bar below the screen</span>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="dung-ctrls">
       <div class="ctrl-g">
         <div class="ctrl-btn" onpointerdown="DK.l=1" onpointerup="DK.l=0" onpointerleave="DK.l=0"><i class="ti ti-arrow-left"></i></div>
@@ -3407,6 +3449,14 @@ function cavMusicStop(){
   }
 }
 
+function toggleCtrlHelper(){
+  var h=document.getElementById('ctrlHelper');
+  var b=document.getElementById('ctrlHelperBtn');
+  if(!h)return;
+  var open=h.style.display==='none';
+  h.style.display=open?'block':'none';
+  if(b){b.style.borderColor=open?'var(--gold)':'var(--border2)';b.style.color=open?'var(--gold)':'var(--text3)';}
+}
 function cavMusicToggle(){
   _cav.muted=!_cav.muted;
   if(_cav.mast&&_cav.ctx){
