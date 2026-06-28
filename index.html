@@ -2361,8 +2361,8 @@ function uiAll(){
   el('mrN').textContent=mRockNum;el('mrD').textContent=totalRocks;
   var _hjEl=document.getElementById('homeJackpotAmt');
   if(_hjEl){
-    var _ep=excPool;
-    var _epStr=_ep>=1000?(Math.floor(_ep/1000))+'K':Math.floor(_ep)+'';
+    var _ep=globalPool>0?globalPool:excPool;
+    var _epStr=_ep>=1000?((_ep/1000).toFixed(1))+'K':_ep.toFixed(3);
     _hjEl.textContent=_epStr+' $EXT';
   }
   var eqEl=el('eqDisplay');
