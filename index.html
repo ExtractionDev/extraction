@@ -2116,6 +2116,22 @@ function _usdcIx(fromATA,toATA,ownerPk,amount){
     programId:new solanaWeb3.PublicKey(_TOKEN_PROG),data:data
   });
 }
+// Idempotent ATA creation — creates token account if missing, no-op if it already exists
+function _createATAIx(payerPk,ownerPk,mintPk){
+  var ata=_getATA(ownerPk,mintPk);
+  return new solanaWeb3.TransactionInstruction({
+    keys:[
+      {pubkey:payerPk,isSigner:true,isWritable:true},
+      {pubkey:ata,isSigner:false,isWritable:true},
+      {pubkey:ownerPk,isSigner:false,isWritable:false},
+      {pubkey:mintPk,isSigner:false,isWritable:false},
+      {pubkey:new solanaWeb3.PublicKey('11111111111111111111111111111111'),isSigner:false,isWritable:false},
+      {pubkey:new solanaWeb3.PublicKey(_TOKEN_PROG),isSigner:false,isWritable:false}
+    ],
+    programId:new solanaWeb3.PublicKey(_ASSOC_PROG),
+    data:new Uint8Array([1])
+  });
+}
 async function buyWithUSDC(lid,sellerWallet,priceUsdc){
   var _xd=_getAuth();if(!_xd||!_xd.username){alert('Sign in to buy.');return;}
   if(!walletConnected||!walletAddress){alert('Connect your Phantom wallet to buy with USDC.');return;}
@@ -2138,6 +2154,8 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
     var sellerATA=_getATA(sellerPk,mintPk);
     var devATA=_getATA(devPk,mintPk);
     var tx=new solanaWeb3.Transaction();
+    tx.add(_createATAIx(buyerPk,sellerPk,mintPk)); // ensure seller USDC account exists
+    tx.add(_createATAIx(buyerPk,devPk,mintPk));    // ensure dev USDC account exists
     tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
     tx.add(_usdcIx(buyerATA,devATA,buyerPk,devUnits));
     tx.feePayer=buyerPk;
@@ -2394,6 +2412,8 @@ async function buyOreWithUSDC(lid,sellerWallet,pricePerUnit,qty){
     var sellerATA=_getATA(sellerPk,mintPk);
     var devATA=_getATA(devPk,mintPk);
     var tx=new solanaWeb3.Transaction();
+    tx.add(_createATAIx(buyerPk,sellerPk,mintPk));
+    tx.add(_createATAIx(buyerPk,devPk,mintPk));
     tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
     tx.add(_usdcIx(buyerATA,devATA,buyerPk,devUnits));
     tx.feePayer=buyerPk;
