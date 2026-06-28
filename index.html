@@ -1980,9 +1980,6 @@ function minerLoop(){
   if(_now-_mLastT<10){requestAnimationFrame(minerLoop);return;} // cap ~100fps max
   _mLastT=_now;
   mTk++;
-  if(mRspTmr>0){mRspTmr--;if(mRspTmr<=0)mNewRock();}
-  else{var iv=60/getSpd();mSwTmr++;if(mSwTmr>=iv&&mRockHP>0){mSwTmr=0;mHitRock();}}
-  if(mEXTToast.life>0)mEXTToast.life--;
   // Tick idle miner animation
   var targetMState=(mSwAnim>0)?'mine':'idle';
   if(targetMState!==mAnimState){mAnimState=targetMState;mAnimFrame=0;mAnimTick=0;}
@@ -1996,6 +1993,12 @@ function minerLoop(){
   if(mTk%60===0)uiAll();
   requestAnimationFrame(minerLoop);
 }
+// Mining LOGIC runs on setInterval so it works even when browser tab is hidden
+setInterval(function(){
+  if(mEXTToast.life>0)mEXTToast.life--;
+  if(mRspTmr>0){mRspTmr--;if(mRspTmr<=0)mNewRock();}
+  else{var iv=60/getSpd();mSwTmr++;if(mSwTmr>=iv&&mRockHP>0){mSwTmr=0;mHitRock();}}
+},16); // ~60 ticks per second
 function drawMiner(){
   var W=560,H=400;
   // Crystal cave background
