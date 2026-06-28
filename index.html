@@ -760,7 +760,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
         <div id="oreListModalContent"></div>
         <div style="display:flex;gap:10px;margin-top:16px">
           <input id="oreListQty" type="number" min="1" placeholder="Qty" style="width:70px;background:var(--bg4);border:1px solid var(--border3);border-radius:6px;color:var(--text);padding:6px;font-family:'Space Mono',monospace;font-size:12px">
-          <input id="oreListPrice" type="number" min="1" placeholder="Price (EXT)" style="flex:1;background:var(--bg4);border:1px solid var(--border3);border-radius:6px;color:var(--text);padding:6px;font-family:'Space Mono',monospace;font-size:12px">
+          <input id="oreListPrice" type="number" min="0.01" step="0.01" placeholder="Price/unit (USDC)" style="flex:1;background:var(--bg4);border:1px solid var(--border3);border-radius:6px;color:var(--text);padding:6px;font-family:'Space Mono',monospace;font-size:12px">
           <button onclick="confirmOreList()" style="background:var(--green);border:none;border-radius:6px;color:#fff;padding:6px 12px;cursor:pointer;font-family:'Space Mono',monospace;font-size:11px">List</button>
           <button onclick="closeOreListModal()" style="background:var(--bg4);border:1px solid var(--border3);border-radius:6px;color:var(--text);padding:6px 12px;cursor:pointer;font-family:'Space Mono',monospace;font-size:11px">×</button>
         </div>
@@ -2154,7 +2154,7 @@ function renderOreMarket(){
   if(myGrid){
     myGrid.innerHTML=myOre.map(function(li){
       var ore=DORES.find(function(o){return o.n===li.oreName;})||DORES[0];
-      return '<div class="mk-ore-listing" style="background:var(--bg4);border:1.5px solid '+ore.c+';border-radius:10px;padding:10px 14px;min-width:160px">'+'<div style="font-size:10px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>'+'<div style="display:flex;align-items:center;gap:8px">'+oreSprite(ore,32)+'<span style="color:'+ore.tc+';font-size:12px;font-weight:700">'+li.oreName+'</span>'+'</div>'+'<div style="color:var(--text3);font-size:10px;margin:3px 0">×'+li.qty+' units</div>'+'<div style="color:#a070ff;font-size:11px;font-weight:700">'+li.price+' EXT</div>'+'<div onclick="withdrawOreListing(\''+li.lid+'\')" style="margin-top:6px;font-size:9px;color:var(--text4);cursor:pointer;text-decoration:underline">Withdraw</div>'+'</div>';
+      return '<div class="mk-ore-listing" style="background:var(--bg4);border:1.5px solid '+ore.c+';border-radius:10px;padding:10px 14px;min-width:160px">'+'<div style="font-size:10px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>'+'<div style="display:flex;align-items:center;gap:8px">'+oreSprite(ore,32)+'<span style="color:'+ore.tc+';font-size:12px;font-weight:700">'+li.oreName+'</span>'+'</div>'+'<div style="color:var(--text3);font-size:10px;margin:3px 0">×'+li.qty+' units</div>'+'<div style="color:#26c281;font-size:11px;font-weight:700">$'+parseFloat(li.price).toFixed(2)+' USDC each</div>'+'<div onclick="withdrawOreListing(\''+li.lid+'\')" style="margin-top:6px;font-size:9px;color:var(--text4);cursor:pointer;text-decoration:underline">Withdraw</div>'+'</div>';
     }).join('');
   }
   // All market listings — fetch from server
@@ -2178,7 +2178,7 @@ function renderOreMarket(){
           +'<div style="font-size:10px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>'
           +'<div style="display:flex;align-items:center;gap:8px">'+oreSprite(ore,32)+'<span style="color:'+ore.tc+';font-size:12px;font-weight:700">'+l.ore_name+'</span></div>'
           +'<div style="color:var(--text3);font-size:10px;margin:3px 0">×'+l.qty+' units</div>'
-          +'<div style="color:#a070ff;font-size:11px;font-weight:700">'+l.price+' EXT each</div>'
+          +'<div style="color:#26c281;font-size:11px;font-weight:700">$'+parseFloat(l.price).toFixed(2)+' USDC each</div>'
           +'<div onclick="withdrawOreListing(\''+l.id+'\')" style="margin-top:6px;font-size:9px;color:var(--text4);cursor:pointer;text-decoration:underline">Withdraw</div>'
           +'</div>';
       }).join('');
@@ -2187,27 +2187,27 @@ function renderOreMarket(){
       allGrid.innerHTML=filtered.map(function(l){
         var ore=DORES.find(function(o){return o.n===l.ore_name;})||DORES[0];
         var isOwn=l.seller===myUser2;
-        var totalCost=l.price*l.qty;
-        var canBuy=!isOwn&&tokens>=totalCost;
+        var totalCost=parseFloat(l.price)*l.qty;
         var badge=isOwn?'<div style="font-size:10px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>':'<div style="font-size:9px;color:var(--blue);margin-bottom:4px">@'+l.seller+'</div>';
         var btn=isOwn
           ?'<button style="margin-top:6px;width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--text4);padding:4px;font-size:9px;font-family:\'Space Mono\',monospace;cursor:default">Listed</button>'
-          :'<button onclick="buyOreItem(\''+l.id+'\')" style="margin-top:6px;width:100%;background:'+(canBuy?'#4a2060':'var(--bg3)')+';border:1px solid '+(canBuy?'#a070ff':'var(--border2)')+';border-radius:5px;color:'+(canBuy?'#c090ff':'var(--text4)')+';padding:4px;cursor:'+(canBuy?'pointer':'default')+';font-size:9px;font-family:\'Space Mono\',monospace">Buy ×'+l.qty+'</button>';
+          :'<button id="orebtn_'+l.id+'" onclick="buyOreWithUSDC(\''+l.id+'\',\''+(l.seller_wallet||'')+'\','+parseFloat(l.price)+','+l.qty+')" style="margin-top:6px;width:100%;background:#0a2018;border:1px solid #26c281;border-radius:5px;color:#26c281;padding:4px;cursor:pointer;font-size:9px;font-family:\'Space Mono\',monospace">Buy ×'+l.qty+' USDC</button>';
         return'<div style="background:var(--bg4);border:1.5px solid '+ore.c+';border-radius:10px;padding:10px 14px;min-width:180px">'+badge
           +'<div style="display:flex;align-items:center;gap:8px">'+oreSprite(ore,32)+'<span style="color:'+ore.tc+';font-size:12px;font-weight:700">'+l.ore_name+'</span></div>'
-          +'<div style="color:var(--text3);font-size:10px;margin:3px 0">×'+l.qty+' units @ '+l.price+' each</div>'
-          +'<div style="color:#a070ff;font-size:11px;font-weight:700">'+totalCost.toFixed(2)+' EXT total</div>'+btn+'</div>';
+          +'<div style="color:var(--text3);font-size:10px;margin:3px 0">×'+l.qty+' units @ $'+parseFloat(l.price).toFixed(2)+' each</div>'
+          +'<div style="color:#26c281;font-size:11px;font-weight:700">$'+totalCost.toFixed(2)+' USDC total</div>'+btn+'</div>';
       }).join('');
     }).catch(function(){if(allGrid)allGrid.innerHTML='<div style="text-align:center;padding:30px;color:var(--red);font-size:11px">Failed to load. Refresh to try again.</div>';});
 }
 function openOreListModal(oreName){
+  if(!walletConnected||!walletAddress){alert('Connect your Phantom wallet first to list ores for USDC.');return;}
   _oreListingName=oreName;
   var ore=DORES.find(function(o){return o.n===oreName;})||DORES[0];
   var qty=oreStash[oreName]||0;
   var modal=document.getElementById('oreListModal');
   var content=document.getElementById('oreListModalContent');
   if(!modal||!content)return;
-  content.innerHTML='<div style="font-size:13px;font-weight:700;color:'+ore.tc+';margin-bottom:8px">List '+oreName+' for sale</div>'+'<div style="font-size:10px;color:var(--text3);margin-bottom:12px">You have <b style="color:var(--gold)">×'+qty+'</b> '+oreName+' in stash.</div>';
+  content.innerHTML='<div style="font-size:13px;font-weight:700;color:'+ore.tc+';margin-bottom:8px">List '+oreName+' for sale</div>'+'<div style="font-size:10px;color:var(--text3);margin-bottom:12px">You have <b style="color:var(--gold)">×'+qty+'</b> '+oreName+' in stash. Price in USDC per unit.</div>';
   document.getElementById('oreListQty').value='';
   document.getElementById('oreListQty').max=qty;
   document.getElementById('oreListPrice').value='';
@@ -2220,19 +2220,17 @@ function confirmOreList(){
   var price=parseFloat(document.getElementById('oreListPrice').value)||0;
   var avail=oreStash[_oreListingName]||0;
   if(qty<1||qty>avail){alert('Invalid quantity');return;}
-  if(price<=0){alert('Enter a price');return;}
+  if(price<0.01){alert('Enter a valid USDC price per unit (min $0.01)');return;}
+  if(!walletConnected||!walletAddress){alert('Connect your Phantom wallet to list ores.');return;}
   var _xd=_getAuth();if(!_xd||!_xd.username){alert('Sign in to list.');return;}
-  // Deduct from stash immediately
   oreStash[_oreListingName]=avail-qty;
   if(oreStash[_oreListingName]<=0)delete oreStash[_oreListingName];
   saveGame();closeOreListModal();renderOreMarket();
   fetch('/api/ore-listings',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action:'list',username:_xd.username,token:_xd.token||'',ore_name:_oreListingName,qty:qty,price:price})
+    body:JSON.stringify({action:'list',username:_xd.username,token:_xd.token||'',ore_name:_oreListingName,qty:qty,price:price,seller_wallet:walletAddress})
   }).then(function(r){return r.json();}).then(function(d){
-    if(!d.ok){// Restore stash on failure
-      oreStash[_oreListingName]=(oreStash[_oreListingName]||0)+qty;saveGame();renderOreMarket();
-      alert('Listing failed: '+(d.error||'Try again'));
-    } else renderOreMarket();
+    if(!d.ok){oreStash[_oreListingName]=(oreStash[_oreListingName]||0)+qty;saveGame();renderOreMarket();alert('Listing failed: '+(d.error||'Try again'));}
+    else renderOreMarket();
   }).catch(function(){oreStash[_oreListingName]=(oreStash[_oreListingName]||0)+qty;saveGame();renderOreMarket();});
 }
 function withdrawOreListing(lid){
@@ -2244,17 +2242,53 @@ function withdrawOreListing(lid){
     renderOreMarket();
   }).catch(function(){renderOreMarket();});
 }
-function buyOreItem(lid){
-  var _xd=_getAuth();if(!_xd){alert('Sign in to buy.');return;}
-  fetch('/api/ore-listings',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action:'buy',username:_xd.username,token:_xd.token||'',lid:lid})
-  }).then(function(r){return r.json();}).then(function(d){
+async function buyOreWithUSDC(lid,sellerWallet,pricePerUnit,qty){
+  var _xd=_getAuth();if(!_xd||!_xd.username){alert('Sign in to buy.');return;}
+  if(!walletConnected||!walletAddress){alert('Connect your Phantom wallet to buy with USDC.');return;}
+  if(!window.solanaWeb3){alert('Web3 not loaded, refresh and try again.');return;}
+  if(!sellerWallet){alert('This listing is missing a seller wallet address.');return;}
+  var totalUsdc=pricePerUnit*qty;
+  var btn=document.getElementById('orebtn_'+lid);
+  try{
+    if(btn){btn.disabled=true;btn.textContent='Sending...';}
+    var conn=new solanaWeb3.Connection('https://api.mainnet-beta.solana.com','confirmed');
+    var buyerPk=new solanaWeb3.PublicKey(walletAddress);
+    var sellerPk=new solanaWeb3.PublicKey(sellerWallet);
+    var devPk=new solanaWeb3.PublicKey(_DEV_WALLET);
+    var mintPk=new solanaWeb3.PublicKey(_USDC_MINT);
+    var totalUnits=Math.round(totalUsdc*1e6);
+    var sellerUnits=Math.round(totalUnits*0.95);
+    var devUnits=totalUnits-sellerUnits;
+    var buyerATA=_getATA(buyerPk,mintPk);
+    var sellerATA=_getATA(sellerPk,mintPk);
+    var devATA=_getATA(devPk,mintPk);
+    var tx=new solanaWeb3.Transaction();
+    tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
+    tx.add(_usdcIx(buyerATA,devATA,buyerPk,devUnits));
+    tx.feePayer=buyerPk;
+    var bh=await conn.getLatestBlockhash();
+    tx.recentBlockhash=bh.blockhash;
+    var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
+    var signed=await provider.signAndSendTransaction(tx);
+    if(btn){btn.textContent='Confirming...';}
+    await conn.confirmTransaction(signed.signature,'confirmed');
+    var r=await fetch('/api/ore-usdc-buy',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:_xd.username,token:_xd.token||'',lid:lid,signature:signed.signature})});
+    var d=await r.json();
     if(d.ok){
       oreStash[d.ore_name]=(oreStash[d.ore_name]||0)+d.qty;
-      tokens-=d.cost;saveGame();uiAll();renderOreMarket();
-      showAchieve('⛏️','Purchase Complete','Got ×'+d.qty+' '+d.ore_name+'!');
-    } else alert(d.error||'Purchase failed. Try again.');
-  }).catch(function(){alert('Network error. Try again.');});
+      saveGame();uiAll();renderOreMarket();
+      showAchieve('⛏️','Purchase Complete!','Got ×'+d.qty+' '+d.ore_name+' for $'+totalUsdc.toFixed(2)+' USDC!');
+    }else{
+      alert((d.error||'Ore transfer failed.')+'\nTX: '+signed.signature+'\nContact support if USDC was deducted.');
+    }
+  }catch(e){
+    console.error('Ore USDC buy error:',e);
+    if(btn){btn.disabled=false;btn.textContent='Buy ×'+qty+' USDC';}
+    if(e.message&&e.message.includes('rejected'))return;
+    alert(e.message||'Transaction failed. Try again.');
+    renderOreMarket();
+  }
 }
 
 function uiAll(){
