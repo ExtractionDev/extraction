@@ -4334,15 +4334,16 @@ function dDraw(){
   }}
   for(var i=0;i<f.rocks.length;i++){var r=f.rocks[i];if(r.done)continue;var rx=r.x-dcam;if(rx<-30||rx>W+30)continue;
     if(r.isExcalibur){
-      // Glowing aura pulse behind the image
-      var gp=0.3+Math.sin(dtk*.1+r.x)*.2;
-      DC.globalAlpha=gp;DC.fillStyle='#00cfff';DC.beginPath();DC.arc(rx,r.y-10,42,0,Math.PI*2);DC.fill();
-      DC.globalAlpha=gp*0.4;DC.fillStyle='#ffffff';DC.beginPath();DC.arc(rx,r.y-10,52,0,Math.PI*2);DC.fill();
-      DC.globalAlpha=1;
-      // Draw the crystal hammer image centred on the rock
       var iw=64,ih=80;
+      var _cy=r.y-ih+23; // bottom of image sits on platform surface
+      // Subtle soft glow centred on the crystal, not below it
+      var _gr=DC.createRadialGradient(rx,_cy+ih*0.45,0,rx,_cy+ih*0.45,iw*0.9);
+      var _gp=0.10+Math.sin(dtk*.08+r.x)*.04;
+      _gr.addColorStop(0,'rgba(0,210,255,'+_gp.toFixed(3)+')');
+      _gr.addColorStop(1,'rgba(0,180,255,0)');
+      DC.fillStyle=_gr;DC.fillRect(rx-iw,_cy,iw*2,ih);
       if(_excImg.complete&&_excImg.naturalWidth>0){
-        DC.drawImage(_excImg,rx-iw/2,r.y-ih,iw,ih);
+        DC.drawImage(_excImg,rx-iw/2,_cy,iw,ih);
       }
       continue;
     }
