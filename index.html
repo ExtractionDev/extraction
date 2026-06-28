@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Serif+Display&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://unpkg.com/@solana/web3.js@1.87.6/lib/index.iife.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -1140,14 +1141,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
   <div class="modal">
     <div class="modal-title">List Item for Sale</div>
     <div class="modal-item-preview" id="listModalItem"></div>
-    <div class="modal-label">Price <i class="ti ti-diamond" style="color:#a070ff;font-size:13px;vertical-align:middle"></i> <span style="color:#a070ff;font-weight:700">$EXT</span></div>
-    <input type="number" id="listPrice" class="modal-input" min="1" placeholder="Enter listing price...">
+    <div class="modal-label">Price <i class="ti ti-currency-dollar" style="color:#26c281;font-size:13px;vertical-align:middle"></i> <span style="color:#26c281;font-weight:700">USDC</span></div>
+    <input type="number" id="listPrice" class="modal-input" min="0.01" step="0.01" placeholder="e.g. 2.50">
+    <div style="font-size:9px;color:var(--text4);margin-top:4px;letter-spacing:.04em">Buyer pays in USDC · You receive 95% · 5% marketplace fee</div>
     <div class="modal-btns">
       <button class="modal-cancel" onclick="closeListModal()">Cancel</button>
       <button class="modal-confirm" onclick="confirmList()"><i class="ti ti-tag"></i> List for Sale</button>
     </div>
   </div>
-
 </div>
 
 <!-- Tab 7: Full Leaderboard -->
@@ -1918,30 +1919,29 @@ function renderBackpack(){
 
 function openListModal(itemId){
   var it=inventory.find(function(x){return x.id===itemId});if(!it)return;
+  if(!walletConnected||!walletAddress){alert('Connect your Phantom wallet first to list items for USDC.');return;}
   listingItemId=itemId;
   document.getElementById('listModalItem').innerHTML=itemIcon(it.rar,60)+'<div><div style="font-size:12px;color:'+it.rar.c+';font-weight:700">'+it.mat+' '+it.type+'</div><div style="font-size:12px;color:var(--text3)">'+it.rar.n+' · '+it.affixes.map(function(a){return'+'+a.v+'% '+a.t.n}).join(', ')+'</div></div>';
-  document.getElementById('listPrice').value=it.price;
+  document.getElementById('listPrice').value='';
   document.getElementById('listModal').style.display='flex';
 }
 function closeListModal(){document.getElementById('listModal').style.display='none';listingItemId=null;}
 function _getAuth(){try{return JSON.parse(localStorage.getItem(_xAuthKey)||'null');}catch(e){return null;}}
 function confirmList(){
   var it=inventory.find(function(x){return x.id===listingItemId});if(!it)return;
-  var price=parseInt(document.getElementById('listPrice').value);
-  if(!price||price<1){alert('Enter a valid price.');return;}
+  var price=parseFloat(document.getElementById('listPrice').value);
+  if(!price||price<0.01){alert('Enter a valid USDC price (min $0.01).');return;}
+  if(!walletConnected||!walletAddress){alert('Connect your Phantom wallet to list items.');return;}
   var _xd=_getAuth();if(!_xd||!_xd.username){alert('Sign in to list items.');return;}
-  // Serialize item for server
   var itemData={id:it.id,slot:it.slot||'pickaxe',mat:it.mat,type:it.type,rarN:it.rar.n,
     affixes:it.affixes.map(function(a){return{tk:a.t.k,v:a.v};}),price:price};
-  // Remove from local inventory immediately
   inventory=inventory.filter(function(x){return x.id!==listingItemId});
   saveGame();closeListModal();uiAll();
   fetch('/api/listings',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action:'list',username:_xd.username,token:_xd.token||'',item:itemData,price:price})
+    body:JSON.stringify({action:'list',username:_xd.username,token:_xd.token||'',item:itemData,price:price,seller_wallet:walletAddress})
   }).then(function(r){return r.json();}).then(function(d){
     if(d.ok){if(activeTab===3)renderMarket(mkFilter);}
-    else{// Failed — restore item
-      inventory.push(it);saveGame();uiAll();alert('Listing failed: '+(d.error||'Try again'));}
+    else{inventory.push(it);saveGame();uiAll();alert('Listing failed: '+(d.error||'Try again'));}
   }).catch(function(){inventory.push(it);saveGame();uiAll();});
 }
 function withdrawListing(lid){
@@ -1965,6 +1965,77 @@ function buyListedItem(lid){
       showAchieve('🛒','Purchase Complete','Got '+d.item.mat+' '+d.item.type+'!');
     } else {alert(d.error||'Purchase failed. Try again.');}
   }).catch(function(){alert('Network error. Try again.');});
+}
+
+// ── USDC Marketplace ────────────────────────────────────────────────────────
+var _USDC_MINT='EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+var _DEV_WALLET='B8ubxUGnvhDTGGRkkN8DkyAfnoLEfnjTPdXfQn3TnVQa';
+var _TOKEN_PROG='TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+var _ASSOC_PROG='ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe1bRS';
+
+function _getATA(walletPk,mintPk){
+  return solanaWeb3.PublicKey.findProgramAddressSync(
+    [walletPk.toBytes(),new solanaWeb3.PublicKey(_TOKEN_PROG).toBytes(),mintPk.toBytes()],
+    new solanaWeb3.PublicKey(_ASSOC_PROG)
+  )[0];
+}
+function _usdcIx(fromATA,toATA,ownerPk,amount){
+  var data=new Uint8Array(9);data[0]=3;
+  var amt=BigInt(Math.round(amount));
+  for(var i=0;i<8;i++){data[1+i]=Number(amt&BigInt(0xff));amt>>=BigInt(8);}
+  return new solanaWeb3.TransactionInstruction({
+    keys:[{pubkey:fromATA,isSigner:false,isWritable:true},{pubkey:toATA,isSigner:false,isWritable:true},{pubkey:ownerPk,isSigner:true,isWritable:false}],
+    programId:new solanaWeb3.PublicKey(_TOKEN_PROG),data:data
+  });
+}
+async function buyWithUSDC(lid,sellerWallet,priceUsdc){
+  var _xd=_getAuth();if(!_xd||!_xd.username){alert('Sign in to buy.');return;}
+  if(!walletConnected||!walletAddress){alert('Connect your Phantom wallet to buy with USDC.');return;}
+  if(!window.solanaWeb3){alert('Web3 not loaded, refresh and try again.');return;}
+  if(!sellerWallet){alert('This listing is missing a seller wallet address.');return;}
+  var btn=document.getElementById('ubtn_'+lid);
+  try{
+    if(btn){btn.disabled=true;btn.textContent='Sending...';}
+    var conn=new solanaWeb3.Connection('https://api.mainnet-beta.solana.com','confirmed');
+    var buyerPk=new solanaWeb3.PublicKey(walletAddress);
+    var sellerPk=new solanaWeb3.PublicKey(sellerWallet);
+    var devPk=new solanaWeb3.PublicKey(_DEV_WALLET);
+    var mintPk=new solanaWeb3.PublicKey(_USDC_MINT);
+    var totalUnits=Math.round(priceUsdc*1e6);
+    var sellerUnits=Math.round(totalUnits*0.95);
+    var devUnits=totalUnits-sellerUnits;
+    var buyerATA=_getATA(buyerPk,mintPk);
+    var sellerATA=_getATA(sellerPk,mintPk);
+    var devATA=_getATA(devPk,mintPk);
+    var tx=new solanaWeb3.Transaction();
+    tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
+    tx.add(_usdcIx(buyerATA,devATA,buyerPk,devUnits));
+    tx.feePayer=buyerPk;
+    var bh=await conn.getLatestBlockhash();
+    tx.recentBlockhash=bh.blockhash;
+    var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
+    var signed=await provider.signAndSendTransaction(tx);
+    if(btn){btn.textContent='Confirming...';}
+    await conn.confirmTransaction(signed.signature,'confirmed');
+    // Tell server to transfer the item
+    var r=await fetch('/api/market-usdc-buy',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:_xd.username,token:_xd.token||'',lid:lid,signature:signed.signature})});
+    var d=await r.json();
+    if(d.ok){
+      var it=_relinkItem(d.item);if(it)inventory.push(it);
+      saveGame();uiAll();
+      if(activeTab===3)renderMarket(mkFilter);
+      showAchieve('🛒','Purchase Complete!','Got '+d.item.mat+' '+d.item.type+' for $'+priceUsdc.toFixed(2)+' USDC!');
+    }else{
+      alert((d.error||'Item transfer failed.')+'\nTX: '+signed.signature+'\nContact support if USDC was deducted.');
+    }
+  }catch(e){
+    console.error('USDC buy error:',e);
+    if(btn){btn.disabled=false;btn.textContent='Buy with USDC';}
+    if(e.message&&e.message.includes('rejected'))return; // user cancelled
+    alert(e.message||'Transaction failed. Try again.');
+    if(activeTab===3)renderMarket(mkFilter);
+  }
 }
 
 function renderMarket(filter){
@@ -1991,7 +2062,7 @@ function renderMarket(filter){
           +'<div style="font-size:10px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>'
           +'<div style="display:flex;align-items:center;gap:8px">'+itemIcon(it.rar,40)+'<div><div style="color:'+it.rar.c+';font-size:13px;font-weight:700;line-height:1.2">'+it.mat+' '+it.type+'</div><div style="color:'+it.rar.c+';font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.85">'+it.rar.n+'</div></div></div>'
           +'<div class="mk-affixes">'+afxH+'</div>'
-          +'<div style="color:#a070ff;font-size:11px;font-weight:700">'+l.price+' EXT</div>'
+          +'<div style="color:#26c281;font-size:11px;font-weight:700">$'+(parseFloat(l.price)||0).toFixed(2)+' USDC</div>'
           +'<div onclick="withdrawListing(\''+l.id+'\')" style="margin-top:6px;font-size:9px;color:var(--text4);cursor:pointer;text-decoration:underline">Withdraw</div>'
           +'</div>';
       }).join('');}
@@ -2006,15 +2077,14 @@ function renderMarket(filter){
         var it=_relinkItem(l.item_data);if(!it)return'';
         var isOwn=l.seller===myUser;
         var afxH=it.affixes.map(function(a){return'<div class="mk-afx"><i class="ti '+a.t.i+'"></i> +'+a.v+'% '+a.t.n+'</div>';}).join('');
-        var canBuy=!isOwn&&tokens>=l.price;
         var badge=isOwn?'<div style="font-size:9px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>':'<div style="font-size:9px;color:var(--blue);margin-bottom:4px">@'+l.seller+'</div>';
         var btn=isOwn
           ?'<button style="margin-top:6px;width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--text4);padding:4px;font-size:9px;font-family:\'Space Mono\',monospace;cursor:default">Listed</button>'
-          :'<button onclick="buyListedItem(\''+l.id+'\')" style="margin-top:6px;width:100%;background:'+(canBuy?'#4a2060':'var(--bg3)')+';border:1px solid '+(canBuy?'#a070ff':'var(--border2)')+';border-radius:5px;color:'+(canBuy?'#c090ff':'var(--text4)')+';padding:4px;cursor:'+(canBuy?'pointer':'default')+';font-size:9px;font-family:\'Space Mono\',monospace">Buy</button>';
+          :'<button id="ubtn_'+l.id+'" onclick="buyWithUSDC(\''+l.id+'\',\''+( l.seller_wallet||'')+'\','+(parseFloat(l.price)||0)+')" style="margin-top:6px;width:100%;background:#0a2018;border:1px solid #26c281;border-radius:5px;color:#26c281;padding:4px;cursor:pointer;font-size:9px;font-family:\'Space Mono\',monospace">Buy with USDC</button>';
         return'<div style="background:var(--bg4);border:1.5px solid '+it.rar.c+';border-radius:10px;padding:10px 14px;min-width:180px;max-width:240px">'+badge
           +'<div style="display:flex;align-items:center;gap:8px">'+itemIcon(it.rar,40)+'<div><div style="color:'+it.rar.c+';font-size:13px;font-weight:700;line-height:1.2">'+it.mat+' '+it.type+'</div><div style="color:'+it.rar.c+';font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.85">'+it.rar.n+'</div></div></div>'
           +'<div class="mk-affixes">'+afxH+'</div>'
-          +'<div style="color:#a070ff;font-size:11px;font-weight:700">'+l.price+' EXT</div>'+btn+'</div>';
+          +'<div style="color:#26c281;font-size:11px;font-weight:700">$'+(parseFloat(l.price)||0).toFixed(2)+' USDC</div>'+btn+'</div>';
       }).join('');
     }).catch(function(){grid.innerHTML='<div style="text-align:center;padding:30px;color:var(--red);font-size:11px">Failed to load listings. Refresh to try again.</div>';});
 }
