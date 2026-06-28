@@ -40,9 +40,10 @@ export default async function handler(req, res) {
 
     // ---------- JACKPOT PULL ----------
     if (action === 'jackpot') {
-      // TEST MODE: true => guaranteed win for testing. Set to false for live 1% odds.
-      const TEST_MODE = true;
-      const WIN_CHANCE = TEST_MODE ? 1.0 : 0.01;
+      // TEST MODE: true => guaranteed win for testing. Set to false for live odds.
+      const TEST_MODE = false;
+      // Live odds: each pull rolls a random win chance between 1% and 6%
+      const WIN_CHANCE = TEST_MODE ? 1.0 : (0.01 + Math.random() * 0.05);
 
       const won = Math.random() < WIN_CHANCE;
       if (!won) {
