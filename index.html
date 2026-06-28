@@ -2162,7 +2162,7 @@ function uiAll(){
       +'</div></div>'+_rows;
   }
   else{eqEl.className='eq-empty';eqEl.textContent='None — find one in the dungeon';}
-  if(activeTab===3)renderMarket(mkFilter);
+  if(activeTab===3&&(Date.now()-(_mkLastFetch||0))>15000){_mkLastFetch=Date.now();renderMarket(mkFilter);}
   if(activeTab===4)renderBackpack();
   // Update home stats count
   el('hsItems').textContent=inventory.length+Object.values(equippedSlots).filter(Boolean).length;
