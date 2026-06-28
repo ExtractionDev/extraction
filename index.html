@@ -1525,20 +1525,20 @@ function closeTutorial(){document.getElementById('tutOverlay').style.display='no
     var myUser='';
     try{var _xd=JSON.parse(localStorage.getItem('extraction_xauth')||'null');if(_xd)myUser=_xd.username;}catch(e){}
     var medals=['🥇','🥈','🥉'];
-    if(!_lb.length){_lbEl.innerHTML='<div style="color:var(--text3);font-size:11px;padding:6px 0">No players yet!</div>';return;}
+    if(!_lb.length){_lbEl.innerHTML='<div style="color:var(--text3);font-size:11px;padding:6px 0">No extractions yet!</div>';return;}
     _lbEl.innerHTML=_lb.map(function(p,i){
       var me=p.username===myUser;
       var st=me?'color:var(--gold);font-weight:700;':'';
       return'<div class="lb-row" style="'+st+'"><span class="lb-rank">'+(medals[i]||'#'+(i+1))+'</span>'
         +'<span class="lb-name">@'+p.username+(me?' ⭐':'')+'</span>'
-        +'<span class="lb-rocks">'+Math.floor(p.gold||0)+' GC</span></div>';
+        +'<span class="lb-rocks">'+Math.floor(p.gc_extracted||0)+' GC'+(p.deepest_floor?' · F'+p.deepest_floor:'')+' ext</span></div>';
     }).join('');
     if(_lbCnt)_lbCnt.textContent=_lb.length+' players';
   }
   function _lbFetch(){
     fetch('/api/leaderboard?v='+Date.now())
       .then(function(r){return r.ok?r.json():[];})
-      .then(function(data){_lb=Array.isArray(data)?data:[];_lbRender();})
+      .then(function(data){_lb=Array.isArray(data)?data:(data.rows||[]);_lbRender();})
       .catch(function(){});
   }
   // Wait for DOM then fetch
@@ -2242,7 +2242,7 @@ var dAmbientParts=[]; // ambient dust/ember motes {x,y,vx,vy,life,maxLife,r,c}
 var dHitPause=0;      // frames to freeze when landing a hit (juice)
 var fogCv=null,fogCtx=null; // offscreen canvas for fog-of-war darkness mask
 var dCombo=0,dComboTimer=0,dBestCombo=0;
-var dRunKills=0,dRunRocksMined=0,dRunStartTime=0;
+var dRunKills=0,dRunRocksMined=0,dRunStartTime=0,dDamageTaken=0;
 var dFloorTransition=0; // counts down from 40 for wipe effect
 var dFloorTransDir=1;   // +1 = incoming, -1 = outgoing
 var mmcv,MMC; // minimap canvas
@@ -2688,7 +2688,7 @@ function startDungeon(){
   _deathPenaltyActive=false;_descPending=false;
   dp={x:40,y:DGY-30,vx:0,vy:0,w:18,h:26,gnd:false,onThin:false,face:1,hp:100,inv:0,spkCd:0,dropT:0,pullSt:0,jumps:0,coyoteT:0,jumpCharge:0,chargedJump:false,burnTicks:0,burnTimer:0};
   dcam=0;dbag={};dcoins=0;dtoasts=[];dtk=0;dRunning=true;DK={l:0,r:0,jumpHeld:false};dRockBreaks=[];
-  dProjectiles=[];dDeathParts=[];dChips=[];dAmbientParts=[];dHitPause=0;dCombo=0;dComboTimer=0;dBestCombo=0;dRunKills=0;dRunRocksMined=0;dRunStartTime=Date.now();dFloorTransition=40;
+  dProjectiles=[];dDeathParts=[];dChips=[];dAmbientParts=[];dHitPause=0;dCombo=0;dComboTimer=0;dBestCombo=0;dRunKills=0;dRunRocksMined=0;dRunStartTime=Date.now();dDamageTaken=0;dFloorTransition=40;
   dDeathAnim=0;dDeathDone=false;dAnim={frame:0,timer:0,state:'idle'};
   // Init minimap
   if(!mmcv){mmcv=document.getElementById('mmcv');if(mmcv)MMC=mmcv.getContext('2d');}
@@ -3100,6 +3100,20 @@ function dEndGame(died){
     dDeathAnim=0;dDeathDone=false;
     _runDeathAnim(final,runLootItems,excMsg||null);
   } else {
+    // Report safe extraction to server for leaderboard tracking
+    try{
+      var _xd2=JSON.parse(localStorage.getItem(_xAuthKey)||'null');
+      if(_xd2&&_xd2.username&&_xd2.token){
+        fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({username:_xd2.username,token:_xd2.token,
+            gold:gold,tokens:tokens,total_rocks:gameStats.totalRocks||0,runs:runs,chests:gameStats.chestsOpened||0,
+            ups:ups,ore_stash:oreStash,inventory:inventory,equipped_slots:eqSlots,
+            game_stats:gameStats,achievements:_achiev,
+            extraction:{floor:dfl+1,damage_taken:dDamageTaken,gc_earned:final}
+          })
+        }).catch(function(){});
+      }
+    }catch(e){}
     document.getElementById('dungGame').style.display='none';
     showRunSummary(false,final,runLootItems,excMsg||null);
     uiAll();
@@ -3422,7 +3436,7 @@ function dLoop(){
   }
   if(dp.y>420){dEndGame(true);return;}
   if(dDescending){dp.inv=120;}else if(dp.inv>0)dp.inv--;if(dp.spkCd>0)dp.spkCd--;
-  if(dp.spkCd===0){for(var i=0;i<f.spikes.length;i++){var s=f.spikes[i];var _sh=s.small?6:10;var _sw=s.small?12:21;var _syo=s.y>=DGY?_terrBump(s.x):0;if(dp.x+dp.w>s.x-_sw&&dp.x<s.x+_sw&&dp.y+dp.h>s.y+_syo-_sh&&dp.y+dp.h<=s.y+_syo+2){dp.hp-=10;dp.spkCd=25;dp.vy=-7;dShake=7;sndDamage();dtoasts.push({x:s.x,y:s.y-30,t:'-10',c:'#e84b4b',life:45});dUpdHUD();if(dp.hp<=0){dEndGame(true);return;}break;}}}
+  if(dp.spkCd===0){for(var i=0;i<f.spikes.length;i++){var s=f.spikes[i];var _sh=s.small?6:10;var _sw=s.small?12:21;var _syo=s.y>=DGY?_terrBump(s.x):0;if(dp.x+dp.w>s.x-_sw&&dp.x<s.x+_sw&&dp.y+dp.h>s.y+_syo-_sh&&dp.y+dp.h<=s.y+_syo+2){dp.hp-=10;dDamageTaken+=10;dp.spkCd=25;dp.vy=-7;dShake=7;sndDamage();dtoasts.push({x:s.x,y:s.y-30,t:'-10',c:'#e84b4b',life:45});dUpdHUD();if(dp.hp<=0){dEndGame(true);return;}break;}}}
   for(var i=0;i<f.enemies.length;i++){
     var e=f.enemies[i];e.ph+=.03*_dt;if(e.hit>0)e.hit--;if(e.atkTimer>0)e.atkTimer--;
     var spd=e.type==='boss'?2.2:e.type==='bat'?3.2:e.type==='golem'?1.0:e.type==='spider'?4.5:e.type==='wraith'?1.8:e.type==='archer'?1.5:e.type==='crusher'?1.2:e.type==='phantom'?2.0:2.2;
@@ -3507,7 +3521,7 @@ function dLoop(){
         // Ram check: if golem reaches player on the same platform, shove them off
         if(_gSameLvl&&Math.abs(dp.x+9-(e.x+11))<24&&dp.inv===0){
           dp.vx=e.chgDir*16;dp.vy=-9;dp.gnd=false;  // strong horizontal + upward launch
-          var _pdmg=22;dp.hp-=_pdmg;dp.inv=45;
+          var _pdmg=22;dp.hp-=_pdmg;dDamageTaken+=_pdmg;dp.inv=45;
           dShake=14;sndDamage();
           dtoasts.push({x:dp.x,y:dp.y-18,t:'SHOVED! -'+_pdmg,c:'#ff6040',life:65});
           dUpdHUD();e.charging=false;e.windT=0;
@@ -3577,11 +3591,11 @@ function dLoop(){
       }
     }
     // ── NORMAL ENEMY COLLISION ────────────────────────────────────────
-    if(!_stomped&&dp.inv===0){var ex2=Math.abs(dp.x+dp.w/2-e.x),ey2=Math.abs(dp.y+dp.h/2-e.y-(e.type==='golem'||e.type==='crusher'?10:0));var hRng=e.type==='crusher'?22:18;if(ex2<hRng&&ey2<20){var dmg=e.type==='boss'?(12+Math.floor(Math.random()*9)):{golem:25,wraith:18,bat:15,spider:12,archer:8,crusher:30,phantom:20,slime:10}[e.type]||10;dp.hp-=dmg;dp.inv=40;dp.vx=dp.x<e.x?-6:6;if(e.type!=='slime')dp.vy=-5;e.hit=10;dShake=10;sndDamage();dtoasts.push({x:dp.x,y:dp.y-10,t:'-'+dmg,c:'#e84b4b',life:45});dUpdHUD();if(dp.hp<=0){dEndGame(true);return;}}}
+    if(!_stomped&&dp.inv===0){var ex2=Math.abs(dp.x+dp.w/2-e.x),ey2=Math.abs(dp.y+dp.h/2-e.y-(e.type==='golem'||e.type==='crusher'?10:0));var hRng=e.type==='crusher'?22:18;if(ex2<hRng&&ey2<20){var dmg=e.type==='boss'?(12+Math.floor(Math.random()*9)):{golem:25,wraith:18,bat:15,spider:12,archer:8,crusher:30,phantom:20,slime:10}[e.type]||10;dp.hp-=dmg;dDamageTaken+=dmg;dp.inv=40;dp.vx=dp.x<e.x?-6:6;if(e.type!=='slime')dp.vy=-5;e.hit=10;dShake=10;sndDamage();dtoasts.push({x:dp.x,y:dp.y-10,t:'-'+dmg,c:'#e84b4b',life:45});dUpdHUD();if(dp.hp<=0){dEndGame(true);return;}}}
   }
-  for(var i=dProjectiles.length-1;i>=0;i--){var pr=dProjectiles[i];pr.x+=pr.vx*_dt;pr.y+=pr.vy*_dt;if(!pr.fireball)pr.vy+=0.12*_dt;pr.life--;if(pr.life<=0){dProjectiles.splice(i,1);continue;}var hplt=false;for(var j=0;j<f.plats.length;j++){var pj=f.plats[j];if(pr.x>pj.x&&pr.x<pj.x+pj.w&&pr.y>pj.y&&pr.y<pj.y+pj.h){hplt=true;break;}}if(hplt){dProjectiles.splice(i,1);continue;}if(dp.inv===0&&pr.x>dp.x&&pr.x<dp.x+dp.w&&pr.y>dp.y&&pr.y<dp.y+dp.h){dp.hp-=pr.dmg;dp.inv=30;dShake=6;sndDamage();if(pr.burn){dp.burnTicks=5;dp.burnTimer=120;dtoasts.push({x:dp.x,y:dp.y-10,t:'-'+pr.dmg+' BURN!',c:'#ff6020',life:50});}else{dtoasts.push({x:dp.x,y:dp.y-10,t:'-'+pr.dmg,c:'#ff6060',life:45});}dUpdHUD();dProjectiles.splice(i,1);if(dp.hp<=0){dEndGame(true);return;}}}
+  for(var i=dProjectiles.length-1;i>=0;i--){var pr=dProjectiles[i];pr.x+=pr.vx*_dt;pr.y+=pr.vy*_dt;if(!pr.fireball)pr.vy+=0.12*_dt;pr.life--;if(pr.life<=0){dProjectiles.splice(i,1);continue;}var hplt=false;for(var j=0;j<f.plats.length;j++){var pj=f.plats[j];if(pr.x>pj.x&&pr.x<pj.x+pj.w&&pr.y>pj.y&&pr.y<pj.y+pj.h){hplt=true;break;}}if(hplt){dProjectiles.splice(i,1);continue;}if(dp.inv===0&&pr.x>dp.x&&pr.x<dp.x+dp.w&&pr.y>dp.y&&pr.y<dp.y+dp.h){dp.hp-=pr.dmg;dDamageTaken+=pr.dmg;dp.inv=30;dShake=6;sndDamage();if(pr.burn){dp.burnTicks=5;dp.burnTimer=120;dtoasts.push({x:dp.x,y:dp.y-10,t:'-'+pr.dmg+' BURN!',c:'#ff6020',life:50});}else{dtoasts.push({x:dp.x,y:dp.y-10,t:'-'+pr.dmg,c:'#ff6060',life:45});}dUpdHUD();dProjectiles.splice(i,1);if(dp.hp<=0){dEndGame(true);return;}}}
   // Burn damage ticks (fireball afterburn: 5 ticks × 2s = 10s total, -2 each)
-  if(dp.burnTicks>0){dp.burnTimer-=_dt;if(dp.burnTimer<=0){dp.hp-=2;dp.burnTicks--;dp.burnTimer=120;dShake=3;dtoasts.push({x:dp.x,y:dp.y-14,t:'-2 burn',c:'#ff4800',life:40});dUpdHUD();if(dp.hp<=0){dEndGame(true);return;}}}
+  if(dp.burnTicks>0){dp.burnTimer-=_dt;if(dp.burnTimer<=0){dp.hp-=2;dDamageTaken+=2;dp.burnTicks--;dp.burnTimer=120;dShake=3;dtoasts.push({x:dp.x,y:dp.y-14,t:'-2 burn',c:'#ff4800',life:40});dUpdHUD();if(dp.hp<=0){dEndGame(true);return;}}}
   if(dMineAnim>0)dMineAnim--;
   var maxFloor=(mode==='free'?4:9);
   if(Math.abs(dp.x-f.ladX)<28&&dp.y+dp.h>DGY-10&&!dDescending&&!_descPending){
@@ -4368,6 +4382,13 @@ function _setSignedInUI(username){
   var lbl=document.getElementById('homeSignInLabel');
   if(btn){btn.className='home-btn-secondary home-btn-signin signedin';}
   if(lbl){lbl.textContent='@'+username;}
+  // Show streak widget — read streak from saved auth data
+  setTimeout(function(){
+    try{
+      var _ad=JSON.parse(localStorage.getItem(_xAuthKey)||'null');
+      _renderStreak((_ad&&_ad.streak)||1);
+    }catch(e){_renderStreak(1);}
+  },200);
   // Load from localStorage first (most recent — saves happen instantly)
   var _localKey='extraction_v1_'+username;
   var _localData=null;
