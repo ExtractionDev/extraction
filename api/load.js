@@ -144,6 +144,33 @@ export default async function handler(req, res) {
     return res.status(200).json(result);
   }
 
+  // ---------- USDC BALANCE CHECK ----------
+  if (req.query.usdc_balance) {
+    const wallet = req.query.usdc_balance;
+    const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+    const rpcs = ['https://api.mainnet-beta.solana.com','https://rpc.ankr.com/solana'];
+    for (const rpc of rpcs) {
+      try {
+        const r = await fetch(rpc, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0', id: 1,
+            method: 'getTokenAccountsByOwner',
+            params: [wallet, { mint: USDC_MINT }, { encoding: 'jsonParsed' }]
+          })
+        });
+        const d = await r.json();
+        if (d.error) continue;
+        const accounts = d.result?.value || [];
+        if (!accounts.length) return res.json({ balance: 0, exists: false });
+        const bal = accounts[0].account.data.parsed.info.tokenAmount.uiAmount || 0;
+        return res.json({ balance: bal, exists: true });
+      } catch(e) { continue; }
+    }
+    return res.json({ balance: 0, exists: false });
+  }
+
   if (req.query.pool) {
     const pool = await getPoolAmount();
     return res.status(200).json({ pool });
