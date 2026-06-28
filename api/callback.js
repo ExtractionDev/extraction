@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 export default async function handler(req, res) {
   const { code } = req.query;
 
@@ -25,17 +27,25 @@ export default async function handler(req, res) {
 
   const { data } = await userResponse.json();
 
-  // Create player in Supabase if they don't exist yet
+  // Generate a secret session token for this player
+  const sessionToken = crypto.randomBytes(32).toString('hex');
+
+  // Save player and session token to Supabase
   await fetch(`${process.env.SUPABASE_URL}/rest/v1/players`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'apikey': process.env.SUPABASE_ANON_KEY,
       'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`,
-      'Prefer': 'resolution=ignore-duplicates'
+      'Prefer': 'resolution=merge-duplicates'
     },
-    body: JSON.stringify({ username: data.username, name: data.name })
+    body: JSON.stringify({ 
+      username: data.username, 
+      name: data.name,
+      session_token: sessionToken
+    })
   });
 
-  res.redirect(`/?username=${data.username}&name=${data.name}`);
+  // Pass session token back to game via URL
+  res.redirect(`/?username=${data.username}&name=${data.name}&token=${sessionToken}`);
 }
