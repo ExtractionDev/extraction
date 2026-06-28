@@ -2831,7 +2831,13 @@ function dMine(){
       if(_xdJ&&_xdJ.username){
         fetch('/api/load',{method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({action:'jackpot',username:_xdJ.username,token:_xdJ.token||''})
-        }).then(function(r2){return r2.json();}).then(function(d){
+        }).then(function(r2){return r2.json().then(function(d){return{status:r2.status,d:d};});}).then(function(res){
+          var d=res.d;
+          if(res.status!==200){
+            console.error('Jackpot server error:',res.status,d);
+            excMsg='⚔ Excalibur mined — payout error: '+((d&&d.error)||res.status);
+            return;
+          }
           if(d&&d.won){
             var wonPool=d.amount||0;
             if(typeof d.newTokens==='number')tokens=d.newTokens; // server truth
@@ -2851,7 +2857,7 @@ function dMine(){
           } else {
             excMsg='⚔ Excalibur Stone mined — no jackpot this time!';
           }
-        }).catch(function(){excMsg='⚔ Excalibur mined, but payout check failed. Try again.';});
+        }).catch(function(e){console.error('Jackpot fetch threw:',e);excMsg='⚔ Excalibur mined, but payout check failed: '+(e&&e.message||'network');});
       }
       var excVal=Math.round(ore.v*(r.nodeMulti||1)*(mode==='free'?1:(1+19*(Math.log10(extFee)-3)/2))*10);
       if(dfl>=5)excVal*=2;
