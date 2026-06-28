@@ -1535,6 +1535,7 @@ function _getSaveKey(){
   try{var _xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');if(_xd&&_xd.username)return'extraction_v1_'+_xd.username;}catch(e){}
   return _saveKey; // fallback for guests (but they can't play anyway)
 }
+var _apiSaveTmr=null;
 function saveGame(){
   try{
     var data={gold:gold,tokens:tokens,totalRocks:totalRocks,runs:runs,chests:chests,ups:ups,excPool:excPool,extBurned:extBurned,devCut:devCut,starterGiven:starterGiven,
@@ -1545,10 +1546,15 @@ function saveGame(){
     };
     // Save to localStorage as backup
     localStorage.setItem(_getSaveKey(),JSON.stringify(data));
-    // Save to Supabase if signed in
-    try{var _xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');if(_xd&&_xd.username){
-      fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:_xd.username,token:_xd.token||'',data:data})});
-    }}catch(e){}
+    // Debounce API save — max once every 8 seconds to avoid hammering the server
+    if(_apiSaveTmr)clearTimeout(_apiSaveTmr);
+    _apiSaveTmr=setTimeout(function(){
+      try{var _xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');if(_xd&&_xd.username){
+        fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:_xd.username,token:_xd.token||'',data:data})})
+          .then(function(r){if(!r.ok)console.error('Save failed:',r.status);})
+          .catch(function(e){console.error('Save error:',e);});
+      }}catch(e){}
+    },8000);
   }catch(e){}
 }
 function _relinkItem(raw){
@@ -2283,21 +2289,23 @@ function mr(x,y,w,h,c){MC.fillStyle=c;MC.fillRect(x*MS,y*MS,w*MS,h*MS);}
 function mp(x,y,w,h,c){MC.fillStyle=c;MC.fillRect(x*MPS,y*MPS,w*MPS,h*MPS);}
 var _mLastT=0;
 function minerLoop(){
-  var _now=performance.now();
-  if(_now-_mLastT<10){requestAnimationFrame(minerLoop);return;} // cap ~100fps max
-  _mLastT=_now;
-  mTk++;
-  // Tick idle miner animation
-  var targetMState=(mSwAnim>0)?'mine':'idle';
-  if(targetMState!==mAnimState){mAnimState=targetMState;mAnimFrame=0;mAnimTick=0;}
-  var ms=SANIM[mAnimState]||SANIM.idle;
-  var mTicksPerFrame=Math.max(1,Math.round(60/ms.fps));
-  mAnimTick++;
-  if(mAnimTick>=mTicksPerFrame){mAnimTick=0;mAnimFrame=(mAnimFrame+1)%ms.frames;}
-  if(mSwAnim>0)mSwAnim--;
-  for(var i=mParts.length-1;i>=0;i--){var p=mParts[i];p.x+=p.vx;p.y+=p.vy;p.vy+=.14;p.life--;if(p.life<=0)mParts.splice(i,1);}
-  if(activeTab===2)drawMiner();
-  if(mTk%60===0)uiAll();
+  try{
+    var _now=performance.now();
+    if(_now-_mLastT<10){requestAnimationFrame(minerLoop);return;} // cap ~100fps max
+    _mLastT=_now;
+    mTk++;
+    // Tick idle miner animation
+    var targetMState=(mSwAnim>0)?'mine':'idle';
+    if(targetMState!==mAnimState){mAnimState=targetMState;mAnimFrame=0;mAnimTick=0;}
+    var ms=SANIM[mAnimState]||SANIM.idle;
+    var mTicksPerFrame=Math.max(1,Math.round(60/ms.fps));
+    mAnimTick++;
+    if(mAnimTick>=mTicksPerFrame){mAnimTick=0;mAnimFrame=(mAnimFrame+1)%ms.frames;}
+    if(mSwAnim>0)mSwAnim--;
+    for(var i=mParts.length-1;i>=0;i--){var p=mParts[i];p.x+=p.vx;p.y+=p.vy;p.vy+=.14;p.life--;if(p.life<=0)mParts.splice(i,1);}
+    if(activeTab===2)drawMiner();
+    if(mTk%60===0)uiAll();
+  }catch(e){console.error('minerLoop error:',e);}
   requestAnimationFrame(minerLoop);
 }
 // Mining LOGIC runs on setInterval so it works even when browser tab is hidden
@@ -4699,11 +4707,8 @@ function _setSignedInUI(username){
           var _sbTokens=d.tokens||0;
           var _localGold=_localData.gold||0;
           var _localTokens=_localData.tokens||0;
-          // Only use Supabase if it has MORE tokens or more gold — never downgrade
+          // Only use Supabase if it has MORE gold AND tokens — never downgrade
           if(_sbTokens>_localTokens||(_sbGold>_localGold&&_sbTokens>=_localTokens)){
-            // Update memory IMMEDIATELY so next auto-save preserves the higher value
-            if(_sbTokens>tokens)tokens=_sbTokens;
-            if(_sbGold>gold)gold=_sbGold;
             var mapped={gold:d.gold,tokens:d.tokens,totalRocks:d.total_rocks,runs:d.runs,chests:d.chests,
               ups:d.ups,oreStash:d.ore_stash,inventory:d.inventory,eqSlots:d.equipped_slots,
               gameStats:d.game_stats,_achiev:d.achievements,lastSaved:new Date(d.updated_at).getTime()};
