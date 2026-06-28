@@ -4340,11 +4340,18 @@ function dDraw(){
   for(var i=0;i<f.rocks.length;i++){var r=f.rocks[i];if(r.done)continue;var rx=r.x-dcam;if(rx<-30||rx>W+30)continue;
     if(r.isExcalibur){
       var iw=64,ih=80;
-      var _cy=r.y-ih+9; // r.y=DGY-9, so bottom of image lands exactly at DGY (ground)
-      // Subtle ambient glow — large enough rect so it doesn't clip at the top
-      var _gp=0.09+Math.sin(dtk*.08+r.x)*.03;
-      var _gr=DC.createRadialGradient(rx,_cy+ih*0.4,0,rx,_cy+ih*0.4,iw*1.1);
-      _gr.addColorStop(0,'rgba(0,210,255,'+_gp.toFixed(3)+')');
+      var _cy=r.y-ih+20; // sink slightly into ground
+      var _pulse=0.18+Math.sin(dtk*.08+r.x)*.06;
+      // Outer wide glow
+      var _gr2=DC.createRadialGradient(rx,_cy+ih*0.35,0,rx,_cy+ih*0.35,iw*2.2);
+      _gr2.addColorStop(0,'rgba(0,200,255,'+(_pulse*0.55).toFixed(3)+')');
+      _gr2.addColorStop(0.5,'rgba(0,160,255,'+(_pulse*0.18).toFixed(3)+')');
+      _gr2.addColorStop(1,'rgba(0,120,200,0)');
+      DC.fillStyle=_gr2;DC.fillRect(rx-iw*2.5,_cy-ih*0.8,iw*5,ih*2.6);
+      // Bright inner core glow
+      var _gr=DC.createRadialGradient(rx,_cy+ih*0.35,0,rx,_cy+ih*0.35,iw*0.9);
+      _gr.addColorStop(0,'rgba(160,240,255,'+(_pulse*0.9).toFixed(3)+')');
+      _gr.addColorStop(0.4,'rgba(0,210,255,'+(_pulse*0.5).toFixed(3)+')');
       _gr.addColorStop(1,'rgba(0,180,255,0)');
       DC.fillStyle=_gr;DC.fillRect(rx-iw*1.5,_cy-ih*0.5,iw*3,ih*2);
       if(_excImg.complete&&_excImg.naturalWidth>0){
