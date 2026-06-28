@@ -1537,25 +1537,33 @@ function _getSaveKey(){
   return _saveKey; // fallback for guests (but they can't play anyway)
 }
 var _apiSaveTmr=null;
-function saveGame(){
+function _doApiSave(data){
+  try{var _xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');if(_xd&&_xd.username){
+    fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:_xd.username,token:_xd.token||'',data:data})})
+      .then(function(r){if(!r.ok)console.error('Save failed:',r.status);})
+      .catch(function(e){console.error('Save error:',e);});
+  }}catch(e){}
+}
+function _buildSaveData(){
+  return{gold:gold,tokens:tokens,totalRocks:totalRocks,runs:runs,chests:chests,ups:ups,excPool:excPool,extBurned:extBurned,devCut:devCut,starterGiven:starterGiven,
+    inventory:inventory.map(function(it){return{id:it.id,slot:it.slot||'pickaxe',slotIcon:it.slotIcon||'ti-pickaxe',mat:it.mat,type:it.type,rarN:it.rar.n,affixes:it.affixes.map(function(a){return{tk:a.t.k,v:a.v};}),price:it.price};}),
+    oreStash:oreStash,
+    eqSlots:{pickaxe:equippedSlots.pickaxe?equippedSlots.pickaxe.id:null,head:equippedSlots.head?equippedSlots.head.id:null,ring:equippedSlots.ring?equippedSlots.ring.id:null,amulet:equippedSlots.amulet?equippedSlots.amulet.id:null},
+    gameStats:gameStats,_achiev:_achiev,lastSaved:Date.now()
+  };
+}
+function saveGame(force){
   try{
-    var data={gold:gold,tokens:tokens,totalRocks:totalRocks,runs:runs,chests:chests,ups:ups,excPool:excPool,extBurned:extBurned,devCut:devCut,starterGiven:starterGiven,
-      inventory:inventory.map(function(it){return{id:it.id,slot:it.slot||'pickaxe',slotIcon:it.slotIcon||'ti-pickaxe',mat:it.mat,type:it.type,rarN:it.rar.n,affixes:it.affixes.map(function(a){return{tk:a.t.k,v:a.v};}),price:it.price};}),
-      oreStash:oreStash,
-      eqSlots:{pickaxe:equippedSlots.pickaxe?equippedSlots.pickaxe.id:null,head:equippedSlots.head?equippedSlots.head.id:null,ring:equippedSlots.ring?equippedSlots.ring.id:null,amulet:equippedSlots.amulet?equippedSlots.amulet.id:null},
-      gameStats:gameStats,_achiev:_achiev,lastSaved:Date.now()
-    };
-    // Save to localStorage as backup
+    var data=_buildSaveData();
     localStorage.setItem(_getSaveKey(),JSON.stringify(data));
-    // Debounce API save — max once every 8 seconds to avoid hammering the server
     if(_apiSaveTmr)clearTimeout(_apiSaveTmr);
-    _apiSaveTmr=setTimeout(function(){
-      try{var _xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');if(_xd&&_xd.username){
-        fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:_xd.username,token:_xd.token||'',data:data})})
-          .then(function(r){if(!r.ok)console.error('Save failed:',r.status);})
-          .catch(function(e){console.error('Save error:',e);});
-      }}catch(e){}
-    },8000);
+    if(force){
+      // Immediate API save — used after critical actions like withdrawing listings
+      _doApiSave(data);_apiSaveTmr=null;
+    }else{
+      // Debounce API save — max once every 8 seconds
+      _apiSaveTmr=setTimeout(function(){_doApiSave(data);},8000);
+    }
   }catch(e){}
 }
 function _relinkItem(raw){
@@ -1949,7 +1957,10 @@ function withdrawListing(lid){
   fetch('/api/listings',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({action:'withdraw',username:_xd.username,token:_xd.token||'',lid:lid})
   }).then(function(r){return r.json();}).then(function(d){
-    if(d.ok&&d.item){inventory.push(_relinkItem(d.item));saveGame();}
+    if(d.ok&&d.item){
+      inventory.push(_relinkItem(d.item));
+      saveGame(true); // force immediate API save so refresh doesn't wipe item
+    }
     if(activeTab===3)renderMarket(mkFilter);uiAll();
   }).catch(function(){if(activeTab===3)renderMarket(mkFilter);});
 }
