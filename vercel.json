@@ -1,8 +1,6 @@
-
 {
-  "functions": {
-    "api/*.js": {
-      "runtime": "nodejs18.x"
-    }
-  }
+  "rewrites": [
+    { "source": "/callback", "destination": "/api/callback" },
+    { "source": "/auth/twitter", "destination": "/api/twitter" }
+  ]
 }
