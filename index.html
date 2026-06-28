@@ -3104,17 +3104,18 @@ function dEndGame(died){
     try{
       var _xd2=JSON.parse(localStorage.getItem(_xAuthKey)||'null');
       if(_xd2&&_xd2.username){
-        var _eqS={pickaxe:equippedSlots.pickaxe?equippedSlots.pickaxe.id:null,head:equippedSlots.head?equippedSlots.head.id:null,ring:equippedSlots.ring?equippedSlots.ring.id:null,amulet:equippedSlots.amulet?equippedSlots.amulet.id:null};
-        fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({username:_xd2.username,token:_xd2.token||'',
-            gold:gold,tokens:tokens,total_rocks:gameStats.totalRocks||0,runs:runs,chests:gameStats.chestsOpened||0,
-            ups:ups,ore_stash:oreStash,inventory:inventory,equipped_slots:_eqS,
-            game_stats:gameStats,achievements:_achiev,
-            extraction:{floor:dfl+1,damage_taken:dDamageTaken,gc_earned:final}
-          })
-        }).catch(function(){});
+        var _extPayload={username:_xd2.username,floor:dfl+1,damage_taken:dDamageTaken,gc_earned:final};
+        console.log('[EXTRACT] Reporting extraction:',_extPayload);
+        fetch('/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify(_extPayload)
+        }).then(function(r){return r.json();}).then(function(d){
+          console.log('[EXTRACT] Server response:',d);
+          if(window._lbRefresh)window._lbRefresh();
+        }).catch(function(e){console.error('[EXTRACT] Failed:',e);});
+      } else {
+        console.log('[EXTRACT] No auth data found, skipping leaderboard report');
       }
-    }catch(e){}
+    }catch(e){console.error('[EXTRACT] Error:',e);}
     document.getElementById('dungGame').style.display='none';
     showRunSummary(false,final,runLootItems,excMsg||null);
     uiAll();
