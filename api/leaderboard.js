@@ -11,7 +11,6 @@ export default async function handler(req, res) {
   const { data, error } = await supabase
     .from('players')
     .select('username, gc_extracted, runs, game_stats')
-    .not('is_banned', 'eq', true)
     .order('gc_extracted', { ascending: false })
     .limit(50);
 
@@ -20,13 +19,15 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: error.message });
   }
 
-  const rows = (data || []).map((p, i) => ({
-    rank: i + 1,
-    username: p.username,
-    gc_extracted: p.gc_extracted || 0,
-    runs: p.runs || 0,
-    deepest_floor: p.game_stats ? (p.game_stats.deepestFloor || 0) : 0
-  }));
+  const rows = (data || [])
+    .filter(p => !p.is_banned)
+    .map((p, i) => ({
+      rank: i + 1,
+      username: p.username,
+      gc_extracted: p.gc_extracted || 0,
+      runs: p.runs || 0,
+      deepest_floor: p.game_stats ? (p.game_stats.deepestFloor || 0) : 0
+    }));
 
   return res.status(200).json({ rows });
 }
