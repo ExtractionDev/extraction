@@ -38,7 +38,7 @@ export default async function handler(req, res) {
 
   // Sanity caps
   const safeGold   = Math.min(Math.max(0, Math.floor(gold || 0)), MAX_GOLD);
-  const safeTokens = Math.min(Math.max(0, tokens || 0), MAX_TOKENS);
+  const safeTokens = Math.min(Math.max(player.tokens || 0, tokens || 0), MAX_TOKENS);
 
   // Monotonic values — can only go up
   const safeRocks  = Math.max(player.total_rocks || 0, totalRocks || 0);
