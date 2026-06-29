@@ -3269,13 +3269,29 @@ function dBuildFloors(){
   ];
   for(var fi=0;fi<numFloors;fi++){
     var c=cfgs[fi],W=c.w,plats=[];
-    plats.push({x:0,y:DGY,w:130,h:36,sol:true,safe:true});var cx=130;
-    // Scaling difficulty: floors 1-3 get fewer fall-through holes so new players aren't killed instantly; floor 4+ = full density
-    var maxHoles=fi>=3?999:(2+Math.floor(Math.random()*2))*(fi===0?1:fi===1?2:4); // fi0:2-3 · fi1:4-6 · fi2:8-12
-    var _holes=0,_capped=false;
-    while(cx<W-160){if(_holes>=maxHoles){_capped=true;break;}var gap=40+Math.random()*40,pw=60+Math.random()*80;cx+=gap;if(cx+pw>W-160)break;plats.push({x:cx,y:DGY,w:pw,h:36,sol:true});cx+=pw;_holes++;}
-    if(_capped&&cx<W-120){plats.push({x:cx,y:DGY,w:(W-120)-cx,h:36,sol:true});} // fill rest solid so a cap never leaves one giant gap
-    plats.push({x:W-120,y:DGY,w:120,h:36,sol:true,safe:true});
+    // Ground generation. First & last segments are the safe spawn/exit zones.
+    if(fi<3){
+      // Floors 1-3: a scaled number of holes placed at RANDOM positions across the WHOLE width (not bunched at the front).
+      var nHoles=(2+Math.floor(Math.random()*2))*(fi===0?1:fi===1?2:4); // fi0:2-3 · fi1:4-6 · fi2:8-12
+      var _hws=[],_htot=0;for(var _k=0;_k<nHoles;_k++){var _hw=46+Math.random()*34;_hws.push(_hw);_htot+=_hw;}
+      var _segN=nHoles+1,_baseMin=130+120+Math.max(0,_segN-2)*70;
+      // Drop holes if they'd leave too little landable ground between them
+      while(nHoles>0&&(W-_htot)<_baseMin){_htot-=_hws.pop();nHoles--;_segN=nHoles+1;_baseMin=130+120+Math.max(0,_segN-2)*70;}
+      var _extra=Math.max(0,(W-_htot)-_baseMin),_wts=[],_wsum=0;
+      for(var _k=0;_k<_segN;_k++){var _w=0.4+Math.random();_wts.push(_w);_wsum+=_w;}
+      var _cx=0;
+      for(var _k=0;_k<_segN;_k++){
+        var _isEnd=(_k===0||_k===_segN-1),_min=(_k===0)?130:(_k===_segN-1)?120:70;
+        var _sw=(_k===_segN-1)?(W-_cx):(_min+_extra*_wts[_k]/_wsum);
+        plats.push({x:_cx,y:DGY,w:_sw,h:36,sol:true,safe:_isEnd});_cx+=_sw;
+        if(_k<nHoles)_cx+=_hws[_k];
+      }
+    } else {
+      // Floor 4+ : original full-density gaps, left-to-right across the whole width
+      plats.push({x:0,y:DGY,w:130,h:36,sol:true,safe:true});var cx=130;
+      while(cx<W-160){var gap=40+Math.random()*40,pw=60+Math.random()*80;cx+=gap;if(cx+pw>W-160)break;plats.push({x:cx,y:DGY,w:pw,h:36,sol:true});cx+=pw;}
+      plats.push({x:W-120,y:DGY,w:120,h:36,sol:true,safe:true});
+    }
     var ladX=W-65,placed=[];
     for(var i=0;i<c.nP;i++){for(var at=0;at<60;at++){
       var px=80+Math.random()*(W-200);
@@ -4582,35 +4598,20 @@ function dDraw(){
       for(var _xi=_vx0;_xi<=_vx1;_xi+=_TSTEP){
         var _wx=p.x+_xi;
         // Layered sine waves → natural rolling terrain
-        var _b=Math.max(0,Math.round(Math.sin(_wx*.085)*4+Math.sin(_wx*.21)*2.5+Math.cos(_wx*.14)*1.5+Math.sin(_wx*.038)*2));
+        var _b=Math.max(0,Math.round(Math.sin(_wx*.045)*2.5+Math.sin(_wx*.017)*2)); // gentle rolling surface
         _tpts.push([pxp+_xi,p.y+_b]);
       }
       if(_tpts.length<2){continue;}
-      // Main body fill
-      DC.fillStyle=_ppl;
+      // Opaque body fill — clean flat terrain (no see-through, no shading stripe, no surface teeth)
+      DC.fillStyle='#1f86a8';
       DC.beginPath();DC.moveTo(_tpts[0][0],H);DC.lineTo(_tpts[0][0],_tpts[0][1]);
       for(var t=1;t<_tpts.length;t++)DC.lineTo(_tpts[t][0],_tpts[t][1]);
       DC.lineTo(_tpts[_tpts.length-1][0],H);DC.closePath();DC.fill();
-      // Sub-surface lighter layer (top ~8px of ground gives sense of depth)
-      DC.fillStyle=_ppm;
-      DC.beginPath();DC.moveTo(_tpts[0][0],_tpts[0][1]);
-      for(var t=1;t<_tpts.length;t++)DC.lineTo(_tpts[t][0],_tpts[t][1]);
-      DC.lineTo(_tpts[_tpts.length-1][0],_tpts[_tpts.length-1][1]+9);
-      DC.lineTo(_tpts[0][0],_tpts[0][1]+9);DC.closePath();DC.fill();
-      // Top surface highlight
-      DC.strokeStyle=_pph;DC.lineWidth=2;DC.lineCap='round';
+      // Single clean top edge
+      DC.strokeStyle='#5cc6e4';DC.lineWidth=2;DC.lineCap='round';
       DC.beginPath();DC.moveTo(_tpts[0][0],_tpts[0][1]);
       for(var t=1;t<_tpts.length;t++)DC.lineTo(_tpts[t][0],_tpts[t][1]);
       DC.stroke();DC.lineCap='butt';DC.lineWidth=1;
-      // Small surface rocks/teeth scattered along the terrain line
-      DC.fillStyle=_ppt;
-      for(var _ri=_vx0+8;_ri<_vx1-5;_ri+=11+((p.x+_ri)%6)){
-        var _ri2=Math.round((_ri-_vx0)/_TSTEP);
-        if(_ri2>=_tpts.length)continue;
-        var _ry=_tpts[Math.min(_ri2,_tpts.length-1)][1];
-        var _rh=2+((p.x+_ri*3)%3);
-        DC.beginPath();DC.moveTo(pxp+_ri-2,_ry);DC.lineTo(pxp+_ri+2,_ry);DC.lineTo(pxp+_ri,_ry-_rh);DC.fill();
-      }
     } else {
       // ── Thin floating platform: stone ledge with texture + stalactites ───
       var _ph=p.h;
