@@ -1659,7 +1659,9 @@ function _buildSaveData(){
     inventory:_allItems.map(function(it){return{id:it.id,slot:it.slot||'pickaxe',slotIcon:it.slotIcon||'ti-pickaxe',mat:it.mat,type:it.type,rarN:it.rar.n,affixes:it.affixes.map(function(a){return{tk:a.t.k,v:a.v};}),price:it.price};}),
     oreStash:oreStash,
     eqSlots:{pickaxe:equippedSlots.pickaxe?equippedSlots.pickaxe.id:null,head:equippedSlots.head?equippedSlots.head.id:null,ring:equippedSlots.ring?equippedSlots.ring.id:null,amulet:equippedSlots.amulet?equippedSlots.amulet.id:null},
-    gameStats:gameStats,_achiev:_achiev,lastSaved:Date.now()
+    gameStats:gameStats,_achiev:_achiev,
+    mRockNum:mRockNum,mRockHP:mRockHP,mRockMax:mRockMax,mRockType:mRockType?mRockType.n:'Rock',
+    lastSaved:Date.now()
   };
 }
 function saveGame(force){
@@ -1697,6 +1699,13 @@ function loadGame(){
     var d=JSON.parse(s);
     gold=d.gold||50;tokens=d.tokens||0;totalRocks=d.totalRocks||0;
     runs=d.runs||0;chests=d.chests||0;
+    // Restore idle rock progression so a refresh can't reset back to the easy 5-HP rock (leaderboard exploit)
+    if(typeof d.mRockNum==='number'&&d.mRockNum>=1){
+      mRockNum=d.mRockNum;mRockMax=mRockNum*5;
+      mRockHP=(typeof d.mRockHP==='number'&&d.mRockHP>0)?Math.min(d.mRockHP,mRockMax):mRockMax;
+      if(d.mRockType){for(var _ri=0;_ri<ROCK_TYPES.length;_ri++){if(ROCK_TYPES[_ri].n===d.mRockType){mRockType=ROCK_TYPES[_ri];break;}}}
+      mMakeCracks();
+    }
     if(d.excPool)excPool=d.excPool;if(d.lifetimeExt)lifetimeExt=d.lifetimeExt;if(d.extBurned)extBurned=d.extBurned;if(d.devCut)devCut=d.devCut;if(d.starterGiven)starterGiven=d.starterGiven;
     if(d.ups)ups=Object.assign(ups,d.ups);
     if(d.oreStash)oreStash=d.oreStash;
@@ -5346,7 +5355,8 @@ function _setSignedInUI(username){
         if(d){
           var mapped={gold:d.gold,tokens:d.tokens,totalRocks:d.total_rocks,runs:d.runs,chests:d.chests,
             ups:d.ups,oreStash:d.ore_stash,inventory:d.inventory,eqSlots:d.equipped_slots,
-            gameStats:d.game_stats,_achiev:d.achievements};
+            gameStats:d.game_stats,_achiev:d.achievements,
+            mRockNum:d.mRockNum,mRockHP:d.mRockHP,mRockMax:d.mRockMax,mRockType:d.mRockType};
           localStorage.setItem(_localKey,JSON.stringify(mapped));
         }
         loadGame();uiAll();
