@@ -4651,7 +4651,7 @@ function dDraw(){
     var _n=s.small?5:6,_sp=s.small?6:7,_bw=s.small?3:5,_sh=s.small?9:17,_x0=s.small?sx-12:sx-21;
     // Glassy spikes: translucent terrain-teal body rising to blood-red tips, with a glass sheen
     var _spg=DC.createLinearGradient(0,_base,0,_base-_sh);
-    _spg.addColorStop(0,'rgba(31,134,168,0.42)');_spg.addColorStop(0.55,'rgba(31,134,168,0.68)');_spg.addColorStop(0.82,'rgba(70,160,180,0.82)');_spg.addColorStop(1,'rgba(198,26,40,0.94)');
+    _spg.addColorStop(0,'rgba(31,134,168,0.42)');_spg.addColorStop(0.5,'rgba(31,134,168,0.72)');_spg.addColorStop(0.6,'rgba(150,68,74,0.86)');_spg.addColorStop(0.7,'rgba(205,24,44,0.97)');_spg.addColorStop(1,'rgba(222,18,42,1)');
     for(var j=0;j<_n;j++){
       var bx=_x0+j*_sp+(_sp-_bw)/2;
       DC.fillStyle=_spg;DC.beginPath();DC.moveTo(bx,_base);DC.lineTo(bx+_bw/2,_base-_sh);DC.lineTo(bx+_bw,_base);DC.closePath();DC.fill();
