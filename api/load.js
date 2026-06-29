@@ -167,6 +167,24 @@ export default async function handler(req, res) {
     return res.json({ confirmed: false, finalized: false });
   }
 
+  // ---------- ATA EXISTENCE CHECK ----------
+  if (req.query.ata_exists) {
+    const ata = req.query.ata_exists;
+    const rpcs = ['https://api.mainnet-beta.solana.com','https://rpc.ankr.com/solana'];
+    for (const rpc of rpcs) {
+      try {
+        const r = await fetch(rpc, {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({jsonrpc:'2.0',id:1,method:'getAccountInfo',params:[ata,{encoding:'base64'}]})
+        });
+        const d = await r.json();
+        if (d.error) continue;
+        return res.json({ exists: d.result && d.result.value !== null });
+      } catch(e) { continue; }
+    }
+    return res.json({ exists: false });
+  }
+
   // ---------- USDC BALANCE CHECK ----------
   if (req.query.usdc_balance) {
     const wallet = req.query.usdc_balance;
