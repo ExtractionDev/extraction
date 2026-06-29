@@ -1304,12 +1304,12 @@ function iImg(k,cx,cy,w,h,dx,dy,dw,dh,ctx,smooth){
 var gold=50,tokens=0,totalRocks=0,runs=0,chests=0,activeTab=0;
 // DORES defined early: several functions (e.g. _genOreMarket) run at parse time and reference it
 var DORES=[
-  {n:'Coal',    c:'#3a3a3a',tc:'#999',    ch:.25,v:3,   rv:1,  img:'stone_1'},
-  {n:'Copper',  c:'#c87040',tc:'#e8a060', ch:.30,v:1,   rv:1,  img:'copper_ore'},
-  {n:'Iron',    c:'#8080a0',tc:'#c0c8d0', ch:.22,v:1,   rv:2,  img:'stone_2'},
-  {n:'Silver',  c:'#a8b0c8',tc:'#d0d8f0', ch:.12,v:3,   rv:4,  img:'silver_ore'},
-  {n:'Gold',    c:'#c8a020',tc:'#ffd700', ch:.08,v:10,  rv:8,  img:'gold_ore'},
-  {n:'Mystrile',c:'#7858e0',tc:'#c8a8ff', ch:.03,v:25,  rv:10, img:'mystrile_ore'}
+  {n:'Coal',    c:'#3a3a3a',tc:'#999',    ch:.27,v:3,   rv:1,  img:'stone_1'},
+  {n:'Copper',  c:'#c87040',tc:'#e8a060', ch:.32,v:1,   rv:1,  img:'copper_ore'},
+  {n:'Iron',    c:'#8080a0',tc:'#c0c8d0', ch:.24,v:1,   rv:2,  img:'stone_2'},
+  {n:'Silver',  c:'#a8b0c8',tc:'#d0d8f0', ch:.12,v:3,   rv:7,  img:'silver_ore'},
+  {n:'Gold',    c:'#c8a020',tc:'#ffd700', ch:.04,v:10,  rv:10, img:'gold_ore'},
+  {n:'Mystrile',c:'#7858e0',tc:'#c8a8ff', ch:.01,v:25,  rv:18, img:'mystrile_ore'}
 ];
 var gameStats={bestGC:0,deepestFloor:0,enemiesKilled:0,totalDmg:0,rareRocks:0,goldRocks:0,mystrileRocks:0};
 var ups={speed:0,power:0,sell:0,luck:0};
@@ -2859,7 +2859,7 @@ var ORE_ROLL_MIN=1, ORE_ROLL_MAX=6;   // each regular rock drops this many of it
 var ORE_DEATH_PENALTY=0.30;           // fraction of THIS RUN's ore lost on a penalised death
 function rollOre(){return ORE_ROLL_MIN+Math.floor(Math.random()*(ORE_ROLL_MAX-ORE_ROLL_MIN+1));}
 // ===== TUNABLE: ore -> $EXT refinery (run-summary) =====
-var REFINE_RATE=10;       // EXT paid per point of ore value — direct "cash in your ore", begins at 0 and scales up. Tune in playtest.
+var REFINE_RATE=2.5;      // EXT paid per point of ore value — direct "cash in your ore" (begins at 0). Lowered 4x: common ore no longer piles up fast. Tune in playtest.
 var REFINE_CAP=1.5;       // safety ceiling as a multiple of entry fee — only a big haul reaches it (no single rare ore caps it)
 var _runRefined=false;    // guard: one refine per summary
 function oreHaulValue(bag){var v=0;for(var k in bag){for(var i=0;i<DORES.length;i++){if(DORES[i].n===k){v+=bag[k]*(DORES[i].rv||DORES[i].v);break;}}}return v;}
