@@ -597,7 +597,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
         <div style="text-align:right"><div class="exc-pool-amount" id="excPoolAmt">0.000</div><div class="exc-pool-sol">$EXT</div></div>
       </div>
       <div class="exc-pool-odds" id="excPoolOdds">⚔ Excalibur odds: 1% this run</div>
-      <div class="exc-burn"><i class="ti ti-flame"></i> <span id="excBurnTxt">80% of each entry feeds the prize pool · 10% burned · 10% dev</span></div>
+      <div class="exc-burn"><i class="ti ti-flame"></i> <span id="excBurnTxt">10% burn · 10% dev · 80% feeds the prize pool</span></div>
     </div>
     <!-- $EXT entry-fee slider — hidden in free mode -->
     <div class="sol-wrap" id="solWrap">
@@ -1526,7 +1526,7 @@ function updExcPool(){
   if(poolEl)poolEl.textContent=displayPool.toFixed(3);
   var jackOdds=1.0; // jackpot pull odds always 1% once found
   if(oddsEl)oddsEl.textContent='⚔ Stone appears: '+odds.toFixed(1)+'% this run  ·  Jackpot pull: 1% if found  ·  Pool: '+displayPool.toFixed(3)+' $EXT';
-  var bl=document.getElementById('excBurnTxt');if(bl)bl.textContent='🔥 '+extBurned.toFixed(2)+' $EXT burned  ·  '+devCut.toFixed(2)+' to dev  ·  80% feeds the prize pool';
+  var bl=document.getElementById('excBurnTxt');if(bl)bl.textContent='🔥 10% burn  ·  10% dev  ·  80% feeds the prize pool';
 }
 function getItemBonus(k){var t=0;['pickaxe','head','ring','amulet'].forEach(function(s){if(equippedSlots[s])equippedSlots[s].affixes.forEach(function(a){if(a.t.k===k)t+=a.v;});});return t;}
 function getSpd(){return(0.5+ups.speed*0.015)*(1+getItemBonus('speed')/100);}
