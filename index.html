@@ -1868,12 +1868,18 @@ async function depositTokens(){
     var fromPk=new solanaWeb3.PublicKey(walletAddress);
     var destPk=new solanaWeb3.PublicKey(_DEPOSIT_WALLET);
     var units=Math.round(amt*Math.pow(10,_DEPOSIT_DECIMALS));
-    var fromATA=_getATA(fromPk,mintPk);
-    var destATA=_getATA(destPk,mintPk);
+    // For USDC, resolve the wallet's REAL token accounts via the server — the exact proven method
+    // the marketplace uses (handles non-standard accounts). For $EXT/other mints, derive the ATA.
+    var fromATA=null,destATA=null,_useLookup=(_DEPOSIT_MINT===_USDC_MINT);
+    if(_useLookup){
+      try{var _faR=await fetch('/api/load?usdc_account='+encodeURIComponent(walletAddress));var _faD=await _faR.json();if(_faD&&_faD.exists&&_faD.account)fromATA=new solanaWeb3.PublicKey(_faD.account);}catch(e){}
+      try{var _daR=await fetch('/api/load?usdc_account='+encodeURIComponent(_DEPOSIT_WALLET));var _daD=await _daR.json();if(_daD&&_daD.exists&&_daD.account)destATA=new solanaWeb3.PublicKey(_daD.account);}catch(e){}
+    }
+    if(!fromATA)fromATA=_getATA(fromPk,mintPk);
     var _bh=await _fetchBlockhash();
     var tx=new solanaWeb3.Transaction();
-    tx.add(_createATAIx(fromPk,destPk,mintPk));    // creates the deposit wallet's token account if missing
-    tx.add(_usdcIx(fromATA,destATA,fromPk,units)); // SPL transfer of $EXT
+    if(!destATA){destATA=_getATA(destPk,mintPk);tx.add(_createATAIx(fromPk,destPk,mintPk));} // create the receiving account only if it doesn't exist yet
+    tx.add(_usdcIx(fromATA,destATA,fromPk,units));
     tx.feePayer=fromPk;tx.recentBlockhash=_bh.blockhash;
     btn.textContent='Approve in wallet...';
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
@@ -2225,8 +2231,8 @@ async function _pollConfirm(signature){
     try{
       var _cr=await fetch('/api/load?sig='+encodeURIComponent(signature));
       var _cd=await _cr.json();
-      if(_cd.err)throw new Error('Transaction failed on-chain: '+JSON.stringify(_cd.err));
       if(_cd.confirmed||_cd.finalized)return;
+      if(_cd.err)throw new Error('Transaction failed on-chain: '+JSON.stringify(_cd.err));
     }catch(e){if(e.message&&e.message.includes('Transaction failed'))throw e;}
   }
   // Timed out but tx may still confirm — not fatal
