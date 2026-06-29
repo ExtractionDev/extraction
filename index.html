@@ -228,6 +228,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 .up-bar{width:100%;height:6px;background:var(--border);border-radius:3px;margin-bottom:8px;overflow:hidden}
 .up-fill{height:100%;border-radius:3px}
 .up-desc{font-size:14px;color:var(--text2);margin-bottom:10px}
+.up-ore{font-size:10px;line-height:1.4;margin:-4px 0 10px;min-height:13px;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.up-ore .oq{font-weight:700}
+.up-ore .short{color:var(--red);font-weight:700}
+.up-ore .sep{opacity:.35}
+.up-ore .lbl{opacity:.55;color:var(--text3)}
 .up-btn{width:100%;padding:11px;border-radius:6px;font-size:14px;cursor:pointer;text-align:center;border:1px solid #3a3020;background:var(--gold3);color:var(--gold);font-family:'Space Mono',monospace;font-weight:700}
 .up-btn:hover{background:#2a1c10}
 .up-btn.off{opacity:.3;cursor:default}
@@ -744,6 +749,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
         <div class="up-bar"><div class="up-fill" id="usB" style="width:0%;background:var(--gold)"></div></div>
         <div class="up-desc" id="usV">0.50 swings/sec</div>
         <div class="up-tooltip" id="usBtTip">Hover to preview</div>
+        <div class="up-ore" id="usOre"></div>
         <div class="up-btn" id="usBt" onclick="buyUp('speed')">5 🪙 gold</div>
       </div>
       <div class="up-card">
@@ -751,6 +757,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
         <div class="up-bar"><div class="up-fill" id="upB" style="width:0%;background:var(--red)"></div></div>
         <div class="up-desc" id="upV">1.0 dmg</div>
         <div class="up-tooltip" id="upBtTip">Hover to preview</div>
+        <div class="up-ore" id="upOre"></div>
         <div class="up-btn" id="upBt" onclick="buyUp('power')">5 🪙 gold</div>
       </div>
       <div class="up-card">
@@ -758,6 +765,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
         <div class="up-bar"><div class="up-fill" id="uxB" style="width:0%;background:var(--purple)"></div></div>
         <div class="up-desc" id="uxV">0.01 $EXT/rock</div>
         <div class="up-tooltip" id="uxBtTip">Hover to preview</div>
+        <div class="up-ore" id="uxOre"></div>
         <div class="up-btn" id="uxBt" onclick="buyUp('sell')">5 🪙 gold</div>
       </div>
       <div class="up-card">
@@ -765,6 +773,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
         <div class="up-bar"><div class="up-fill" id="ulB" style="width:0%;background:#4aaa50"></div></div>
         <div class="up-desc" id="ulV">Silver 10.0% · Gold 1.00% · Mystrile 0.100%</div>
         <div class="up-tooltip" id="ulBtTip">Hover to preview</div>
+        <div class="up-ore" id="ulOre"></div>
         <div class="up-btn" id="ulBt" onclick="buyUp('luck')">25 🪙</div>
       </div>
       <div class="panel-title" style="margin-top:14px"><i class="ti ti-chart-bar"></i> Rock Rarities</div>
@@ -1542,6 +1551,13 @@ function _oreSpend(n){ // consume n ore units, cheapest value first (keeps Gold/
   var keys=Object.keys(oreStash).filter(function(k){return oreStash[k]>0;}).sort(function(a,b){return _oreUnitVal(a)-_oreUnitVal(b);});
   for(var i=0;i<keys.length&&n>0;i++){var k=keys[i],take=Math.min(n,oreStash[k]);oreStash[k]-=take;n-=take;if(oreStash[k]<=0)delete oreStash[k];}
 }
+function _oreSpendPreview(n){ // non-destructive: which ores WOULD be consumed for n units (cheapest first)
+  var keys=Object.keys(oreStash).filter(function(k){return oreStash[k]>0;}).sort(function(a,b){return _oreUnitVal(a)-_oreUnitVal(b);});
+  var out=[],need=n;
+  for(var i=0;i<keys.length&&need>0;i++){var k=keys[i],take=Math.min(need,oreStash[k]);out.push({n:k,q:take});need-=take;}
+  return{list:out,short:need};
+}
+function _oreTc(name){for(var i=0;i<DORES.length;i++)if(DORES[i].n===name)return DORES[i].tc;return '#999';}
 function getCost(t){return Math.floor((UP_BASE[t]||40)*Math.pow(1.08,ups[t]));} // +8%/level — smooth curve to lvl 500
 function buyUp(t){if(ups[t]>=500)return;var c=getCost(t),oc=getOreCost(t);if(gold>=c&&_oreTotal()>=oc){gold-=c;_oreSpend(oc);ups[t]++;sndLevelUp();saveGame();uiAll();}}
 function equipItem(id){
@@ -2578,9 +2594,13 @@ function uiAll(){
               function(){return'→ '+(1+ups.power*0.12+0.12).toFixed(2)+' dmg/swing';},
               function(){return'→ '+(0.01+ups.sell*0.003+0.003).toFixed(4)+' $EXT/rock';},
               function(){var lk=ups.luck+1;return'Silver→'+((0.10+lk*0.001)*100).toFixed(1)+'%';}];
-  for(var i=0;i<4;i++){var c=getCost(ts[i]),btn=el(ids[i]+'Bt'),tip=el(ids[i]+'BtTip');
-    if(ups[ts[i]]>=500){btn.className='up-btn maxed';btn.innerHTML='MAXED';}
-    else{var oc=getOreCost(ts[i]),aff=(gold>=c&&_oreTotal()>=oc);btn.className='up-btn'+(aff?'':' off');btn.innerHTML='<i class="ti ti-arrow-up"></i> Upgrade · '+c+' 🪙 · '+oc+' ⛏';}
+  for(var i=0;i<4;i++){var c=getCost(ts[i]),btn=el(ids[i]+'Bt'),tip=el(ids[i]+'BtTip'),oreEl=el(ids[i]+'Ore');
+    if(ups[ts[i]]>=500){btn.className='up-btn maxed';btn.innerHTML='MAXED';if(oreEl)oreEl.innerHTML='';}
+    else{var oc=getOreCost(ts[i]),aff=(gold>=c&&_oreTotal()>=oc);btn.className='up-btn'+(aff?'':' off');btn.innerHTML='<i class="ti ti-arrow-up"></i> Upgrade · '+c+' 🪙 · '+oc+' ⛏';
+      if(oreEl){var pv=_oreSpendPreview(oc),parts=pv.list.map(function(o){return '<span class="oq" style="color:'+_oreTc(o.n)+'">'+o.q+' '+o.n+'</span>';});
+        if(pv.short>0)parts.push('<span class="short">need '+pv.short+' more</span>');
+        oreEl.innerHTML='<span class="lbl">spends</span> '+(parts.length?parts.join('<span class="sep">·</span>'):'<span class="short">no ore yet</span>');}
+    }
     if(tip)tip.textContent=ups[ts[i]]>=500?'Maxed':tipFns[i]();
   }
   el('mrN').textContent=mRockNum;el('mrD').textContent=totalRocks;
