@@ -5050,9 +5050,12 @@ function dDraw(){
   if(dCombo>=2&&dComboTimer>0){var ca=Math.min(1,dComboTimer/30);DC.globalAlpha=ca;DC.fillStyle=dCombo>=4?'#ff4040':dCombo>=3?'#ff9040':'#ffd040';DC.font='bold '+(10+dCombo*2)+'px "Space Mono"';DC.textAlign='center';DC.fillText(dCombo+'x COMBO',W/2,H-28);DC.globalAlpha=1;}
   DC.restore();
   // ── Fog-of-war: darkness mask with directional headlamp + torch light holes ─
+  // Lighting scales with depth: floors 1-3 (dfl 0-2) are brighter; floor 4+ uses full darkness.
+  var _fogDark=dfl<=2?(0.50+dfl*0.08):0.84;   // 0.50, 0.58, 0.66, then 0.84 from floor 4 on
+  var _ambR=dfl<=2?100:70;                      // wider ambient pool on the lit early floors
   if(!fogCv){fogCv=document.createElement('canvas');fogCv.width=800;fogCv.height=400;fogCtx=fogCv.getContext('2d');}
   fogCtx.clearRect(0,0,800,400);
-  fogCtx.fillStyle='rgba(0,0,0,0.84)';fogCtx.fillRect(0,0,800,400);
+  fogCtx.fillStyle='rgba(0,0,0,'+_fogDark+')';fogCtx.fillRect(0,0,800,400);
   fogCtx.globalCompositeOperation='destination-out';
   // Headlamp: small ambient glow around player + bright directional cone
   var _plx2=dp.x-dcam+9,_ply2=dp.y+6; // head/helmet position
@@ -5063,7 +5066,7 @@ function dDraw(){
   var _halfAng=Math.PI*0.224;             // ~40° half-angle = ~80° cone width
   var _coneR=255;
   // Small ambient base circle so the area right around the player is always faintly lit
-  var _ambGrd=fogCtx.createRadialGradient(_plx2,_ply2+5,0,_plx2,_ply2+5,70);
+  var _ambGrd=fogCtx.createRadialGradient(_plx2,_ply2+5,0,_plx2,_ply2+5,_ambR);
   _ambGrd.addColorStop(0,'rgba(0,0,0,0.95)');_ambGrd.addColorStop(0.55,'rgba(0,0,0,0.65)');_ambGrd.addColorStop(1,'rgba(0,0,0,0)');
   fogCtx.fillStyle=_ambGrd;fogCtx.fillRect(0,0,800,400);
   // Directional cone in facing direction (clip to sector then fill with radial gradient)
