@@ -2122,11 +2122,19 @@ function _getATA(walletPk,mintPk){
   )[0];
 }
 function _usdcIx(fromATA,toATA,ownerPk,amount){
-  var data=new Uint8Array(9);data[0]=3;
+  // transferChecked (discriminator 12): data = [12, amount(8 LE), decimals(1)]
+  var data=new Uint8Array(10);data[0]=12;
   var amt=BigInt(Math.round(amount));
   for(var i=0;i<8;i++){data[1+i]=Number(amt&BigInt(0xff));amt>>=BigInt(8);}
+  data[9]=6; // USDC has 6 decimals
+  var mintPk=new solanaWeb3.PublicKey(_USDC_MINT);
   return new solanaWeb3.TransactionInstruction({
-    keys:[{pubkey:fromATA,isSigner:false,isWritable:true},{pubkey:toATA,isSigner:false,isWritable:true},{pubkey:ownerPk,isSigner:true,isWritable:false}],
+    keys:[
+      {pubkey:fromATA,isSigner:false,isWritable:true},
+      {pubkey:mintPk,isSigner:false,isWritable:false},
+      {pubkey:toATA,isSigner:false,isWritable:true},
+      {pubkey:ownerPk,isSigner:true,isWritable:false}
+    ],
     programId:new solanaWeb3.PublicKey(_TOKEN_PROG),data:data
   });
 }
