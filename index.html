@@ -1868,12 +1868,15 @@ async function depositTokens(){
     var fromPk=new solanaWeb3.PublicKey(walletAddress);
     var destPk=new solanaWeb3.PublicKey(_DEPOSIT_WALLET);
     var units=Math.round(amt*Math.pow(10,_DEPOSIT_DECIMALS));
-    var fromATA=_getATA(fromPk,mintPk);
-    var destATA=_getATA(destPk,mintPk);
+    // REAL on-chain accounts via Solscan-backed lookup (handles non-standard accounts); derive/create as fallback
+    var _depUSDC=(_DEPOSIT_MINT===_USDC_MINT);
+    var fromATA=(_depUSDC?await _realAcct(walletAddress):null)||_getATA(fromPk,mintPk);
+    var destReal=(_depUSDC?await _realAcct(_DEPOSIT_WALLET):null);
     var tx=new solanaWeb3.Transaction();
-    tx.add(_createATAIx(fromPk,destPk,mintPk)); // create the receiving account if it doesn't exist yet (no-op if it does)
+    var destATA;
+    if(destReal){destATA=destReal;}else{destATA=_getATA(destPk,mintPk);tx.add(_createATAIx(fromPk,destPk,mintPk));}
     tx.add(_usdcIx(fromATA,destATA,fromPk,units));
-    tx.feePayer=fromPk; // Phantom attaches a FRESH blockhash + submits via its own RPC (avoids stale-blockhash drops)
+    tx.feePayer=fromPk;
     tx.recentBlockhash=await _freshBlockhash();
     btn.textContent='Approve in wallet...';
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
@@ -2241,6 +2244,15 @@ async function _fetchBlockhash(){
   console.log('Blockhash via:',d.rpc);
   return {blockhash:d.blockhash,rpc:d.rpc||'https://api.mainnet-beta.solana.com'};
 }
+// Resolve a wallet's REAL on-chain USDC account (Solscan-backed server lookup) — handles non-standard accounts.
+async function _realAcct(wallet){
+  try{
+    var r=await fetch('/api/load?usdc_account='+encodeURIComponent(wallet));
+    var d=await r.json();
+    if(d&&d.exists&&d.account)return new solanaWeb3.PublicKey(d.account);
+  }catch(e){}
+  return null;
+}
 // Always grab a CURRENT blockhash right before signing — stale ones get silently dropped by the network.
 async function _freshBlockhash(){
   try{
@@ -2321,18 +2333,18 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
     var totalUnits=Math.round(priceUsdc*1e6);
     var sellerUnits=Math.round(totalUnits*0.95);
     var feeUnits=totalUnits-sellerUnits;
-    var buyerATA=_getATA(buyerPk,_usdcMintPk());
-    // Derive seller + fee accounts the standard way; create them in-tx if missing (works for every wallet, not just yours)
     var sellerPk=new solanaWeb3.PublicKey(sellerWallet);
-    var sellerATA=_getATA(sellerPk,_usdcMintPk());
     var feeWalletPk=new solanaWeb3.PublicKey(_FEE_WALLET);
-    var feeATA=_getATA(feeWalletPk,_usdcMintPk());
+    // REAL on-chain accounts via Solscan-backed lookup (handles non-standard accounts); derive/create as fallback
+    var buyerATA=(await _realAcct(walletAddress))||_getATA(buyerPk,_usdcMintPk());
+    var sellerReal=await _realAcct(sellerWallet);
+    var feeReal=await _realAcct(_FEE_WALLET);
     var tx=new solanaWeb3.Transaction();
-    tx.add(_createATAIx(buyerPk,sellerPk,_usdcMintPk()));    // ensure seller's USDC account exists
-    tx.add(_createATAIx(buyerPk,feeWalletPk,_usdcMintPk())); // ensure fee wallet's USDC account exists
+    var sellerATA;if(sellerReal){sellerATA=sellerReal;}else{sellerATA=_getATA(sellerPk,_usdcMintPk());tx.add(_createATAIx(buyerPk,sellerPk,_usdcMintPk()));}
+    var feeATA;if(feeReal){feeATA=feeReal;}else{feeATA=_getATA(feeWalletPk,_usdcMintPk());tx.add(_createATAIx(buyerPk,feeWalletPk,_usdcMintPk()));}
     tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
     tx.add(_usdcIx(buyerATA,feeATA,buyerPk,feeUnits));
-    tx.feePayer=buyerPk; // Phantom attaches a FRESH blockhash + submits via its own RPC
+    tx.feePayer=buyerPk;
     tx.recentBlockhash=await _freshBlockhash();
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
     var signed=await provider.signAndSendTransaction(tx);
@@ -2586,18 +2598,18 @@ async function buyOreWithUSDC(lid,sellerWallet,pricePerUnit,qty){
     var totalUnits=Math.round(totalUsdc*1e6);
     var sellerUnits=Math.round(totalUnits*0.95);
     var feeUnits=totalUnits-sellerUnits;
-    // Derive accounts the standard way; create receiving accounts in-tx if missing (works for every wallet)
-    var buyerATA=_getATA(buyerPk,_usdcMintPk());
+    // REAL on-chain accounts via Solscan-backed lookup (handles non-standard accounts); derive/create as fallback
+    var buyerATA=(await _realAcct(walletAddress))||_getATA(buyerPk,_usdcMintPk());
     var sellerPk=new solanaWeb3.PublicKey(sellerWallet);
-    var sellerATA=_getATA(sellerPk,_usdcMintPk());
     var feeWalletPk=new solanaWeb3.PublicKey(_FEE_WALLET);
-    var feeATA=_getATA(feeWalletPk,_usdcMintPk());
+    var sellerReal=await _realAcct(sellerWallet);
+    var feeReal=await _realAcct(_FEE_WALLET);
     var tx=new solanaWeb3.Transaction();
-    tx.add(_createATAIx(buyerPk,sellerPk,_usdcMintPk()));
-    tx.add(_createATAIx(buyerPk,feeWalletPk,_usdcMintPk()));
+    var sellerATA;if(sellerReal){sellerATA=sellerReal;}else{sellerATA=_getATA(sellerPk,_usdcMintPk());tx.add(_createATAIx(buyerPk,sellerPk,_usdcMintPk()));}
+    var feeATA;if(feeReal){feeATA=feeReal;}else{feeATA=_getATA(feeWalletPk,_usdcMintPk());tx.add(_createATAIx(buyerPk,feeWalletPk,_usdcMintPk()));}
     tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
     tx.add(_usdcIx(buyerATA,feeATA,buyerPk,feeUnits));
-    tx.feePayer=buyerPk; // Phantom attaches a FRESH blockhash + submits via its own RPC
+    tx.feePayer=buyerPk;
     tx.recentBlockhash=await _freshBlockhash();
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
     var signed=await provider.signAndSendTransaction(tx);
