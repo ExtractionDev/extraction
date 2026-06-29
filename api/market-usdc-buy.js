@@ -112,7 +112,7 @@ export default async function handler(req, res) {
     // Use the REAL on-chain USDC account (derivation can mismatch non-standard accounts)
     const sellerATA = await getRealUsdcAccount(listing.seller_wallet);
     if (!sellerATA) return res.status(400).json({ error: 'Seller has no USDC account' });
-    const feeATA    = getATA(FEE_WALLET, USDC_MINT);
+    const feeATA    = await getRealUsdcAccount(FEE_WALLET);
 
     const innerIx = (tx.meta && tx.meta.innerInstructions) ? tx.meta.innerInstructions : [];
     const allIx = [
@@ -129,7 +129,7 @@ export default async function handler(req, res) {
       });
 
     const sellerReceived = transfers.filter(t => t.to === sellerATA).reduce((s, t) => s + t.amount, 0);
-    const feeReceived    = transfers.filter(t => t.to === feeATA).reduce((s, t) => s + t.amount, 0);
+    const feeReceived    = feeATA ? transfers.filter(t => t.to === feeATA).reduce((s, t) => s + t.amount, 0) : 0;
 
     // Seller + fee together must cover the full price (fee is optional / may be 0)
     if ((sellerReceived + feeReceived) < totalUnits * (1 - SLIPPAGE)) {
