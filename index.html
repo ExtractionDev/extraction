@@ -4178,7 +4178,7 @@ function drawMinerFrame(ctx,state,frame,dx,dy,dw,dh,flipX,glowColor,aimX,aimY){
         theta=(flipX?Math.PI:0)-0.5;
       }
       var unit=nh/pLEN;                       // proportional to character height
-      var _szM=_isMyth?1.15:1;                 // Mythic Crystal renders 15% larger
+      var _szM=1.15;                 // every pickaxe renders at the Mythic's length (reach = nh*0.65*1.15) so handle & head sit identically
       var scLen=unit*0.65*_szM, scWid=unit*0.56*_szM;   // proportional to character height
       ctx.save();
       ctx.globalAlpha=alpha;
