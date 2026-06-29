@@ -1761,7 +1761,13 @@ setInterval(saveGame,20000);
 function _fetchGlobalPool(){
   fetch('/api/load?pool=1')
     .then(function(r){return r.ok?r.json():null;})
-    .then(function(d){if(d&&typeof d.pool==='number'){globalPool=d.pool;updExcPool();
+    .then(function(d){if(d&&typeof d.pool==='number'){
+      // Jar coin: any increase at all (even +0.0001) drops one coin on this 15s refresh
+      if(_jarLastPool===null){_jarFill=Math.max(0,Math.min(1,d.pool/JAR_FULL_EXT));}
+      else if(d.pool>_jarLastPool){_jarDropQueue=Math.min(_jarDropQueue+1,20);}
+      else if(d.pool<_jarLastPool){_jarDropQueue=0;}
+      _jarLastPool=d.pool;
+      globalPool=d.pool;updExcPool();
       var hj=document.getElementById('homeJackpotAmt');if(hj)hj.textContent=globalPool.toFixed(3)+' $EXT';
     }})
     .catch(function(){});
@@ -2689,11 +2695,8 @@ var _jarFill=0,_jarDrops=[],_jarPulse=0,_jarLastPool=null,_jarDropQueue=0,_jarDr
 function _fmtJarPool(v){v=v||0;return v>=1000?Math.round(v).toLocaleString()+' $EXT':v.toFixed(3)+' $EXT';}
 function _jarSurfY(fill){return (MGY-8)-fill*(JAR_BH-16);} // surface y of the packed ore for a given fill 0..1
 function _jarTick(){
-  // Any time the jackpot grows, a coin falls in
-  if(_jarLastPool===null){_jarLastPool=globalPool;_jarFill=Math.max(0,Math.min(1,globalPool/JAR_FULL_EXT));}
-  else if(globalPool>_jarLastPool){_jarDropQueue=Math.min(_jarDropQueue+1,20);_jarLastPool=globalPool;} // increase → one coin
-  else if(globalPool<_jarLastPool){_jarLastPool=globalPool;_jarDropQueue=0;} // pool claimed/reset → settle down
-  _jarFill+=(Math.max(0,Math.min(1,globalPool/JAR_FULL_EXT))-_jarFill)*0.05; // ease toward true level
+  // Detection lives in the 15s pool fetch; here we just fill, release queued coins, and animate
+  if(_jarLastPool!==null)_jarFill+=(Math.max(0,Math.min(1,globalPool/JAR_FULL_EXT))-_jarFill)*0.05; // ease toward true level
   if(_jarDropCd>0)_jarDropCd--;
   if(_jarDropQueue>0&&_jarDropCd<=0){_jarDrops.push({x:JAR_CX+(Math.random()-0.5)*8,y:MGY-JAR_BH-26,vy:1.1});_jarDropQueue--;_jarDropCd=10;}
   var _surfY=_jarSurfY(_jarFill);
