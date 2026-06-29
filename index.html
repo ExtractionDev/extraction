@@ -2207,8 +2207,8 @@ async function _pollConfirm(signature){
     try{
       var _cr=await fetch('/api/load?sig='+encodeURIComponent(signature));
       var _cd=await _cr.json();
-      if(_cd.confirmed||_cd.finalized)return;
       if(_cd.err)throw new Error('Transaction failed on-chain: '+JSON.stringify(_cd.err));
+      if(_cd.confirmed||_cd.finalized)return;
     }catch(e){if(e.message&&e.message.includes('Transaction failed'))throw e;}
   }
   // Timed out but tx may still confirm — not fatal
