@@ -1460,10 +1460,9 @@ function goTab(n){
   var _tabExtras={1:'noscroll dung',2:'noscroll miner-tab',3:'market-tab',4:'bp-tab',5:'docs-tab',7:'lb-full-tab'};
   for(var i=0;i<8;i++){
     var t=document.getElementById('t'+i),nb=document.getElementById('nb'+i);
-    if(!t||!nb)continue;
     var extras=_tabExtras[i]?(' '+_tabExtras[i]):'';
-    t.className='tab'+extras+(i===n?' on':'');
-    nb.className='nav-btn'+(i===n?' on':'');
+    if(t)t.className='tab'+extras+(i===n?' on':'');
+    if(nb)nb.className='nav-btn'+(i===n?' on':'');
   }
   // FIX: if switching to dungeon tab and no run is active, ensure entry screen is visible
   if(n===1&&!dRunning){
