@@ -2139,8 +2139,7 @@ function _createATAIx(payerPk,ownerPk,mintPk){
       {pubkey:ownerPk,isSigner:false,isWritable:false},
       {pubkey:mintPk,isSigner:false,isWritable:false},
       {pubkey:new solanaWeb3.PublicKey('11111111111111111111111111111111'),isSigner:false,isWritable:false},
-      {pubkey:new solanaWeb3.PublicKey(_TOKEN_PROG),isSigner:false,isWritable:false},
-      {pubkey:new solanaWeb3.PublicKey('SysvarRent111111111111111111111111111111111'),isSigner:false,isWritable:false}
+      {pubkey:new solanaWeb3.PublicKey(_TOKEN_PROG),isSigner:false,isWritable:false}
     ],
     programId:new solanaWeb3.PublicKey(_ASSOC_PROG),
     data:new Uint8Array([1])
