@@ -6,11 +6,11 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY
 );
 
-const DEV_WALLET   = 'B8ubxUGnvhDTGGRkkN8DkyAfnoLEfnjTPdXfQn3TnVQa';
-const USDC_MINT    = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-const TOKEN_PROG   = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
-const ASSOC_PROG   = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe1bRS';
-const SLIPPAGE     = 0.01;
+const DEV_WALLET = 'B8ubxUGnvhDTGGRkkN8DkyAfnoLEfnjTPdXfQn3TnVQa';
+const USDC_MINT  = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+const TOKEN_PROG = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+const ASSOC_PROG = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe1bRS';
+const SLIPPAGE   = 0.01;
 
 function getATA(walletAddress, mintAddress) {
   const [ata] = PublicKey.findProgramAddressSync(
@@ -67,24 +67,18 @@ export default async function handler(req, res) {
     }
 
     const { data: player, error: playerErr } = await supabase
-      .from('players')
-      .select('session_token')
-      .eq('username', username)
-      .single();
+      .from('players').select('session_token').eq('username', username).single();
     if (playerErr || !player) return res.status(403).json({ error: 'Player not found' });
     if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session' });
 
     const { data: listing, error: listErr } = await supabase
-      .from('listings')
-      .select('*')
-      .eq('id', lid)
-      .single();
+      .from('listings').select('*').eq('id', lid).single();
     if (listErr || !listing) return res.status(404).json({ error: 'Listing not found' });
     if (listing.seller === username) return res.status(400).json({ error: 'Cannot buy your own listing' });
     if (!listing.seller_wallet) return res.status(400).json({ error: 'Listing has no seller wallet' });
 
     const tx = await getParsedTx(signature);
-    if (!tx)          return res.status(400).json({ error: 'Transaction not found on chain yet. If USDC was deducted, contact support with your TX signature.' });
+    if (!tx) return res.status(400).json({ error: 'Transaction not found on chain yet. If USDC was deducted, contact support with your TX signature.' });
     if (tx.meta && tx.meta.err) return res.status(400).json({ error: 'Transaction failed on chain' });
 
     const totalUnits  = Math.round(parseFloat(listing.price) * 1e6);
@@ -128,13 +122,9 @@ export default async function handler(req, res) {
 
     try {
       await supabase.from('sales').insert({
-        listing_id: lid,
-        seller:     listing.seller,
-        buyer:      username,
-        price_usdc: listing.price,
-        signature,
-        item_data:  listing.item_data,
-        sold_at:    new Date().toISOString()
+        listing_id: lid, seller: listing.seller, buyer: username,
+        price_usdc: listing.price, signature, item_data: listing.item_data,
+        sold_at: new Date().toISOString()
       });
     } catch (e) { /* ignore */ }
 
