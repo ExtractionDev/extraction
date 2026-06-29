@@ -1304,12 +1304,12 @@ function iImg(k,cx,cy,w,h,dx,dy,dw,dh,ctx,smooth){
 var gold=50,tokens=0,totalRocks=0,runs=0,chests=0,activeTab=0;
 // DORES defined early: several functions (e.g. _genOreMarket) run at parse time and reference it
 var DORES=[
-  {n:'Coal',    c:'#3a3a3a',tc:'#999',    ch:.25,v:3,   img:'stone_1'},
-  {n:'Copper',  c:'#c87040',tc:'#e8a060', ch:.30,v:1,   img:'copper_ore'},
-  {n:'Iron',    c:'#8080a0',tc:'#c0c8d0', ch:.22,v:1,   img:'stone_2'},
-  {n:'Silver',  c:'#a8b0c8',tc:'#d0d8f0', ch:.12,v:3,   img:'silver_ore'},
-  {n:'Gold',    c:'#c8a020',tc:'#ffd700', ch:.08,v:10,  img:'gold_ore'},
-  {n:'Mystrile',c:'#7858e0',tc:'#c8a8ff', ch:.03,v:25,  img:'mystrile_ore'}
+  {n:'Coal',    c:'#3a3a3a',tc:'#999',    ch:.25,v:3,   rv:2,  img:'stone_1'},
+  {n:'Copper',  c:'#c87040',tc:'#e8a060', ch:.30,v:1,   rv:1,  img:'copper_ore'},
+  {n:'Iron',    c:'#8080a0',tc:'#c0c8d0', ch:.22,v:1,   rv:3,  img:'stone_2'},
+  {n:'Silver',  c:'#a8b0c8',tc:'#d0d8f0', ch:.12,v:3,   rv:7,  img:'silver_ore'},
+  {n:'Gold',    c:'#c8a020',tc:'#ffd700', ch:.08,v:10,  rv:18, img:'gold_ore'},
+  {n:'Mystrile',c:'#7858e0',tc:'#c8a8ff', ch:.03,v:25,  rv:50, img:'mystrile_ore'}
 ];
 var gameStats={bestGC:0,deepestFloor:0,enemiesKilled:0,totalDmg:0,rareRocks:0,goldRocks:0,mystrileRocks:0};
 var ups={speed:0,power:0,sell:0,luck:0};
@@ -2860,11 +2860,11 @@ var ORE_DEATH_PENALTY=0.30;           // fraction of THIS RUN's ore lost on a pe
 function rollOre(){return ORE_ROLL_MIN+Math.floor(Math.random()*(ORE_ROLL_MAX-ORE_ROLL_MIN+1));}
 // ===== TUNABLE: ore -> $EXT refinery (run-summary) =====
 var REFINE_EDGE=0.9;      // house edge: average haul pays this fraction of entry fee
-var REFINE_AVG_HAUL=600;  // expected ore-value of a typical paid run (calibrate via playtest)
+var REFINE_AVG_HAUL=150;  // rarity-weighted ore value of a typical paid run → common-ore runs lose slowly; Gold/Mystrile spike toward the cap. Tune to your avg.
 var REFINE_CAP=1.5;       // max payout as multiple of entry fee
 var REFINE_FLOOR=0.2;     // min payout as multiple of entry fee (only reachable after mining ≥1 rock)
 var _runRefined=false;    // guard: one refine per summary
-function oreHaulValue(bag){var v=0;for(var k in bag){for(var i=0;i<DORES.length;i++){if(DORES[i].n===k){v+=bag[k]*DORES[i].v;break;}}}return v;}
+function oreHaulValue(bag){var v=0;for(var k in bag){for(var i=0;i<DORES.length;i++){if(DORES[i].n===k){v+=bag[k]*(DORES[i].rv||DORES[i].v);break;}}}return v;}
 function refinePayout(bag){var ratio=oreHaulValue(bag)/REFINE_AVG_HAUL;var mult=Math.max(REFINE_FLOOR,Math.min(REFINE_CAP,ratio*REFINE_EDGE));return{mult:mult,ext:Math.round(extFee*mult)};}
 var dRockBreaks=[]; // active "crack in half" break animations
 function _rockSpriteKey(r){
@@ -4283,7 +4283,7 @@ function showRunSummary(died,final,runLootItems,excMsg){
     var _p=refinePayout(dbag);
     var _haulStr=Object.keys(dbag).filter(function(k){return dbag[k]>0;}).map(function(k){return dbag[k]+' '+k;}).join(' · ');
     refEl.innerHTML=
-      '<div class="run-refine-haul">⚒ Ore haul: <b>'+_haulStr+'</b></div>'+
+      '<div class="run-refine-haul">⚒ Ore haul: <b>'+_haulStr+'</b> <span style="opacity:.65">(value '+_hv+')</span></div>'+
       '<div class="run-refine-payout">+'+_p.ext.toLocaleString()+' $EXT</div>'+
       '<div class="run-refine-mult">'+_p.mult.toFixed(2)+'× entry fee</div>'+
       '<button class="run-refine-btn" id="rRefineBtn" onclick="refineRun()">Refine ore → $EXT</button>'+
