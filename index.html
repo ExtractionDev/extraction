@@ -3320,9 +3320,9 @@ function dBuildFloors(){
         break;
       }
     }
-    // Torches: ~35% of eligible platforms get a torch, min 200px apart
+    // Torches: ~35% of eligible platforms get a torch, min 200px apart — floors 1–5 only (none from floor 6 on)
     var torches=[];
-    for(var _toi=0;_toi<plats.length;_toi++){
+    if(fi<5)for(var _toi=0;_toi<plats.length;_toi++){
       var _top=plats[_toi];
       if(_top.safe||_top.w<40)continue;
       if(Math.random()<0.35){
