@@ -386,6 +386,15 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 /* RUN SUMMARY OVERLAY */
 .run-summary{position:fixed;inset:0;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;z-index:900;display:none}
 .run-summary.show{display:flex}
+.run-refine{margin:10px 0;padding:12px 14px;border:1px solid rgba(63,180,215,.5);border-radius:10px;background:linear-gradient(180deg,rgba(40,165,205,.10),rgba(40,165,205,.03));text-align:center}
+.run-refine-haul{font-size:11px;color:#9fdcef;margin-bottom:6px}
+.run-refine-haul b{color:#d8faff}
+.run-refine-payout{font-size:20px;font-weight:800;color:#6fd4ee;margin-bottom:8px;text-shadow:0 0 10px rgba(63,180,215,.4)}
+.run-refine-mult{font-size:10px;color:#7fb8cc;font-weight:600}
+.run-refine-btn{width:100%;padding:9px;border:none;border-radius:8px;background:linear-gradient(180deg,#3fb4d7,#1f8db0);color:#04212e;font-weight:800;font-size:13px;cursor:pointer;letter-spacing:.3px}
+.run-refine-btn:hover{filter:brightness(1.1)}
+.run-refine-btn:disabled{background:#2a4450;color:#6a8a99;cursor:default;filter:none}
+.run-refine-note{font-size:9px;color:#6a8a99;margin-top:6px}
 .run-box{background:var(--bg2);border:1.5px solid var(--border3);border-radius:16px;padding:28px 24px;width:min(420px,95vw);max-height:90vh;overflow-y:auto}
 .run-title{font-size:22px;font-family:'DM Serif Display',serif;text-align:center;margin-bottom:4px}
 .run-title.win{color:var(--gold2)}
@@ -861,6 +870,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
       <div class="run-loot-title"><i class="ti ti-sparkles" style="color:var(--gold)"></i> Loot Found</div>
       <div id="rLootItems"></div>
     </div>
+    <div class="run-refine" id="rRefine" style="display:none"></div>
     <div class="run-btns">
       <button class="run-btn-play" onclick="closeSummaryPlay()"><i class="ti ti-arrow-down"></i> Run Again</button>
       <button class="run-btn-home" onclick="closeSummaryHome()"><i class="ti ti-home"></i> Home</button>
@@ -2806,6 +2816,18 @@ function pickFloorMod(isBossFloor){
 var _descPending=false;
 var _deathPenaltyActive=false;
 var dp,dcam,dfl,dflData,dbag,dcoins,dtoasts,dtk,DGY=350,dMineAnim=0,dShake=0,dFlash=0,_dt=1;
+// ===== TUNABLE: ore vein RNG + death ore penalty =====
+var ORE_ROLL_MIN=1, ORE_ROLL_MAX=6;   // each regular rock drops this many of its ore (flat random)
+var ORE_DEATH_PENALTY=0.30;           // fraction of THIS RUN's ore lost on a penalised death
+function rollOre(){return ORE_ROLL_MIN+Math.floor(Math.random()*(ORE_ROLL_MAX-ORE_ROLL_MIN+1));}
+// ===== TUNABLE: ore -> $EXT refinery (run-summary) =====
+var REFINE_EDGE=0.9;      // house edge: average haul pays this fraction of entry fee
+var REFINE_AVG_HAUL=600;  // expected ore-value of a typical paid run (calibrate via playtest)
+var REFINE_CAP=1.5;       // max payout as multiple of entry fee
+var REFINE_FLOOR=0.5;     // min payout as multiple of entry fee
+var _runRefined=false;    // guard: one refine per summary
+function oreHaulValue(bag){var v=0;for(var k in bag){for(var i=0;i<DORES.length;i++){if(DORES[i].n===k){v+=bag[k]*DORES[i].v;break;}}}return v;}
+function refinePayout(bag){var ratio=oreHaulValue(bag)/REFINE_AVG_HAUL;var mult=Math.max(REFINE_FLOOR,Math.min(REFINE_CAP,ratio*REFINE_EDGE));return{mult:mult,ext:Math.round(extFee*mult)};}
 var dRockBreaks=[]; // active "crack in half" break animations
 function _rockSpriteKey(r){
   var m={Coal:'stone_1',Copper:'copper_node',Iron:'stone_2',Silver:'silver_node',Gold:'gold_node',Mystrile:'mystrile_node'};
@@ -3150,8 +3172,9 @@ function dMine(){
     var _dgcB=1+(getItemBonus('dungeonGC')/100);
     nodeVal=Math.round(nodeVal*solM*_dgcB);
     if(dfl>=5)nodeVal*=2;
-    dbag[ore.n]=(dbag[ore.n]||0)+1;dcoins+=nodeVal;sndCoin();dRunRocksMined++;
-    var dispVal='+'+ore.n+' '+nodeVal+'GC';
+    var _oreQty=rollOre();
+    dbag[ore.n]=(dbag[ore.n]||0)+_oreQty;dcoins+=nodeVal;sndCoin();dRunRocksMined++;
+    var dispVal='+'+_oreQty+' '+ore.n+' '+nodeVal+'GC';
     if(r.nodeMulti>1)dispVal+=' (x'+r.nodeMulti+' bonus)';
     if(solM>1.05)dispVal+=' ['+solM.toFixed(1)+'x]';
     if(dfl>=5)dispVal+=' x2!';
@@ -3853,6 +3876,13 @@ function dEndGame(died){
     var penalty=Math.floor(dcoins*0.30);
     dcoins=Math.max(0,dcoins-penalty);
     dtoasts.push({x:dp?dp.x:400,y:dp?dp.y-20:200,t:'-30% PENALTY: -'+penalty+' GC',c:'#e84b4b',life:80});
+    // Death also taxes the run's ore haul (mirrors the GC penalty)
+    var _oreLost=0;
+    Object.keys(dbag).forEach(function(k){
+      var _drop=Math.floor(dbag[k]*ORE_DEATH_PENALTY);
+      dbag[k]=Math.max(0,dbag[k]-_drop);_oreLost+=_drop;
+    });
+    if(_oreLost>0)dtoasts.push({x:dp?dp.x:400,y:dp?dp.y+4:224,t:'-'+Math.round(ORE_DEATH_PENALTY*100)+'% ORE: -'+_oreLost,c:'#e84b4b',life:80});
   }
   _deathPenaltyActive=false;_descPending=false;
   var final=Math.round(dcoins*risMul);
@@ -4187,7 +4217,34 @@ function showRunSummary(died,final,runLootItems,excMsg){
       return '<div class="run-loot-item"><span style="font-size:16px">' + l.icon + '</span><span style="font-size:10px;color:' + l.c + '">' + l.text + '</span></div>';
     }).join('');
   } else lootEl.style.display='none';
+  // ── Refinery: offer to convert THIS run's ore haul into $EXT (paid runs only) ──
+  var refEl=document.getElementById('rRefine');
+  _runRefined=false;
+  var _hv=oreHaulValue(dbag);
+  if(mode!=='free'&&_hv>0&&extFee>0){
+    var _p=refinePayout(dbag);
+    var _haulStr=Object.keys(dbag).filter(function(k){return dbag[k]>0;}).map(function(k){return dbag[k]+' '+k;}).join(' · ');
+    refEl.innerHTML=
+      '<div class="run-refine-haul">⚒ Ore haul: <b>'+_haulStr+'</b></div>'+
+      '<div class="run-refine-payout">+'+_p.ext.toLocaleString()+' $EXT</div>'+
+      '<div class="run-refine-mult">'+_p.mult.toFixed(2)+'× entry fee</div>'+
+      '<button class="run-refine-btn" id="rRefineBtn" onclick="refineRun()">Refine ore → $EXT</button>'+
+      '<div class="run-refine-note">Or keep it — ore banks to your stash to sell on the market.</div>';
+    refEl.style.display='';
+  } else refEl.style.display='none';
   el.classList.add('show');
+}
+function refineRun(){
+  if(_runRefined||mode==='free'||extFee<=0)return;
+  var _p=refinePayout(dbag);
+  if(_p.ext<=0)return;
+  // Remove this run's ore from the stash (it was just banked) and pay out $EXT
+  for(var k in dbag){if(dbag[k]>0){oreStash[k]=Math.max(0,(oreStash[k]||0)-dbag[k]);if(oreStash[k]<=0)delete oreStash[k];}}
+  tokens+=_p.ext;lifetimeExt+=_p.ext;
+  _runRefined=true;
+  saveGame();updExt();uiAll();
+  var btn=document.getElementById('rRefineBtn');
+  if(btn){btn.disabled=true;btn.textContent='✓ Refined +'+_p.ext.toLocaleString()+' $EXT';}
 }
 function dLoop(){
   if(!dRunning)return;
