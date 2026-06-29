@@ -5045,10 +5045,10 @@ function dDraw(){
   if(dCombo>=2&&dComboTimer>0){var ca=Math.min(1,dComboTimer/30);DC.globalAlpha=ca;DC.fillStyle=dCombo>=4?'#ff4040':dCombo>=3?'#ff9040':'#ffd040';DC.font='bold '+(10+dCombo*2)+'px "Space Mono"';DC.textAlign='center';DC.fillText(dCombo+'x COMBO',W/2,H-28);DC.globalAlpha=1;}
   DC.restore();
   // ── Fog-of-war: darkness mask with directional headlamp + torch light holes ─
-  // Lighting scales smoothly with depth: floor 1 (entrance) is brightest, descending into darkness.
-  var _depthT=Math.min(1,dfl/9);                // 0 at the entrance floor → 1 at the deepest floor
-  var _fogDark=0.22+_depthT*0.64;               // 0.22 bright entrance → 0.86 deep darkness
-  var _ambR=Math.round(135-_depthT*70);         // wide lit pool up top (135px) → tight (65px) deep down
+  // Darkness doubles each floor through floor 6 (capped at 90%), then holds flat for floors 6–10.
+  var _df=Math.min(dfl,5);                          // floors 7–10 reuse floor 6's lighting
+  var _fogDark=Math.min(0.90,0.22*Math.pow(2,_df)); // 22%→44%→88%→90%(cap), flat from floor 6 on
+  var _ambR=Math.round(135-(_df/5)*70);             // 135px lit pool up top → 65px from floor 6 down
   if(!fogCv){fogCv=document.createElement('canvas');fogCv.width=800;fogCv.height=400;fogCtx=fogCv.getContext('2d');}
   fogCtx.clearRect(0,0,800,400);
   fogCtx.fillStyle='rgba(0,0,0,'+_fogDark+')';fogCtx.fillRect(0,0,800,400);
