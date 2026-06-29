@@ -2995,6 +2995,10 @@ var GOLEM_CHARGE_SPD=7.5;       // lunge speed px/frame — well above the playe
 var GOLEM_CHARGE_TIME=40;       // frames the lunge lasts (~300px of travel)
 var GOLEM_CHARGE_DMG=20;        // damage on a connecting slam
 var GOLEM_CHARGE_RANGE=250;     // how close (same level) the player must be to trigger a wind-up
+// ── Wraith (ghost) tunables ──
+var WRAITH_SPD=2.1;            // drift speed (a touch faster so it roams further)
+var WRAITH_BOB=30;            // vertical wave amplitude — large enough to sink through platforms
+var WRAITH_PHASE_ALPHA=0.12;  // how faint it gets while phased inside terrain
 var dDeathParts=[];   // enemy death particles {x,y,vx,vy,life,maxLife,c,r}
 var dChips=[];        // rock chip particles {x,y,vx,vy,life,maxLife,c}
 var dAmbientParts=[]; // ambient dust/ember motes {x,y,vx,vy,life,maxLife,r,c}
@@ -4388,11 +4392,19 @@ function dLoop(){
   if(dp.spkCd===0){for(var i=0;i<f.spikes.length;i++){var s=f.spikes[i];var _sh=s.small?8:15;var _sw=s.small?12:21;var _syo=s.y>=DGY?_terrBump(s.x):0;if(dp.x+dp.w>s.x-_sw&&dp.x<s.x+_sw&&dp.y+dp.h>s.y+_syo-_sh&&dp.y+dp.h<=s.y+_syo+2){dp.hp-=10;dDamageTaken+=10;dp.spkCd=25;dp.vy=-7;dShake=7;sndDamage();dtoasts.push({x:s.x,y:s.y-30,t:'-10',c:'#e84b4b',life:45});dUpdHUD();if(dp.hp<=0){dEndGame(true);return;}break;}}}
   for(var i=0;i<f.enemies.length;i++){
     var e=f.enemies[i];e.ph+=.03*_dt;if(e.hit>0)e.hit--;if(e.atkTimer>0)e.atkTimer--;
-    var spd=e.type==='boss'?2.2:e.type==='bat'?3.2:e.type==='golem'?1.0:e.type==='spider'?SPIDER_PATROL_SPD:e.type==='wraith'?1.8:e.type==='archer'?1.5:e.type==='crusher'?1.2:e.type==='phantom'?2.0:2.2;
+    var spd=e.type==='boss'?2.2:e.type==='bat'?3.2:e.type==='golem'?1.0:e.type==='spider'?SPIDER_PATROL_SPD:e.type==='wraith'?WRAITH_SPD:e.type==='archer'?1.5:e.type==='crusher'?1.2:e.type==='phantom'?2.0:2.2;
     if(e.type==='phantom'){var pdx=dp.x-e.x,pdy=dp.y-e.y,pm=Math.sqrt(pdx*pdx+pdy*pdy)||1;e.x+=spd*(pdx/pm)*_dt;e.y+=spd*(pdy/pm)*0.6*_dt;}
     else if(e.type==='wraith'){
-      e.x+=spd*e.dir*_dt;
-      e.y=e.by+Math.sin(e.ph*3)*15;
+      e.x+=spd*e.dir*_dt;                                  // drift sideways
+      e.y=e.by+Math.sin(e.ph*3)*WRAITH_BOB;               // tall vertical wave — dips down through floors and rises back out
+      // Roam far: bounce only at the map edges, not a tight patrol zone
+      if(e.x<8){e.x=8;e.dir=1;}else if(e.x>f.w-26){e.x=f.w-26;e.dir=-1;}
+      // Phase: fade toward invisible while overlapping any platform, solid in open air
+      var _inWall=false;
+      for(var _wpi=0;_wpi<f.plats.length;_wpi++){var _wp=f.plats[_wpi];
+        if(e.x+9>_wp.x&&e.x-9<_wp.x+_wp.w&&e.y+22>_wp.y&&e.y<_wp.y+_wp.h){_inWall=true;break;}}
+      if(e.phase===undefined)e.phase=1;
+      e.phase+=((_inWall?WRAITH_PHASE_ALPHA:1)-e.phase)*0.12*_dt; // smooth fade in/out of terrain
     }
     else if(e.type==='bat'){
       // ── Velocity-based random wander + AABB platform collision ───────────
@@ -4512,7 +4524,7 @@ function dLoop(){
       if(!e.charging){if(e.x>e.ex)e.dir=-1;else if(e.x<e.sx)e.dir=1;}
       e.x=Math.max(8,Math.min(f.w-30,e.x));
     }
-    else if(e.type!=='boss'&&e.type!=='bat'){if(e.x>e.ex){e.x=e.ex;e.dir=-1;}else if(e.x<e.sx){e.x=e.sx;e.dir=1;}}
+    else if(e.type!=='boss'&&e.type!=='bat'&&e.type!=='wraith'){if(e.x>e.ex){e.x=e.ex;e.dir=-1;}else if(e.x<e.sx){e.x=e.sx;e.dir=1;}}
     if(e.type==='archer'&&e.atkTimer===0){var adx=dp.x-e.x;if(Math.abs(adx)<350){var adir=adx>0?1:-1;dProjectiles.push({x:e.x,y:e.y+8,vx:3.5*adir,vy:-0.5,life:90,dmg:12,c:'#e84b4b',r:4});e.atkTimer=120;_snd({f:600,sweep:400,wave:'square',vol:0.06,dur:0.07});}}
     if(e.type==='crusher'&&Math.abs(dp.x-e.x)<200&&dtk%30===0)e.dir=dp.x>e.x?1:-1;
     if(e.type==='boss'&&e.atkTimer===0&&Math.abs(dp.x-e.x)<820){
@@ -5101,7 +5113,7 @@ function dDraw(){
         DC.setLineDash([]);DC.restore();
       }
       DC.fillStyle=w?'#fff':'#3a2818';DC.fillRect(ex-12,e.y+2+leg,4,2);DC.fillRect(ex+10,e.y+2-leg,4,2);DC.fillRect(ex-10,e.y+8-leg,4,2);DC.fillRect(ex+8,e.y+8+leg,4,2);DC.fillStyle=w?'#fff':'#5a3828';DC.fillRect(ex-7,e.y,14,10);DC.fillStyle='#e84b4b';DC.fillRect(ex-3,e.y+3,2,2);DC.fillRect(ex+2,e.y+3,2,2);}
-    else if(e.type==='wraith'){DC.globalAlpha=w?1:.45+Math.sin(dtk*.06)*.2;DC.fillStyle=w?'#fff':'#4a4870';DC.fillRect(ex-9,e.y,18,22);DC.fillStyle='#b0b0ff';DC.fillRect(ex-4,e.y+4,3,3);DC.fillRect(ex+2,e.y+4,3,3);DC.globalAlpha=1;}
+    else if(e.type==='wraith'){var _wa=(e.phase===undefined?1:e.phase);DC.globalAlpha=w?Math.max(0.5,_wa):(.45+Math.sin(dtk*.06)*.2)*_wa;DC.fillStyle=w?'#fff':'#4a4870';DC.fillRect(ex-9,e.y,18,22);DC.fillStyle='#b0b0ff';DC.fillRect(ex-4,e.y+4,3,3);DC.fillRect(ex+2,e.y+4,3,3);DC.globalAlpha=1;}
     else if(e.type==='golem'){
       if(e.windT>0&&!e.charging){var _gwp=Math.min(1,e.windT/GOLEM_WINDUP);DC.globalAlpha=(_gwp*0.5+Math.sin(dtk*0.35)*0.12);DC.fillStyle='#ff2020';DC.beginPath();DC.arc(ex+11,e.y+15,18+_gwp*10,0,6.28);DC.fill();DC.globalAlpha=1;}
       if(e.charging){var _cd=e.chgDir||e.dir||1;DC.globalAlpha=0.30;DC.fillStyle='#c08050';for(var _gt=1;_gt<=3;_gt++){DC.fillRect(ex-11-_cd*(_gt*9),e.y+4,20,22);DC.globalAlpha*=0.55;}DC.globalAlpha=1;}
