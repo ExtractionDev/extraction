@@ -3348,8 +3348,6 @@ function dBuildFloors(){
         break;
       }
     }
-    // No spikes directly below a chest
-    if(floorChest){spikes=spikes.filter(function(s){return Math.abs(s.x-(floorChest.x+24))>80;});}
     var isVeinFloor=(!isFree&&fi<numFloors-1&&Math.random()<0.10);
     // ── Healing shrine (10% chance) ──
     var shrine=null;
@@ -3399,6 +3397,8 @@ function dBuildFloors(){
         break;
       }
     }
+    // No spikes under a chest (covers BOTH the random and chestGuarantee paths) — clear within 40px of the chest centre
+    if(floorChest){var _chCx=floorChest.x+12;spikes=spikes.filter(function(s){return Math.abs(s.x-_chCx)>40;});}
     // Torches: ~35% of eligible platforms get a torch, min 200px apart — floors 1–5 only (none from floor 6 on)
     var torches=[];
     if(fi<5)for(var _toi=0;_toi<plats.length;_toi++){
@@ -4359,7 +4359,7 @@ function dLoop(){
   }
   if(dp.y>420){dEndGame(true);return;}
   if(dDescending){dp.inv=120;}else if(dp.inv>0)dp.inv--;if(dp.spkCd>0)dp.spkCd--;
-  if(dp.spkCd===0){for(var i=0;i<f.spikes.length;i++){var s=f.spikes[i];var _sh=s.small?6:10;var _sw=s.small?12:21;var _syo=s.y>=DGY?_terrBump(s.x):0;if(dp.x+dp.w>s.x-_sw&&dp.x<s.x+_sw&&dp.y+dp.h>s.y+_syo-_sh&&dp.y+dp.h<=s.y+_syo+2){dp.hp-=10;dDamageTaken+=10;dp.spkCd=25;dp.vy=-7;dShake=7;sndDamage();dtoasts.push({x:s.x,y:s.y-30,t:'-10',c:'#e84b4b',life:45});dUpdHUD();if(dp.hp<=0){dEndGame(true);return;}break;}}}
+  if(dp.spkCd===0){for(var i=0;i<f.spikes.length;i++){var s=f.spikes[i];var _sh=s.small?8:15;var _sw=s.small?12:21;var _syo=s.y>=DGY?_terrBump(s.x):0;if(dp.x+dp.w>s.x-_sw&&dp.x<s.x+_sw&&dp.y+dp.h>s.y+_syo-_sh&&dp.y+dp.h<=s.y+_syo+2){dp.hp-=10;dDamageTaken+=10;dp.spkCd=25;dp.vy=-7;dShake=7;sndDamage();dtoasts.push({x:s.x,y:s.y-30,t:'-10',c:'#e84b4b',life:45});dUpdHUD();if(dp.hp<=0){dEndGame(true);return;}break;}}}
   for(var i=0;i<f.enemies.length;i++){
     var e=f.enemies[i];e.ph+=.03*_dt;if(e.hit>0)e.hit--;if(e.atkTimer>0)e.atkTimer--;
     var spd=e.type==='boss'?2.2:e.type==='bat'?3.2:e.type==='golem'?1.0:e.type==='spider'?4.5:e.type==='wraith'?1.8:e.type==='archer'?1.5:e.type==='crusher'?1.2:e.type==='phantom'?2.0:2.2;
@@ -4647,12 +4647,17 @@ function dDraw(){
     }}
   for(var i=0;i<f.spikes.length;i++){var s=f.spikes[i],sx=s.x-dcam;if(sx<-20||sx>W+20)continue;
     var _syo=s.y>=DGY?_terrBump(s.x):0; // sink into terrain dips on solid ground
-    DC.fillStyle='#7a2828';
-    if(s.small){// Half-size: 5 spikes, 6px tall, 6px wide
-      for(var j=0;j<5;j++){var bx=sx-12+j*6;DC.beginPath();DC.moveTo(bx,s.y+_syo);DC.lineTo(bx+3,s.y+_syo-6);DC.lineTo(bx+6,s.y+_syo);DC.fill();}
-    }else{// Full-size: 6 spikes, 11px tall, 7px wide
-      for(var j=0;j<6;j++){var bx=sx-21+j*7;DC.beginPath();DC.moveTo(bx,s.y+_syo);DC.lineTo(bx+3.5,s.y+_syo-11);DC.lineTo(bx+7,s.y+_syo);DC.fill();}
-    }}
+    var _base=s.y+_syo;
+    var _n=s.small?5:6,_sp=s.small?6:7,_bw=s.small?3:5,_sh=s.small?9:17,_x0=s.small?sx-12:sx-21;
+    // Glassy spikes: translucent terrain-teal body rising to blood-red tips, with a glass sheen
+    var _spg=DC.createLinearGradient(0,_base,0,_base-_sh);
+    _spg.addColorStop(0,'rgba(31,134,168,0.42)');_spg.addColorStop(0.55,'rgba(31,134,168,0.68)');_spg.addColorStop(0.82,'rgba(70,160,180,0.82)');_spg.addColorStop(1,'rgba(198,26,40,0.94)');
+    for(var j=0;j<_n;j++){
+      var bx=_x0+j*_sp+(_sp-_bw)/2;
+      DC.fillStyle=_spg;DC.beginPath();DC.moveTo(bx,_base);DC.lineTo(bx+_bw/2,_base-_sh);DC.lineTo(bx+_bw,_base);DC.closePath();DC.fill();
+      DC.strokeStyle='rgba(190,235,248,0.45)';DC.lineWidth=1;DC.beginPath();DC.moveTo(bx+_bw/2,_base-_sh);DC.lineTo(bx+0.6,_base-1);DC.stroke();
+    }
+  }
   // Torches — flickering flame + warm glow on platforms
   if(f.torches){for(var _toi=0;_toi<f.torches.length;_toi++){
     var _tc=f.torches[_toi],_tx=_tc.x-dcam;if(_tx<-40||_tx>W+40)continue;
