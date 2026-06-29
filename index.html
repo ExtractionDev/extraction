@@ -25,10 +25,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 .app{height:100vh;display:flex;flex-direction:column;overflow:hidden}
 .nav{display:flex;align-items:center;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;z-index:10}
 .nav-tabs{display:flex;flex:1}
-.nav-btn{flex:1;padding:10px 3px 9px;text-align:center;font-size:clamp(9px,1.1vw,16px);letter-spacing:.1em;text-transform:uppercase;color:var(--gold);cursor:pointer;border-bottom:3px solid transparent;transition:border-color .2s;display:flex;align-items:center;justify-content:center;gap:2px;flex-direction:column}
+.nav-btn{flex:1;padding:9px 2px 8px;text-align:center;font-size:clamp(8px,0.95vw,13px);letter-spacing:.05em;text-transform:uppercase;color:var(--gold);cursor:pointer;border-bottom:3px solid transparent;transition:border-color .2s;display:flex;align-items:center;justify-content:center;gap:2px;flex-direction:column}
 .nav-btn:hover{color:var(--gold)}
 .nav-btn.on{color:var(--gold);border-bottom-color:var(--gold)}
-.nav-btn i{font-size:clamp(11px,1.3vw,17px);display:block;margin-bottom:1px}
+.nav-btn i{font-size:clamp(10px,1.1vw,15px);display:block;margin-bottom:1px}
 .nav-wallet{padding:7px 12px;background:var(--bg4);border:1px solid var(--border3);border-radius:8px;color:var(--text2);cursor:pointer;font-size:9px;font-family:'Space Mono',monospace;display:flex;align-items:center;gap:6px;white-space:nowrap;margin:0 8px;transition:all .2s;flex-shrink:0}
 .nav-wallet:hover{border-color:var(--sol);color:var(--sol)}
 .nav-wallet.connected{border-color:var(--green);color:#90c848}
@@ -521,6 +521,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     <div class="nav-btn" id="nb6" onclick="goTab(6)"><i class="ti ti-hammer"></i><span>Smith</span></div>
     <div class="nav-btn" id="nb7" onclick="goTab(7)"><i class="ti ti-trophy"></i><span>Ranks</span></div>
   </div>
+  <button class="nav-wallet" id="navDepositBtn" onclick="openDeposit()" style="margin-right:6px;padding:14px 20px;font-size:17px;gap:8px;border-radius:10px;border-color:#90c848;color:#90c848"><i class="ti ti-download" style="font-size:19px"></i><span>Deposit</span></button>
   <button class="nav-wallet" id="walletBtn" onclick="connectPhantom()" style="padding:14px 20px;font-size:17px;gap:8px;border-radius:10px"><i class="ti ti-wallet" style="font-size:19px"></i><span>Connect</span></button>
   <button class="nav-wallet home-btn-signin" id="navSignInBtn" onclick="openXAuth()" style="padding:14px 20px;font-size:17px;gap:8px;border-radius:10px;margin-left:0;border-color:#1d9bf0;color:#1d9bf0"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.844-8.17-10.656h6.28l4.265 5.64L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg><span id="navSignInLabel">Sign In</span></button>
   <button class="nav-wallet" onclick="openSettings()" style="margin-left:6px;padding:14px 18px;border-radius:10px"><i class="ti ti-settings" style="font-size:19px"></i></button>
@@ -913,8 +914,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
       <button class="toggle-btn on" id="soundToggle" onclick="toggleSound()"></button></div>
     <div class="settings-row"><span class="settings-label"><i class="ti ti-moon"></i> Mute music (future)</span>
       <button class="toggle-btn" id="musicToggle"></button></div>
-    <div class="settings-row"><span class="settings-label"><i class="ti ti-download"></i> Deposit USDC → $EXT</span>
-      <button class="reset-btn" style="background:#051a0a;border-color:var(--green);color:#90c848" onclick="openDeposit()">Deposit</button></div>
     <div class="settings-row"><span class="settings-label"><i class="ti ti-wallet"></i> Withdraw $EXT</span>
       <button class="reset-btn" style="background:#0c0520;border-color:var(--sol);color:var(--sol)" onclick="openWithdraw()">Withdraw</button></div>
     <div style="font-size:8px;color:var(--text4);margin-top:12px;text-align:center">Extraction v0.1 · Built on Solana</div>
