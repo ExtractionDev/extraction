@@ -7,6 +7,7 @@ const supabase = createClient(
 );
 
 const DEV_WALLET = 'B8ubxUGnvhDTGGRkkN8DkyAfnoLEfnjTPdXfQn3TnVQa';
+const FEE_WALLET = '8TJ2QxVzYR4USc9cbpnCaeXgtXjMwE9jaJpJgvMaxgMs';
 const USDC_MINT  = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const TOKEN_PROG = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const ASSOC_PROG = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe1bRS';
@@ -86,11 +87,8 @@ export default async function handler(req, res) {
     }
 
     const totalUnits  = Math.round(parseFloat(listing.price) * 1e6);
-    const sellerUnits = Math.round(totalUnits * 0.95);
-    const devUnits    = totalUnits - sellerUnits;
-
     const sellerATA = getATA(listing.seller_wallet, USDC_MINT);
-    const devATA    = getATA(DEV_WALLET, USDC_MINT);
+    const feeATA    = getATA(FEE_WALLET, USDC_MINT);
 
     const innerIx = (tx.meta && tx.meta.innerInstructions) ? tx.meta.innerInstructions : [];
     const allIx = [
@@ -106,16 +104,15 @@ export default async function handler(req, res) {
         return { to: info.destination, amount: parseInt(amt || '0') };
       });
 
-    const sellerTransfer = transfers.find(t => t.to === sellerATA);
-    if (!sellerTransfer) return res.status(400).json({ error: 'No transfer to seller found in transaction' });
-    if (sellerTransfer.amount < sellerUnits * (1 - SLIPPAGE)) {
-      return res.status(400).json({ error: 'Seller received incorrect USDC amount' });
-    }
+    const sellerReceived = transfers.filter(t => t.to === sellerATA).reduce((s, t) => s + t.amount, 0);
+    const feeReceived    = transfers.filter(t => t.to === feeATA).reduce((s, t) => s + t.amount, 0);
 
-    const devTransfer = transfers.find(t => t.to === devATA);
-    if (!devTransfer) return res.status(400).json({ error: 'No marketplace fee transfer found in transaction' });
-    if (devTransfer.amount < devUnits * (1 - SLIPPAGE)) {
-      return res.status(400).json({ error: 'Marketplace fee incorrect' });
+    // Seller + fee together must cover the full price (within slippage)
+    if ((sellerReceived + feeReceived) < totalUnits * (1 - SLIPPAGE)) {
+      return res.status(400).json({ error: 'Payment incorrect. Seller got ' + sellerReceived + ', fee got ' + feeReceived + ', needed ' + totalUnits });
+    }
+    if (sellerReceived <= 0) {
+      return res.status(400).json({ error: 'No transfer to seller found in transaction' });
     }
 
     const { error: deleteErr } = await supabase.from('listings').delete().eq('id', lid);
