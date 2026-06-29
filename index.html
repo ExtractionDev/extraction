@@ -2139,7 +2139,8 @@ function _createATAIx(payerPk,ownerPk,mintPk){
       {pubkey:ownerPk,isSigner:false,isWritable:false},
       {pubkey:mintPk,isSigner:false,isWritable:false},
       {pubkey:new solanaWeb3.PublicKey('11111111111111111111111111111111'),isSigner:false,isWritable:false},
-      {pubkey:new solanaWeb3.PublicKey(_TOKEN_PROG),isSigner:false,isWritable:false}
+      {pubkey:new solanaWeb3.PublicKey(_TOKEN_PROG),isSigner:false,isWritable:false},
+      {pubkey:new solanaWeb3.PublicKey('SysvarRent111111111111111111111111111111111'),isSigner:false,isWritable:false}
     ],
     programId:new solanaWeb3.PublicKey(_ASSOC_PROG),
     data:new Uint8Array([1])
@@ -2197,6 +2198,7 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
       if(activeTab===3)renderMarket(mkFilter);
       showAchieve('🛒','Purchase Complete!','Got '+d.item.mat+' '+d.item.type+' for $'+priceUsdc.toFixed(2)+' USDC!');
     }else{
+      console.error('Buy failed:',d.error,d.logs||'');
       alert((d.error||'Item transfer failed.')+'\nTX: '+signed.signature+'\nContact support if USDC was deducted.');
     }
   }catch(e){
