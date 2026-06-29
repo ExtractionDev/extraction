@@ -1874,6 +1874,7 @@ async function depositTokens(){
     tx.add(_createATAIx(fromPk,destPk,mintPk)); // create the receiving account if it doesn't exist yet (no-op if it does)
     tx.add(_usdcIx(fromATA,destATA,fromPk,units));
     tx.feePayer=fromPk; // Phantom attaches a FRESH blockhash + submits via its own RPC (avoids stale-blockhash drops)
+    tx.recentBlockhash=await _freshBlockhash();
     btn.textContent='Approve in wallet...';
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
     var signed=await provider.signAndSendTransaction(tx);
@@ -2240,6 +2241,16 @@ async function _fetchBlockhash(){
   console.log('Blockhash via:',d.rpc);
   return {blockhash:d.blockhash,rpc:d.rpc||'https://api.mainnet-beta.solana.com'};
 }
+// Always grab a CURRENT blockhash right before signing — stale ones get silently dropped by the network.
+async function _freshBlockhash(){
+  try{
+    var conn=new solanaWeb3.Connection('https://api.mainnet-beta.solana.com','confirmed');
+    var bh=await conn.getLatestBlockhash('confirmed'); // 'confirmed' gives the longest validity window
+    if(bh&&bh.blockhash)return bh.blockhash;
+  }catch(e){console.warn('Direct blockhash failed, falling back to server:',e&&e.message);}
+  var d=await _fetchBlockhash();
+  return d.blockhash;
+}
 
 
 function _usdcMintPk(){return new solanaWeb3.PublicKey(_USDC_MINT);}
@@ -2322,6 +2333,7 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
     tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
     tx.add(_usdcIx(buyerATA,feeATA,buyerPk,feeUnits));
     tx.feePayer=buyerPk; // Phantom attaches a FRESH blockhash + submits via its own RPC
+    tx.recentBlockhash=await _freshBlockhash();
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
     var signed=await provider.signAndSendTransaction(tx);
     if(btn){btn.textContent='Confirming...';}
@@ -2586,6 +2598,7 @@ async function buyOreWithUSDC(lid,sellerWallet,pricePerUnit,qty){
     tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
     tx.add(_usdcIx(buyerATA,feeATA,buyerPk,feeUnits));
     tx.feePayer=buyerPk; // Phantom attaches a FRESH blockhash + submits via its own RPC
+    tx.recentBlockhash=await _freshBlockhash();
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
     var signed=await provider.signAndSendTransaction(tx);
     if(btn){btn.textContent='Confirming...';}
