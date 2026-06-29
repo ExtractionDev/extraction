@@ -2189,10 +2189,9 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
     var feeUnits=totalUnits-sellerUnits;
     var buyerATA=_getATA(buyerPk,mintPk);
     var sellerATA=_getATA(sellerPk,mintPk);
-    var feeATA=_getATA(feePk,mintPk);
     var tx=new solanaWeb3.Transaction();
-    tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
-    tx.add(_usdcIx(buyerATA,feeATA,buyerPk,feeUnits));
+    // Single transfer: full price to seller (fee disabled until fee wallet USDC account is set up)
+    tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,totalUnits));
     tx.feePayer=buyerPk;
     tx.recentBlockhash=bh.blockhash;
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
