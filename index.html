@@ -2146,7 +2146,7 @@ function _createATAIx(payerPk,ownerPk,mintPk){
       {pubkey:ata,isSigner:false,isWritable:true},
       {pubkey:ownerPk,isSigner:false,isWritable:false},
       {pubkey:mintPk,isSigner:false,isWritable:false},
-      {pubkey:new solanaWeb3.PublicKey('11111111111111111111111111111111'),isSigner:false,isWritable:false},
+      {pubkey:solanaWeb3.SystemProgram.programId,isSigner:false,isWritable:false},
       {pubkey:new solanaWeb3.PublicKey(_TOKEN_PROG),isSigner:false,isWritable:false}
     ],
     programId:new solanaWeb3.PublicKey(_ASSOC_PROG),
@@ -2185,9 +2185,11 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
     var sellerATA=_getATA(sellerPk,mintPk);
     var devATA=_getATA(devPk,mintPk);
     var tx=new solanaWeb3.Transaction();
-    // Only create ATAs that don't already exist (avoids ProgramAccountNotFound)
-    if(!(await _ataExists(sellerATA)))tx.add(_createATAIx(buyerPk,sellerPk,mintPk));
-    if(!(await _ataExists(devATA)))tx.add(_createATAIx(buyerPk,devPk,mintPk));
+    // Create seller/dev USDC accounts only if missing
+    var _needSeller=!(await _ataExists(sellerATA));
+    var _needDev=!(await _ataExists(devATA));
+    if(_needSeller)tx.add(_createATAIx(buyerPk,sellerPk,mintPk));
+    if(_needDev)tx.add(_createATAIx(buyerPk,devPk,mintPk));
     tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
     tx.add(_usdcIx(buyerATA,devATA,buyerPk,devUnits));
     tx.feePayer=buyerPk;
@@ -2472,7 +2474,7 @@ async function buyOreWithUSDC(lid,sellerWallet,pricePerUnit,qty){
       saveGame();uiAll();renderOreMarket();
       showAchieve('⛏️','Purchase Complete!','Got ×'+d.qty+' '+d.ore_name+' for $'+totalUsdc.toFixed(2)+' USDC!');
     }else{
-      alert((d.error||'Ore transfer failed.')+'\nTX: '+signed.signature+'\nContact support if USDC was deducted.');
+      alert((d.error||'Ore transfer failed.')+'\n\nLOGS: '+(d.logs||'none')+'\n\nTX: '+signed.signature);
     }
   }catch(e){
     console.error('Ore USDC buy error:',e);
