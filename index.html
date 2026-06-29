@@ -2129,6 +2129,14 @@ function _usdcIx(fromATA,toATA,ownerPk,amount){
     programId:new solanaWeb3.PublicKey(_TOKEN_PROG),data:data
   });
 }
+// Check if an ATA exists on-chain via server
+async function _ataExists(ataPk){
+  try{
+    var r=await fetch('/api/load?ata_exists='+encodeURIComponent(ataPk.toBase58()));
+    var d=await r.json();
+    return !!d.exists;
+  }catch(e){return false;}
+}
 // Idempotent ATA creation — creates token account if missing, no-op if it already exists
 function _createATAIx(payerPk,ownerPk,mintPk){
   var ata=_getATA(ownerPk,mintPk);
@@ -2177,8 +2185,9 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
     var sellerATA=_getATA(sellerPk,mintPk);
     var devATA=_getATA(devPk,mintPk);
     var tx=new solanaWeb3.Transaction();
-    tx.add(_createATAIx(buyerPk,sellerPk,mintPk)); // ensure seller USDC account exists
-    tx.add(_createATAIx(buyerPk,devPk,mintPk));    // ensure dev USDC account exists
+    // Only create ATAs that don't already exist (avoids ProgramAccountNotFound)
+    if(!(await _ataExists(sellerATA)))tx.add(_createATAIx(buyerPk,sellerPk,mintPk));
+    if(!(await _ataExists(devATA)))tx.add(_createATAIx(buyerPk,devPk,mintPk));
     tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
     tx.add(_usdcIx(buyerATA,devATA,buyerPk,devUnits));
     tx.feePayer=buyerPk;
@@ -2445,8 +2454,8 @@ async function buyOreWithUSDC(lid,sellerWallet,pricePerUnit,qty){
     var sellerATA=_getATA(sellerPk,mintPk);
     var devATA=_getATA(devPk,mintPk);
     var tx=new solanaWeb3.Transaction();
-    tx.add(_createATAIx(buyerPk,sellerPk,mintPk));
-    tx.add(_createATAIx(buyerPk,devPk,mintPk));
+    if(!(await _ataExists(sellerATA)))tx.add(_createATAIx(buyerPk,sellerPk,mintPk));
+    if(!(await _ataExists(devATA)))tx.add(_createATAIx(buyerPk,devPk,mintPk));
     tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
     tx.add(_usdcIx(buyerATA,devATA,buyerPk,devUnits));
     tx.feePayer=buyerPk;
