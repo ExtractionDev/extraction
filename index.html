@@ -4162,7 +4162,7 @@ function drawMinerFrame(ctx,state,frame,dx,dy,dw,dh,flipX,glowColor,aimX,aimY){
       var _isMyth=(equipped.rar&&equipped.rar.n==='Mythic');
       // Prismatic (Mythic) art is laid out differently from standard pickaxes — its handle
       // butt sits higher and its head mass is lower-right, so it needs its own anchors.
-      var _bx=(_isMyth?0.146:0.042)*PW, _by=(_isMyth?0.750:0.865)*PH, _hx=(_isMyth?0.835:0.747)*PW, _hy=(_isMyth?0.430:0.28)*PH; // butt & head in pickaxe px
+      var _bx=(_isMyth?0.146:0.141)*PW, _by=(_isMyth?0.750:0.783)*PH, _hx=(_isMyth?0.835:0.747)*PW, _hy=(_isMyth?0.430:0.28)*PH; // butt(grip) & head in pickaxe px — standard grip moved ~14% up the handle (along the butt→head axis, so aim is unchanged)
       var pANG=Math.atan2(_hy-_by,_hx-_bx), pLEN=Math.hypot(_hx-_bx,_hy-_by);
       // left-hand anchor in canvas coords (mirrors with which way he faces)
       var handX=fx+(flipX?0.271:-0.271)*nw, handY=fy-0.317*nh;
