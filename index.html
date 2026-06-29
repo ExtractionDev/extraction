@@ -1868,19 +1868,12 @@ async function depositTokens(){
     var fromPk=new solanaWeb3.PublicKey(walletAddress);
     var destPk=new solanaWeb3.PublicKey(_DEPOSIT_WALLET);
     var units=Math.round(amt*Math.pow(10,_DEPOSIT_DECIMALS));
-    // For USDC, resolve the wallet's REAL token accounts via the server — the exact proven method
-    // the marketplace uses (handles non-standard accounts). For $EXT/other mints, derive the ATA.
-    var fromATA=null,destATA=null,_useLookup=(_DEPOSIT_MINT===_USDC_MINT);
-    if(_useLookup){
-      try{var _faR=await fetch('/api/load?usdc_account='+encodeURIComponent(walletAddress));var _faD=await _faR.json();if(_faD&&_faD.exists&&_faD.account)fromATA=new solanaWeb3.PublicKey(_faD.account);}catch(e){}
-      try{var _daR=await fetch('/api/load?usdc_account='+encodeURIComponent(_DEPOSIT_WALLET));var _daD=await _daR.json();if(_daD&&_daD.exists&&_daD.account)destATA=new solanaWeb3.PublicKey(_daD.account);}catch(e){}
-    }
-    if(!fromATA)fromATA=_getATA(fromPk,mintPk);
-    var _bh=await _fetchBlockhash();
+    var fromATA=_getATA(fromPk,mintPk);
+    var destATA=_getATA(destPk,mintPk);
     var tx=new solanaWeb3.Transaction();
-    if(!destATA){destATA=_getATA(destPk,mintPk);tx.add(_createATAIx(fromPk,destPk,mintPk));} // create the receiving account only if it doesn't exist yet
+    tx.add(_createATAIx(fromPk,destPk,mintPk)); // create the receiving account if it doesn't exist yet (no-op if it does)
     tx.add(_usdcIx(fromATA,destATA,fromPk,units));
-    tx.feePayer=fromPk;tx.recentBlockhash=_bh.blockhash;
+    tx.feePayer=fromPk; // Phantom attaches a FRESH blockhash + submits via its own RPC (avoids stale-blockhash drops)
     btn.textContent='Approve in wallet...';
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
     var signed=await provider.signAndSendTransaction(tx);
@@ -2249,6 +2242,7 @@ async function _fetchBlockhash(){
 }
 
 
+function _usdcMintPk(){return new solanaWeb3.PublicKey(_USDC_MINT);}
 function _getATA(walletPk,mintPk){
   return solanaWeb3.PublicKey.findProgramAddressSync(
     [walletPk.toBuffer(),new solanaWeb3.PublicKey(_TOKEN_PROG).toBuffer(),mintPk.toBuffer()],
@@ -2312,45 +2306,22 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
       }
     }catch(e){console.warn('Balance check failed, proceeding anyway:',e.message);}
     if(btn){btn.textContent='Sending...';}
-    var _bhResult=await _fetchBlockhash();
-    var bh={blockhash:_bhResult.blockhash};
     var buyerPk=new solanaWeb3.PublicKey(walletAddress);
     var totalUnits=Math.round(priceUsdc*1e6);
     var sellerUnits=Math.round(totalUnits*0.95);
     var feeUnits=totalUnits-sellerUnits;
-    var _baR=await fetch('/api/load?usdc_account='+encodeURIComponent(walletAddress));
-    var _baD=await _baR.json();
-    if(!_baD.exists||!_baD.account){
-      if(btn){btn.disabled=false;btn.textContent='Buy with USDC';}
-      alert('Your wallet has no USDC account. Add USDC to your wallet first.');
-      return;
-    }
-    var buyerATA=new solanaWeb3.PublicKey(_baD.account);
-    // Fetch the REAL on-chain USDC account for the seller (derivation can mismatch non-standard accounts)
-    var _saR=await fetch('/api/load?usdc_account='+encodeURIComponent(sellerWallet));
-    var _saD=await _saR.json();
-    if(!_saD.exists||!_saD.account){
-      if(btn){btn.disabled=false;btn.textContent='Buy with USDC';}
-      alert('The seller has no USDC account yet. They need to receive USDC once before they can be paid.');
-      return;
-    }
-    var sellerATA=new solanaWeb3.PublicKey(_saD.account);
-    // Fee wallet — look up its real USDC account; skip fee gracefully if not set up
-    var feeATA=null;
-    try{
-      var _feR=await fetch('/api/load?usdc_account='+encodeURIComponent(_FEE_WALLET));
-      var _feD=await _feR.json();
-      if(_feD.exists&&_feD.account)feeATA=new solanaWeb3.PublicKey(_feD.account);
-    }catch(e){}
+    var buyerATA=_getATA(buyerPk,_usdcMintPk());
+    // Derive seller + fee accounts the standard way; create them in-tx if missing (works for every wallet, not just yours)
+    var sellerPk=new solanaWeb3.PublicKey(sellerWallet);
+    var sellerATA=_getATA(sellerPk,_usdcMintPk());
+    var feeWalletPk=new solanaWeb3.PublicKey(_FEE_WALLET);
+    var feeATA=_getATA(feeWalletPk,_usdcMintPk());
     var tx=new solanaWeb3.Transaction();
-    if(feeATA){
-      tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
-      tx.add(_usdcIx(buyerATA,feeATA,buyerPk,feeUnits));
-    }else{
-      tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,totalUnits));
-    }
-    tx.feePayer=buyerPk;
-    tx.recentBlockhash=bh.blockhash;
+    tx.add(_createATAIx(buyerPk,sellerPk,_usdcMintPk()));    // ensure seller's USDC account exists
+    tx.add(_createATAIx(buyerPk,feeWalletPk,_usdcMintPk())); // ensure fee wallet's USDC account exists
+    tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
+    tx.add(_usdcIx(buyerATA,feeATA,buyerPk,feeUnits));
+    tx.feePayer=buyerPk; // Phantom attaches a FRESH blockhash + submits via its own RPC
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
     var signed=await provider.signAndSendTransaction(tx);
     if(btn){btn.textContent='Confirming...';}
@@ -2599,32 +2570,22 @@ async function buyOreWithUSDC(lid,sellerWallet,pricePerUnit,qty){
       }
     }catch(e){console.warn('Balance check failed, proceeding anyway:',e.message);}
     if(btn){btn.textContent='Sending...';}
-    var _bhResult=await _fetchBlockhash();
-    var bh={blockhash:_bhResult.blockhash};
     var buyerPk=new solanaWeb3.PublicKey(walletAddress);
     var totalUnits=Math.round(totalUsdc*1e6);
     var sellerUnits=Math.round(totalUnits*0.95);
     var feeUnits=totalUnits-sellerUnits;
-    // Fetch REAL on-chain USDC accounts
-    var _baR=await fetch('/api/load?usdc_account='+encodeURIComponent(walletAddress));
-    var _baD=await _baR.json();
-    if(!_baD.exists||!_baD.account){if(btn){btn.disabled=false;btn.textContent='Buy ×'+qty+' USDC';}alert('Your wallet has no USDC account. Add USDC first.');return;}
-    var buyerATA=new solanaWeb3.PublicKey(_baD.account);
-    var _saR=await fetch('/api/load?usdc_account='+encodeURIComponent(sellerWallet));
-    var _saD=await _saR.json();
-    if(!_saD.exists||!_saD.account){if(btn){btn.disabled=false;btn.textContent='Buy ×'+qty+' USDC';}alert('The seller has no USDC account yet.');return;}
-    var sellerATA=new solanaWeb3.PublicKey(_saD.account);
-    var feeATA=null;
-    try{var _feR=await fetch('/api/load?usdc_account='+encodeURIComponent(_FEE_WALLET));var _feD=await _feR.json();if(_feD.exists&&_feD.account)feeATA=new solanaWeb3.PublicKey(_feD.account);}catch(e){}
+    // Derive accounts the standard way; create receiving accounts in-tx if missing (works for every wallet)
+    var buyerATA=_getATA(buyerPk,_usdcMintPk());
+    var sellerPk=new solanaWeb3.PublicKey(sellerWallet);
+    var sellerATA=_getATA(sellerPk,_usdcMintPk());
+    var feeWalletPk=new solanaWeb3.PublicKey(_FEE_WALLET);
+    var feeATA=_getATA(feeWalletPk,_usdcMintPk());
     var tx=new solanaWeb3.Transaction();
-    if(feeATA){
-      tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
-      tx.add(_usdcIx(buyerATA,feeATA,buyerPk,feeUnits));
-    }else{
-      tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,totalUnits));
-    }
-    tx.feePayer=buyerPk;
-    tx.recentBlockhash=bh.blockhash;
+    tx.add(_createATAIx(buyerPk,sellerPk,_usdcMintPk()));
+    tx.add(_createATAIx(buyerPk,feeWalletPk,_usdcMintPk()));
+    tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
+    tx.add(_usdcIx(buyerATA,feeATA,buyerPk,feeUnits));
+    tx.feePayer=buyerPk; // Phantom attaches a FRESH blockhash + submits via its own RPC
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
     var signed=await provider.signAndSendTransaction(tx);
     if(btn){btn.textContent='Confirming...';}
