@@ -2685,7 +2685,7 @@ var _mLastT=0;
 // ── Jackpot Jar — painted into the idle-miner scene, left wall, opaque glass ──
 var JAR_FULL_EXT=1000000;  // pool value ($EXT) that completely fills the jar
 var JAR_DROP_EXT=10000;    // every +10k $EXT in the pool drops a fresh ball into the jar
-var JAR_CX=92,JAR_BW=76,JAR_BH=100; // scene position: centre-x, body width/height (base sits on the floor MGY)
+var JAR_CX=508,JAR_BW=76,JAR_BH=100; // scene position: centre-x (tucked against the right wall), body width/height (base on the floor MGY)
 var _jarFill=0,_jarDrops=[],_jarPulse=0,_jarLastPool=null,_jarDropQueue=0,_jarDropCd=0;
 function _fmtJarPool(v){v=v||0;return v>=1000?Math.round(v).toLocaleString()+' $EXT':v.toFixed(3)+' $EXT';}
 function _jarSurfY(fill){return (MGY-8)-fill*(JAR_BH-16);} // surface y of the packed ore for a given fill 0..1
@@ -2706,37 +2706,43 @@ function _jarTick(){
 function drawJarScene(){
   var x=MC,floor=MGY,bw=JAR_BW,bh=JAR_BH,bx=JAR_CX-bw/2,by=floor-bh;
   function rr(px,py,pw,ph,r){x.beginPath();x.moveTo(px+r,py);x.arcTo(px+pw,py,px+pw,py+ph,r);x.arcTo(px+pw,py+ph,px,py+ph,r);x.arcTo(px,py+ph,px,py,r);x.arcTo(px,py,px+pw,py,r);x.closePath();}
-  // ── Tap coming out of the LEFT wall ──
-  var pipeY=by-46;
-  x.fillStyle='#c4c8d2';x.fillRect(0,pipeY-5,9,22);                 // wall mount plate
-  x.fillStyle='#9aa0ad';x.fillRect(0,pipeY,JAR_CX+5,9);            // horizontal pipe from the wall
-  x.fillStyle='#7d828e';x.fillRect(0,pipeY+7,JAR_CX+5,2);          // pipe underside shade
-  x.fillStyle='#9aa0ad';x.fillRect(JAR_CX-6,pipeY,12,24);          // elbow turning down over the jar
-  x.fillStyle='#6f7480';x.fillRect(JAR_CX-6,pipeY+22,12,3);        // spout lip
-  if(_jarDropQueue>0||_jarDrops.length){x.fillStyle='rgba(150,80,240,0.6)';x.fillRect(JAR_CX-2,pipeY+23,5,3);} // drip glow
-  // ── rim + neck (opaque) ──
-  x.fillStyle='#bdbbdc';x.fillRect(bx-3,by-9,bw+6,9);
-  x.fillStyle='#a9a7cc';x.fillRect(bx+5,by-2,bw-10,8);
-  // ── jar body: OPAQUE frosted glass so the cave background can't show through ──
+  // ── Small tap coming out of the RIGHT wall ──
+  var pipeY=by-42,W=560;
+  x.fillStyle='#c4c8d2';x.fillRect(W-7,pipeY-3,7,15);             // wall mount plate (right edge)
+  x.fillStyle='#9aa0ad';x.fillRect(JAR_CX-4,pipeY,W-(JAR_CX-4),6); // horizontal pipe back to the wall
+  x.fillStyle='#7d828e';x.fillRect(JAR_CX-4,pipeY+5,W-(JAR_CX-4),2); // pipe underside shade
+  x.fillStyle='#9aa0ad';x.fillRect(JAR_CX-4,pipeY,8,16);          // elbow turning down over the jar
+  x.fillStyle='#6f7480';x.fillRect(JAR_CX-4,pipeY+15,8,2);        // spout lip
+  if(_jarDropQueue>0||_jarDrops.length){x.fillStyle='rgba(150,80,240,0.6)';x.fillRect(JAR_CX-1,pipeY+16,3,2);} // drip glow
+  // ── rim + neck (translucent) ──
+  x.fillStyle='rgba(189,187,220,0.55)';x.fillRect(bx-3,by-9,bw+6,9);
+  x.fillStyle='rgba(169,167,204,0.42)';x.fillRect(bx+5,by-2,bw-10,8);
+  // ── jar body: TRANSLUCENT glass — the cave background shows through ──
   x.save();rr(bx,by,bw,bh,16);x.clip();
-  x.fillStyle='#9f9dc2';x.fillRect(bx,by,bw,bh);                   // solid frosted backing
-  x.fillStyle='#8d8bb2';x.fillRect(bx,by+bh*0.55,bw,bh*0.45);      // darker glass toward the base
-  // packed ore fill
+  x.fillStyle='rgba(170,168,208,0.13)';x.fillRect(bx,by,bw,bh);    // faint glass tint
+  x.fillStyle='rgba(120,118,160,0.12)';x.fillRect(bx,by+bh*0.55,bw,bh*0.45); // subtle deeper tint near the base
+  // packed ore fill — each ball stamped with a gold $
   var surfY=_jarSurfY(_jarFill),r=7,dx=14,dy=12,row=0;
+  x.textAlign='center';x.textBaseline='middle';
   for(var yy=floor-8;yy>=surfY;yy-=dy,row++){var off=(row%2)?dx/2:0;
     for(var xx=bx+8+off;xx<=bx+bw-6;xx+=dx){
       x.beginPath();x.arc(xx,yy,r,0,6.28);x.fillStyle='#7a2fd0';x.fill();
       x.lineWidth=1;x.strokeStyle='#5a1fa0';x.stroke();
-      x.beginPath();x.arc(xx-2.2,yy-2.2,r*0.4,0,6.28);x.fillStyle='rgba(205,160,255,0.9)';x.fill();}}
+      x.beginPath();x.arc(xx-2.2,yy-2.2,r*0.4,0,6.28);x.fillStyle='rgba(205,160,255,0.9)';x.fill();
+      x.fillStyle='#ffd24a';x.font='bold 8px "Space Mono"';x.fillText('$',xx,yy+0.5);}}  // $ token mark
+  x.textBaseline='alphabetic';
   if(_jarPulse>0){x.globalAlpha=_jarPulse/9*0.55;x.fillStyle='#c89cff';x.fillRect(bx,surfY-7,bw,7);x.globalAlpha=1;} // splash
   // glass sheen
   x.fillStyle='rgba(255,255,255,0.16)';x.fillRect(bx+8,by+6,7,bh-18);
   x.fillStyle='rgba(255,255,255,0.08)';x.fillRect(bx+20,by+9,4,bh-24);
   x.restore();
-  // ── falling drop balls ──
+  // ── falling drop balls (also stamped) ──
+  x.textAlign='center';x.textBaseline='middle';
   for(var k=0;k<_jarDrops.length;k++){var d=_jarDrops[k];
     x.beginPath();x.arc(d.x,d.y,6,0,6.28);x.fillStyle='#8a3ce0';x.fill();
-    x.beginPath();x.arc(d.x-1.6,d.y-1.6,2.2,0,6.28);x.fillStyle='rgba(210,170,255,0.9)';x.fill();}
+    x.beginPath();x.arc(d.x-1.6,d.y-1.6,2.2,0,6.28);x.fillStyle='rgba(210,170,255,0.9)';x.fill();
+    x.fillStyle='#ffd24a';x.font='bold 8px "Space Mono"';x.fillText('$',d.x,d.y+0.5);}
+  x.textBaseline='alphabetic';
   // ── glass outline ──
   rr(bx,by,bw,bh,16);x.strokeStyle='#d6d4f0';x.lineWidth=2;x.stroke();
   // ── pool amount under the jar ──
@@ -2807,6 +2813,7 @@ function drawMiner(){
     MC.fillText(mEXTToast.text,18,27);
     MC.globalAlpha=1;
   }
+  drawJarScene(); // painted on the right wall BEFORE the rock so the rock sits in front of it
   if(mRspTmr<=0){
     MC.fillStyle='#06050a';MC.beginPath();MC.ellipse(340,MGY+2,26,4,0,0,6.28);MC.fill();
     // Glow for special rocks
@@ -2873,7 +2880,6 @@ function drawMiner(){
     MC.restore();
   }
   for(var i=0;i<mParts.length;i++){var p=mParts[i];MC.globalAlpha=Math.min(1,p.life/10);if(p.label){MC.font='bold 12px "Space Mono"';MC.textAlign='center';MC.fillStyle=p.c;MC.fillText(p.label,p.x,p.y);p.y+=p.vy;}else{MC.fillStyle=p.c;MC.fillRect(p.x,p.y,p.s,p.s);}MC.globalAlpha=1;}
-  drawJarScene();
   // Rock number — large, accent colour, top-centre
   MC.font='bold 13px "Space Mono"';MC.textAlign='center';MC.fillStyle='#4a3a88';MC.fillText('ROCK  #'+mRockNum,280,20);
 }
