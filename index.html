@@ -2116,10 +2116,12 @@ async function _fetchBlockhash(){
 
 
 function _getATA(walletPk,mintPk){
-  return solanaWeb3.PublicKey.findProgramAddressSync(
+  var r=solanaWeb3.PublicKey.findProgramAddressSync(
     [walletPk.toBuffer(),new solanaWeb3.PublicKey(_TOKEN_PROG).toBuffer(),mintPk.toBuffer()],
     new solanaWeb3.PublicKey(_ASSOC_PROG)
   )[0];
+  console.log('_getATA('+walletPk.toBase58()+') TOKEN_PROG='+_TOKEN_PROG+' ASSOC='+_ASSOC_PROG+' => '+r.toBase58());
+  return r;
 }
 function _usdcIx(fromATA,toATA,ownerPk,amount){
   // plain Transfer (discriminator 3): data = [3, amount(8 LE)]
