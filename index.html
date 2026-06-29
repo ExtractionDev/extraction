@@ -2698,9 +2698,9 @@ function _jarTick(){
   // Detection lives in the 15s pool fetch; here we just fill, release queued coins, and animate
   if(_jarLastPool!==null)_jarFill+=(Math.max(0,Math.min(1,globalPool/JAR_FULL_EXT))-_jarFill)*0.05; // ease toward true level
   if(_jarDropCd>0)_jarDropCd--;
-  if(_jarDropQueue>0&&_jarDropCd<=0){_jarDrops.push({x:JAR_CX+(Math.random()-0.5)*8,y:MGY-JAR_BH-26,vy:1.1});_jarDropQueue--;_jarDropCd=10;}
+  if(_jarDropQueue>0&&_jarDropCd<=0){_jarDrops.push({x:JAR_CX+(Math.random()-0.5)*8,y:MGY-JAR_BH-26,vy:0.77});_jarDropQueue--;_jarDropCd=10;}
   var _surfY=_jarSurfY(_jarFill);
-  for(var i=_jarDrops.length-1;i>=0;i--){var d=_jarDrops[i];d.y+=d.vy;d.vy+=0.45;if(d.y>=_surfY-6){_jarDrops.splice(i,1);_jarPulse=9;}}
+  for(var i=_jarDrops.length-1;i>=0;i--){var d=_jarDrops[i];d.y+=d.vy;d.vy+=0.315;if(d.y>=_surfY-6){_jarDrops.splice(i,1);_jarPulse=9;}}
   if(_jarPulse>0)_jarPulse--;
 }
 function drawJarScene(){
