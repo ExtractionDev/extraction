@@ -2198,7 +2198,7 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
       showAchieve('🛒','Purchase Complete!','Got '+d.item.mat+' '+d.item.type+' for $'+priceUsdc.toFixed(2)+' USDC!');
     }else{
       console.error('Buy failed:',d.error,d.logs||'');
-      alert((d.error||'Item transfer failed.')+'\nTX: '+signed.signature+'\nContact support if USDC was deducted.');
+      alert((d.error||'Item transfer failed.')+'\n\nLOGS: '+(d.logs||'none')+'\n\nTX: '+signed.signature);
     }
   }catch(e){
     console.error('USDC buy error:',e);
