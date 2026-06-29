@@ -2186,8 +2186,6 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
     var sellerATA=_getATA(sellerPk,mintPk);
     var feeATA=_getATA(feePk,mintPk);
     var tx=new solanaWeb3.Transaction();
-    if(!(await _ataExists(sellerATA)))tx.add(_createATAIx(buyerPk,sellerPk,mintPk));
-    if(!(await _ataExists(feeATA)))tx.add(_createATAIx(buyerPk,feePk,mintPk));
     tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
     tx.add(_usdcIx(buyerATA,feeATA,buyerPk,feeUnits));
     tx.feePayer=buyerPk;
@@ -2454,8 +2452,6 @@ async function buyOreWithUSDC(lid,sellerWallet,pricePerUnit,qty){
     var sellerATA=_getATA(sellerPk,mintPk);
     var feeATA=_getATA(feePk,mintPk);
     var tx=new solanaWeb3.Transaction();
-    if(!(await _ataExists(sellerATA)))tx.add(_createATAIx(buyerPk,sellerPk,mintPk));
-    if(!(await _ataExists(feeATA)))tx.add(_createATAIx(buyerPk,feePk,mintPk));
     tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
     tx.add(_usdcIx(buyerATA,feeATA,buyerPk,feeUnits));
     tx.feePayer=buyerPk;
