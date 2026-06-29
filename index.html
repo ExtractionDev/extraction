@@ -2191,10 +2191,25 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
     var totalUnits=Math.round(priceUsdc*1e6);
     var sellerUnits=Math.round(totalUnits*0.95);
     var feeUnits=totalUnits-sellerUnits;
-    var buyerATA=_getATA(buyerPk,mintPk);
-    var sellerATA=_getATA(sellerPk,mintPk);
-    console.log('DERIVED sellerATA:',sellerATA.toBase58());
-    console.log('REAL sellerATA should be: FGtRr5e9xycxQb8Goy2GSbX6ocwcvCWKBPfvksrv6Kuy');
+    var _baR=await fetch('/api/load?usdc_account='+encodeURIComponent(walletAddress));
+    var _baD=await _baR.json();
+    if(!_baD.exists||!_baD.account){
+      if(btn){btn.disabled=false;btn.textContent='Buy with USDC';}
+      alert('Your wallet has no USDC account. Add USDC to your wallet first.');
+      return;
+    }
+    var buyerATA=new solanaWeb3.PublicKey(_baD.account);
+    console.log('REAL buyerATA from chain:',_baD.account);
+    // Fetch the REAL on-chain USDC account for the seller (derivation can mismatch non-standard accounts)
+    var _saR=await fetch('/api/load?usdc_account='+encodeURIComponent(sellerWallet));
+    var _saD=await _saR.json();
+    if(!_saD.exists||!_saD.account){
+      if(btn){btn.disabled=false;btn.textContent='Buy with USDC';}
+      alert('The seller has no USDC account yet. They need to receive USDC once before they can be paid.');
+      return;
+    }
+    var sellerATA=new solanaWeb3.PublicKey(_saD.account);
+    console.log('REAL sellerATA from chain:',_saD.account);
     var tx=new solanaWeb3.Transaction();
     // Single transfer: full price to seller (fee disabled until fee wallet USDC account is set up)
     tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,totalUnits));
