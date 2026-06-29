@@ -7,8 +7,7 @@ const supabase = createClient(
 );
 
 const DEV_WALLET = 'B8ubxUGnvhDTGGRkkN8DkyAfnoLEfnjTPdXfQn3TnVQa';
-const FEE_WALLET = '8TJ2QxVzYR4USc9cbpnCaeXgtXjMwE9jaJpJgvMaxgMs';
-const FEE_USDC_ATA = 'DahywsifztfJH7RXMTJs3NZWCj1qoPJNAdjuLaYXnoxJ';
+const FEE_WALLET = '72MJWgvcqEb43mbuSTiHme6oYr4rEvwc7f3kaETHdNaN';
 const USDC_MINT  = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const TOKEN_PROG = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const ASSOC_PROG = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe1bRS';
@@ -91,7 +90,7 @@ export default async function handler(req, res) {
     const totalUnits  = Math.round(totalUsdc * 1e6);
 
     const sellerATA = getATA(listing.seller_wallet, USDC_MINT);
-    const feeATA    = FEE_USDC_ATA;
+    const feeATA    = getATA(FEE_WALLET, USDC_MINT);
 
     const innerIx = (tx.meta && tx.meta.innerInstructions) ? tx.meta.innerInstructions : [];
     const allIx = [
