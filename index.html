@@ -215,10 +215,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 .lb-rocks{font-size:10px;color:var(--gold2);white-space:nowrap;font-weight:700}
 .miner-cv canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:-moz-crisp-edges}
 .miner-panel{flex:1;min-width:0;background:var(--bg2);border-left:1px solid var(--border);overflow-y:auto;padding:12px 16px}
-.jar-card{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 6px 11px;margin-bottom:14px;background:linear-gradient(180deg,#17131f,#0e0b16);border:1px solid var(--border2);border-radius:12px;position:relative;overflow:hidden}
-.jar-card canvas{image-rendering:pixelated;image-rendering:-moz-crisp-edges;width:150px;height:190px}
-.jar-amt{font-size:15px;font-weight:800;color:#b98bff;font-family:'DM Serif Display',serif;letter-spacing:.02em}
-.jar-sub{font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--text3)}
 .panel-title{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--text2);margin-bottom:8px;margin-top:12px;font-weight:700;display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--border2);padding-bottom:6px}
 .eq-card{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px}
 .eq-empty{font-size:14px;color:var(--text4);font-style:italic}
@@ -745,11 +741,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
       </div>
     </div>
     <div class="miner-panel">
-      <div class="jar-card">
-        <canvas id="jarCv" width="150" height="190"></canvas>
-        <div class="jar-amt" id="jarAmt">— $EXT</div>
-        <div class="jar-sub">Excalibur pool · 1M fills the jar</div>
-      </div>
       <div class="panel-title">Equipped pickaxe</div>
       <div class="eq-card"><div id="eqDisplay" class="eq-empty">None — find one in the dungeon</div></div>
       <div class="panel-title">Upgrades</div>
@@ -2691,66 +2682,66 @@ function mHitRock(){
 function mr(x,y,w,h,c){MC.fillStyle=c;MC.fillRect(x*MS,y*MS,w*MS,h*MS);}
 function mp(x,y,w,h,c){MC.fillStyle=c;MC.fillRect(x*MPS,y*MPS,w*MPS,h*MPS);}
 var _mLastT=0;
-// ── Jackpot Jar widget — fills live with the Excalibur prize pool ──
+// ── Jackpot Jar — painted into the idle-miner scene, left wall, opaque glass ──
 var JAR_FULL_EXT=1000000;  // pool value ($EXT) that completely fills the jar
 var JAR_DROP_EXT=10000;    // every +10k $EXT in the pool drops a fresh ball into the jar
+var JAR_CX=92,JAR_BW=76,JAR_BH=100; // scene position: centre-x, body width/height (base sits on the floor MGY)
 var _jarFill=0,_jarDrops=[],_jarPulse=0,_jarLastPool=null,_jarDropQueue=0,_jarDropCd=0;
 function _fmtJarPool(v){v=v||0;return v>=1000?Math.round(v).toLocaleString()+' $EXT':v.toFixed(3)+' $EXT';}
+function _jarSurfY(fill){return (MGY-8)-fill*(JAR_BH-16);} // surface y of the packed ore for a given fill 0..1
 function _jarTick(){
   // Detect pool changes → queue one ball drop per 10k added to the pool
   if(_jarLastPool===null){_jarLastPool=globalPool;_jarFill=Math.max(0,Math.min(1,globalPool/JAR_FULL_EXT));}
   else if(globalPool>_jarLastPool){
     var dd=Math.floor((globalPool-_jarLastPool)/JAR_DROP_EXT);
-    if(dd>0){_jarDropQueue=Math.min(_jarDropQueue+dd,14);_jarLastPool+=dd*JAR_DROP_EXT;} // catch up fully, but cap visible drops
+    if(dd>0){_jarDropQueue=Math.min(_jarDropQueue+dd,14);_jarLastPool+=dd*JAR_DROP_EXT;} // catch up fully, cap visible drops
   }else if(globalPool<_jarLastPool){_jarLastPool=globalPool;_jarDropQueue=0;} // pool claimed/reset → settle down
-  // Ease the fill toward the true pool level
-  var _tf=Math.max(0,Math.min(1,globalPool/JAR_FULL_EXT));
-  _jarFill+=(_tf-_jarFill)*0.05;
-  // Release queued drops on a short cooldown so a burst staggers nicely
+  _jarFill+=(Math.max(0,Math.min(1,globalPool/JAR_FULL_EXT))-_jarFill)*0.05; // ease toward true level
   if(_jarDropCd>0)_jarDropCd--;
-  if(_jarDropQueue>0&&_jarDropCd<=0){_jarDrops.push({x:76+(Math.random()-0.5)*7,y:33,vy:1.1});_jarDropQueue--;_jarDropCd=10;}
-  // Update falling balls; land into the surface with a splash pulse
-  var _surfY=167-_jarFill*106;
+  if(_jarDropQueue>0&&_jarDropCd<=0){_jarDrops.push({x:JAR_CX+(Math.random()-0.5)*8,y:MGY-JAR_BH-26,vy:1.1});_jarDropQueue--;_jarDropCd=10;}
+  var _surfY=_jarSurfY(_jarFill);
   for(var i=_jarDrops.length-1;i>=0;i--){var d=_jarDrops[i];d.y+=d.vy;d.vy+=0.45;if(d.y>=_surfY-6){_jarDrops.splice(i,1);_jarPulse=9;}}
   if(_jarPulse>0)_jarPulse--;
 }
-function drawJar(){
-  var c=document.getElementById('jarCv');if(!c)return;var x=c.getContext('2d');
-  x.clearRect(0,0,150,190);
-  // ── Faucet / tap mounted on the stats wall ──
-  x.fillStyle='#c4c8d2';x.fillRect(4,11,11,14);                 // wall flange
-  x.fillStyle='#9aa0ad';x.fillRect(6,14,68,8);x.fillRect(70,14,10,19); // pipe + elbow down
-  x.fillStyle='#7d828e';x.fillRect(6,20,68,2);x.fillStyle='#6f7480';x.fillRect(70,31,10,3); // shading + spout lip
-  if(_jarDropQueue>0||_jarDrops.length){x.fillStyle='rgba(150,80,240,0.55)';x.fillRect(73,32,4,3);} // active-drip glow
-  function _rr(px,py,pw,ph,r){x.beginPath();x.moveTo(px+r,py);x.arcTo(px+pw,py,px+pw,py+ph,r);x.arcTo(px+pw,py+ph,px,py+ph,r);x.arcTo(px,py+ph,px,py,r);x.arcTo(px,py,px+pw,py,r);x.closePath();}
-  // rim + neck
-  x.fillStyle='rgba(206,204,232,0.82)';x.fillRect(44,42,62,6);
-  x.fillStyle='rgba(206,204,232,0.40)';x.fillRect(48,48,54,10);
-  // ── jar interior + packed-ball fill (clipped to body) ──
-  var surfY=167-_jarFill*106;
-  x.save();_rr(42,56,66,116,15);x.clip();
-  x.fillStyle='rgba(150,150,200,0.10)';x.fillRect(42,56,66,116);
-  var r=6.6,dx=13,dy=11,row=0;
-  for(var yy=167;yy>=surfY;yy-=dy,row++){
-    var off=(row%2)?dx/2:0;
-    for(var xx=49+off;xx<=104;xx+=dx){
+function drawJarScene(){
+  var x=MC,floor=MGY,bw=JAR_BW,bh=JAR_BH,bx=JAR_CX-bw/2,by=floor-bh;
+  function rr(px,py,pw,ph,r){x.beginPath();x.moveTo(px+r,py);x.arcTo(px+pw,py,px+pw,py+ph,r);x.arcTo(px+pw,py+ph,px,py+ph,r);x.arcTo(px,py+ph,px,py,r);x.arcTo(px,py,px+pw,py,r);x.closePath();}
+  // ── Tap coming out of the LEFT wall ──
+  var pipeY=by-46;
+  x.fillStyle='#c4c8d2';x.fillRect(0,pipeY-5,9,22);                 // wall mount plate
+  x.fillStyle='#9aa0ad';x.fillRect(0,pipeY,JAR_CX+5,9);            // horizontal pipe from the wall
+  x.fillStyle='#7d828e';x.fillRect(0,pipeY+7,JAR_CX+5,2);          // pipe underside shade
+  x.fillStyle='#9aa0ad';x.fillRect(JAR_CX-6,pipeY,12,24);          // elbow turning down over the jar
+  x.fillStyle='#6f7480';x.fillRect(JAR_CX-6,pipeY+22,12,3);        // spout lip
+  if(_jarDropQueue>0||_jarDrops.length){x.fillStyle='rgba(150,80,240,0.6)';x.fillRect(JAR_CX-2,pipeY+23,5,3);} // drip glow
+  // ── rim + neck (opaque) ──
+  x.fillStyle='#bdbbdc';x.fillRect(bx-3,by-9,bw+6,9);
+  x.fillStyle='#a9a7cc';x.fillRect(bx+5,by-2,bw-10,8);
+  // ── jar body: OPAQUE frosted glass so the cave background can't show through ──
+  x.save();rr(bx,by,bw,bh,16);x.clip();
+  x.fillStyle='#9f9dc2';x.fillRect(bx,by,bw,bh);                   // solid frosted backing
+  x.fillStyle='#8d8bb2';x.fillRect(bx,by+bh*0.55,bw,bh*0.45);      // darker glass toward the base
+  // packed ore fill
+  var surfY=_jarSurfY(_jarFill),r=7,dx=14,dy=12,row=0;
+  for(var yy=floor-8;yy>=surfY;yy-=dy,row++){var off=(row%2)?dx/2:0;
+    for(var xx=bx+8+off;xx<=bx+bw-6;xx+=dx){
       x.beginPath();x.arc(xx,yy,r,0,6.28);x.fillStyle='#7a2fd0';x.fill();
       x.lineWidth=1;x.strokeStyle='#5a1fa0';x.stroke();
-      x.beginPath();x.arc(xx-2,yy-2,r*0.4,0,6.28);x.fillStyle='rgba(205,160,255,0.85)';x.fill();
-    }
-  }
-  if(_jarPulse>0){x.globalAlpha=_jarPulse/9*0.6;x.fillStyle='#c89cff';x.fillRect(44,surfY-7,62,7);x.globalAlpha=1;} // splash
+      x.beginPath();x.arc(xx-2.2,yy-2.2,r*0.4,0,6.28);x.fillStyle='rgba(205,160,255,0.9)';x.fill();}}
+  if(_jarPulse>0){x.globalAlpha=_jarPulse/9*0.55;x.fillStyle='#c89cff';x.fillRect(bx,surfY-7,bw,7);x.globalAlpha=1;} // splash
+  // glass sheen
+  x.fillStyle='rgba(255,255,255,0.16)';x.fillRect(bx+8,by+6,7,bh-18);
+  x.fillStyle='rgba(255,255,255,0.08)';x.fillRect(bx+20,by+9,4,bh-24);
   x.restore();
   // ── falling drop balls ──
-  for(var k=0;k<_jarDrops.length;k++){var dd2=_jarDrops[k];
-    x.beginPath();x.arc(dd2.x,dd2.y,5.5,0,6.28);x.fillStyle='#8a3ce0';x.fill();
-    x.beginPath();x.arc(dd2.x-1.5,dd2.y-1.5,2,0,6.28);x.fillStyle='rgba(210,170,255,0.85)';x.fill();
-  }
-  // ── glass outline + sheen ──
-  _rr(42,56,66,116,15);x.strokeStyle='rgba(214,212,240,0.9)';x.lineWidth=2;x.stroke();
-  x.fillStyle='rgba(255,255,255,0.12)';x.fillRect(50,62,6,100);
-  x.fillStyle='rgba(255,255,255,0.06)';x.fillRect(60,64,4,96);
-  var amtEl=document.getElementById('jarAmt');if(amtEl)amtEl.textContent=_fmtJarPool(globalPool);
+  for(var k=0;k<_jarDrops.length;k++){var d=_jarDrops[k];
+    x.beginPath();x.arc(d.x,d.y,6,0,6.28);x.fillStyle='#8a3ce0';x.fill();
+    x.beginPath();x.arc(d.x-1.6,d.y-1.6,2.2,0,6.28);x.fillStyle='rgba(210,170,255,0.9)';x.fill();}
+  // ── glass outline ──
+  rr(bx,by,bw,bh,16);x.strokeStyle='#d6d4f0';x.lineWidth=2;x.stroke();
+  // ── pool amount under the jar ──
+  x.fillStyle='#b98bff';x.font='bold 11px "Space Mono"';x.textAlign='center';
+  x.fillText(_fmtJarPool(globalPool),JAR_CX,floor+15);
 }
 function minerLoop(){
   try{
@@ -2772,7 +2763,7 @@ function minerLoop(){
     if(equipped&&equipped.rar&&equipped.rar.n==='Mythic'&&_idlePickHead&&_mythIdleParts.length<25&&mTk%3===0){
       _mythIdleParts.push({x:_idlePickHead.x+(Math.random()-0.5)*12,y:_idlePickHead.y+(Math.random()-0.5)*12,vx:(Math.random()-0.5)*0.45,vy:-(0.25+Math.random()*0.4),life:22+Math.random()*26,maxLife:48,r:0.3+Math.random()*0.6});
     }
-    if(activeTab===2){drawMiner();_jarTick();drawJar();}
+    if(activeTab===2){_jarTick();drawMiner();}
     if(mTk%60===0)uiAll();
   }catch(e){console.error('minerLoop error:',e);}
   requestAnimationFrame(minerLoop);
@@ -2882,6 +2873,7 @@ function drawMiner(){
     MC.restore();
   }
   for(var i=0;i<mParts.length;i++){var p=mParts[i];MC.globalAlpha=Math.min(1,p.life/10);if(p.label){MC.font='bold 12px "Space Mono"';MC.textAlign='center';MC.fillStyle=p.c;MC.fillText(p.label,p.x,p.y);p.y+=p.vy;}else{MC.fillStyle=p.c;MC.fillRect(p.x,p.y,p.s,p.s);}MC.globalAlpha=1;}
+  drawJarScene();
   // Rock number — large, accent colour, top-centre
   MC.font='bold 13px "Space Mono"';MC.textAlign='center';MC.fillStyle='#4a3a88';MC.fillText('ROCK  #'+mRockNum,280,20);
 }
