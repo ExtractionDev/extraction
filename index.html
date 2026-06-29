@@ -3353,7 +3353,7 @@ function _runDeathAnim(final,runLootItems,excMsg){
   requestAnimationFrame(deathTick);
 }
 // TEST MODE: true = Excalibur stone always spawns (for testing payout). Set false for live odds.
-var EXC_TEST_MODE=false;
+var EXC_TEST_MODE=true;
 function _placeExcalibur(){
   if(mode==='free')return;
   var targetFi=EXC_TEST_MODE?0:null;
@@ -5297,3 +5297,4 @@ xAuthLoad();
 
 </body>
 </html>
+      
