@@ -2192,6 +2192,7 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
     var tx=new solanaWeb3.Transaction();
     // Single transfer: full price to seller (fee disabled until fee wallet USDC account is set up)
     tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,totalUnits));
+    console.log('BUY VERSION: single-transfer-v2');
     tx.feePayer=buyerPk;
     tx.recentBlockhash=bh.blockhash;
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
