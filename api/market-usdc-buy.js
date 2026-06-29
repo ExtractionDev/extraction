@@ -79,7 +79,11 @@ export default async function handler(req, res) {
 
     const tx = await getParsedTx(signature);
     if (!tx) return res.status(400).json({ error: 'Transaction not found on chain yet. If USDC was deducted, contact support with your TX signature.' });
-    if (tx.meta && tx.meta.err) return res.status(400).json({ error: 'Transaction failed on chain' });
+    if (tx.meta && tx.meta.err) {
+      const errDetail = JSON.stringify(tx.meta.err);
+      const logs = (tx.meta.logMessages || []).slice(-5).join(' | ');
+      return res.status(400).json({ error: 'Transaction failed on chain: ' + errDetail, logs: logs });
+    }
 
     const totalUnits  = Math.round(parseFloat(listing.price) * 1e6);
     const sellerUnits = Math.round(totalUnits * 0.95);
