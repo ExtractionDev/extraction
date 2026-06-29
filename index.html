@@ -2989,6 +2989,12 @@ var SPIDER_CLIMB_SPD=0.9;       // web climb-back speed px/frame
 var SPIDER_HANG_TIME=130;       // frames the spider dangles at the bottom before climbing (~2.2s)
 var SPIDER_DROP_DEPTH=130;      // how far down the web it lowers
 var SPIDER_DROP_GAP_MIN=180,SPIDER_DROP_GAP_MAX=540; // random gap between ambient drops (3-9s) — happens on its own, no player trigger
+// ── Golem charge tunables ──
+var GOLEM_WINDUP=38;            // wind-up telegraph frames (red glow) before the lunge
+var GOLEM_CHARGE_SPD=7.5;       // lunge speed px/frame — well above the player's 4px move speed
+var GOLEM_CHARGE_TIME=40;       // frames the lunge lasts (~300px of travel)
+var GOLEM_CHARGE_DMG=20;        // damage on a connecting slam
+var GOLEM_CHARGE_RANGE=250;     // how close (same level) the player must be to trigger a wind-up
 var dDeathParts=[];   // enemy death particles {x,y,vx,vy,life,maxLife,c,r}
 var dChips=[];        // rock chip particles {x,y,vx,vy,life,maxLife,c}
 var dAmbientParts=[]; // ambient dust/ember motes {x,y,vx,vy,life,maxLife,r,c}
@@ -4452,28 +4458,29 @@ function dLoop(){
       }
     }
     else if(e.type==='golem'){
-      // Wind-up then platform-rush — only triggers when player is on the same level
+      // Telegraph (red glow) then a fast, committed lunge that slams the player off the platform on contact
       if(!e.windT)e.windT=0;if(!e.charging)e.charging=false;
       var _gdx=dp.x+9-(e.x+11);
       // Same-platform check: player feet and golem feet at roughly the same Y
-      var _gSameLvl=Math.abs((dp.y+dp.h)-(e.y+30))<30;
+      var _gSameLvl=Math.abs((dp.y+dp.h)-(e.y+30))<34;
       if(e.charging){
-        e.x+=e.chgDir*spd*3.2*_dt;
-        e.windT=Math.max(0,e.windT-_dt);
-        if(e.windT<=0)e.charging=false;
-        // Ram check: if golem reaches player on the same platform, shove them off
-        if(_gSameLvl&&Math.abs(dp.x+9-(e.x+11))<24&&dp.inv===0){
-          dp.vx=e.chgDir*16;dp.vy=-9;dp.gnd=false;  // strong horizontal + upward launch
-          var _pdmg=22;dp.hp-=_pdmg;dDamageTaken+=_pdmg;dp.inv=45;
-          dShake=14;sndDamage();
-          dtoasts.push({x:dp.x,y:dp.y-18,t:'SHOVED! -'+_pdmg,c:'#ff6040',life:65});
-          dUpdHUD();e.charging=false;e.windT=0;
+        e.x+=e.chgDir*GOLEM_CHARGE_SPD*_dt;                         // fast forward lunge
+        e.chgT-=_dt;
+        if(e.chgT<=0)e.charging=false;
+        // Slam: launch the player hard off the ledge, once per charge
+        if(!e.didHit&&_gSameLvl&&Math.abs(dp.x+9-(e.x+11))<26&&dp.inv===0){
+          dp.vx=e.chgDir*20;dp.vy=-11;dp.gnd=false;                 // big horizontal shove + pop to fling them off
+          dp.hp-=GOLEM_CHARGE_DMG;dDamageTaken+=GOLEM_CHARGE_DMG;dp.inv=45;
+          dShake=16;sndDamage();
+          dtoasts.push({x:dp.x,y:dp.y-18,t:'SLAMMED! -'+GOLEM_CHARGE_DMG,c:'#ff6040',life:65});
+          dUpdHUD();e.didHit=true;
           if(dp.hp<=0){dEndGame(true);return;}
         }
       }
-      else if(_gSameLvl&&Math.abs(_gdx)<200&&e.windT===0){
-        // Only wind up when on same platform level
-        e.windT+=_dt;if(e.windT>=45){e.charging=true;e.chgDir=_gdx>0?1:-1;e.windT=28;e.dir=e.chgDir;}
+      else if(_gSameLvl&&Math.abs(_gdx)<GOLEM_CHARGE_RANGE){
+        // Wind up only when the player is on the same level and in range
+        e.windT+=_dt;
+        if(e.windT>=GOLEM_WINDUP){e.charging=true;e.chgDir=_gdx>0?1:-1;e.dir=e.chgDir;e.chgT=GOLEM_CHARGE_TIME;e.didHit=false;e.windT=0;}
       }
       else{if(e.windT>0)e.windT=Math.max(0,e.windT-_dt*0.5);e.x+=spd*e.dir*_dt;}
     }
@@ -4500,7 +4507,12 @@ function dLoop(){
     // Knockback — applied after type-specific movement, decays quickly
     if(e.kbVX){e.x+=e.kbVX*_dt;e.kbVX*=Math.pow(0.68,_dt);if(Math.abs(e.kbVX)<0.2)e.kbVX=0;}
     if(e.kbVY){e.y+=e.kbVY*_dt;e.kbVY*=Math.pow(0.74,_dt);if(Math.abs(e.kbVY)<0.2)e.kbVY=0;}
-    if(e.type!=='boss'&&e.type!=='bat'){if(e.x>e.ex){e.x=e.ex;e.dir=-1;}else if(e.x<e.sx){e.x=e.sx;e.dir=1;}}
+    if(e.type==='golem'){
+      // A charging golem may overshoot its patrol zone (clamp only to the map); afterwards it just turns and walks back — no teleport snap
+      if(!e.charging){if(e.x>e.ex)e.dir=-1;else if(e.x<e.sx)e.dir=1;}
+      e.x=Math.max(8,Math.min(f.w-30,e.x));
+    }
+    else if(e.type!=='boss'&&e.type!=='bat'){if(e.x>e.ex){e.x=e.ex;e.dir=-1;}else if(e.x<e.sx){e.x=e.sx;e.dir=1;}}
     if(e.type==='archer'&&e.atkTimer===0){var adx=dp.x-e.x;if(Math.abs(adx)<350){var adir=adx>0?1:-1;dProjectiles.push({x:e.x,y:e.y+8,vx:3.5*adir,vy:-0.5,life:90,dmg:12,c:'#e84b4b',r:4});e.atkTimer=120;_snd({f:600,sweep:400,wave:'square',vol:0.06,dur:0.07});}}
     if(e.type==='crusher'&&Math.abs(dp.x-e.x)<200&&dtk%30===0)e.dir=dp.x>e.x?1:-1;
     if(e.type==='boss'&&e.atkTimer===0&&Math.abs(dp.x-e.x)<820){
@@ -5091,8 +5103,8 @@ function dDraw(){
       DC.fillStyle=w?'#fff':'#3a2818';DC.fillRect(ex-12,e.y+2+leg,4,2);DC.fillRect(ex+10,e.y+2-leg,4,2);DC.fillRect(ex-10,e.y+8-leg,4,2);DC.fillRect(ex+8,e.y+8+leg,4,2);DC.fillStyle=w?'#fff':'#5a3828';DC.fillRect(ex-7,e.y,14,10);DC.fillStyle='#e84b4b';DC.fillRect(ex-3,e.y+3,2,2);DC.fillRect(ex+2,e.y+3,2,2);}
     else if(e.type==='wraith'){DC.globalAlpha=w?1:.45+Math.sin(dtk*.06)*.2;DC.fillStyle=w?'#fff':'#4a4870';DC.fillRect(ex-9,e.y,18,22);DC.fillStyle='#b0b0ff';DC.fillRect(ex-4,e.y+4,3,3);DC.fillRect(ex+2,e.y+4,3,3);DC.globalAlpha=1;}
     else if(e.type==='golem'){
-      if(e.windT>0&&!e.charging){var _gwp=Math.min(1,e.windT/45);DC.globalAlpha=(_gwp*0.5+Math.sin(dtk*0.35)*0.12);DC.fillStyle='#ff2020';DC.beginPath();DC.arc(ex+11,e.y+15,18+_gwp*10,0,6.28);DC.fill();DC.globalAlpha=1;}
-      if(e.charging){DC.globalAlpha=0.22;DC.fillStyle='#8a6040';DC.fillRect(ex-11-(e.dir||1)*14,e.y+2,22,24);DC.globalAlpha=1;}
+      if(e.windT>0&&!e.charging){var _gwp=Math.min(1,e.windT/GOLEM_WINDUP);DC.globalAlpha=(_gwp*0.5+Math.sin(dtk*0.35)*0.12);DC.fillStyle='#ff2020';DC.beginPath();DC.arc(ex+11,e.y+15,18+_gwp*10,0,6.28);DC.fill();DC.globalAlpha=1;}
+      if(e.charging){var _cd=e.chgDir||e.dir||1;DC.globalAlpha=0.30;DC.fillStyle='#c08050';for(var _gt=1;_gt<=3;_gt++){DC.fillRect(ex-11-_cd*(_gt*9),e.y+4,20,22);DC.globalAlpha*=0.55;}DC.globalAlpha=1;}
       DC.fillStyle=w?'#fff':'#8a6040';DC.fillRect(ex-11,e.y+2,22,24);DC.fillStyle='#e84b4b';DC.fillRect(ex-5,e.y+9,4,4);DC.fillRect(ex+3,e.y+9,4,4);DC.fillStyle='#5a3818';DC.fillRect(ex-15,e.y+10,5,14);DC.fillRect(ex+12,e.y+10,5,14);DC.fillStyle='#4a2818';DC.fillRect(ex-9,e.y+26,8,6);DC.fillRect(ex+3,e.y+26,8,6);}
     else if(e.type==='archer'){DC.fillStyle=w?'#fff':'#c06028';DC.fillRect(ex-7,e.y,14,20);DC.fillStyle='#e08040';DC.fillRect(ex-4,e.y+3,3,3);DC.fillRect(ex+2,e.y+3,3,3);DC.fillStyle='#c06028';var bowDir=e.dir>0?1:-1;DC.fillRect(ex+8*bowDir,e.y-4,2,16);DC.strokeStyle=w?'#fff':'#a04018';DC.lineWidth=1;DC.beginPath();DC.moveTo(ex+8*bowDir,e.y-4);DC.lineTo(ex+8*bowDir,e.y+12);DC.stroke();}
     else if(e.type==='crusher'){DC.fillStyle=w?'#fff':'#6040a0';DC.fillRect(ex-14,e.y,28,30);DC.fillStyle='#8060c0';DC.fillRect(ex-10,e.y+4,8,8);DC.fillRect(ex+2,e.y+4,8,8);DC.fillStyle='#4a2880';DC.fillRect(ex-18,e.y+8,6,18);DC.fillRect(ex+12,e.y+8,6,18);DC.fillStyle='#302060';DC.fillRect(ex-11,e.y+28,9,8);DC.fillRect(ex+2,e.y+28,9,8);}
