@@ -2860,7 +2860,7 @@ var ORE_DEATH_PENALTY=0.30;           // fraction of THIS RUN's ore lost on a pe
 function rollOre(){return ORE_ROLL_MIN+Math.floor(Math.random()*(ORE_ROLL_MAX-ORE_ROLL_MIN+1));}
 // ===== TUNABLE: ore -> $EXT refinery (run-summary) =====
 var REFINE_EDGE=0.9;      // house edge: average haul pays this fraction of entry fee
-var REFINE_AVG_HAUL=150;  // rarity-weighted ore value of a typical paid run → common-ore runs lose slowly; Gold/Mystrile spike toward the cap. Tune to your avg.
+var REFINE_AVG_HAUL=50;   // rarity-weighted ore value of a typical paid run (calibrated to real ~40-50 hauls). Common runs ~0.8x; rare ore spikes toward cap.
 var REFINE_CAP=1.5;       // max payout as multiple of entry fee
 var REFINE_FLOOR=0.2;     // min payout as multiple of entry fee (only reachable after mining ≥1 rock)
 var _runRefined=false;    // guard: one refine per summary
