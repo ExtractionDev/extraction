@@ -2117,7 +2117,7 @@ async function _fetchBlockhash(){
 
 function _getATA(walletPk,mintPk){
   return solanaWeb3.PublicKey.findProgramAddressSync(
-    [walletPk.toBytes(),new solanaWeb3.PublicKey(_TOKEN_PROG).toBytes(),mintPk.toBytes()],
+    [walletPk.toBuffer(),new solanaWeb3.PublicKey(_TOKEN_PROG).toBuffer(),mintPk.toBuffer()],
     new solanaWeb3.PublicKey(_ASSOC_PROG)
   )[0];
 }
@@ -2182,6 +2182,8 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
     var bh={blockhash:_bhResult.blockhash};
     var buyerPk=new solanaWeb3.PublicKey(walletAddress);
     var sellerPk=new solanaWeb3.PublicKey(sellerWallet);
+    console.log('SELLER WALLET from listing:',sellerWallet);
+    console.log('SELLER WALLET should be: Esgg315FKDkcNjja79HoaAtBHDNG5ygJvbEMExRSS8M8');
     var feePk=new solanaWeb3.PublicKey(_FEE_WALLET);
     var mintPk=new solanaWeb3.PublicKey(_USDC_MINT);
     var totalUnits=Math.round(priceUsdc*1e6);
