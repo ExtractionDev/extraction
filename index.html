@@ -3172,7 +3172,7 @@ function dMine(){
     var _dgcB=1+(getItemBonus('dungeonGC')/100);
     nodeVal=Math.round(nodeVal*solM*_dgcB);
     if(dfl>=5)nodeVal*=2;
-    var _oreQty=rollOre();
+    var _oreQty=(mode==='free')?1:rollOre();
     dbag[ore.n]=(dbag[ore.n]||0)+_oreQty;dcoins+=nodeVal;sndCoin();dRunRocksMined++;
     var dispVal='+'+_oreQty+' '+ore.n+' '+nodeVal+'GC';
     if(r.nodeMulti>1)dispVal+=' (x'+r.nodeMulti+' bonus)';
