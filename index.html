@@ -940,16 +940,27 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 <!-- DEPOSIT MODAL -->
 <div class="settings-modal" id="depositModal" onclick="if(event.target===this)closeDeposit()">
   <div class="settings-box" style="width:340px">
-    <div class="settings-title"><i class="ti ti-download" style="color:#90c848"></i> Deposit <span id="depTokSym">USDC</span> <i class="ti ti-x" style="cursor:pointer;font-size:14px;color:var(--text3);float:right" onclick="closeDeposit()"></i></div>
-    <div style="font-size:11px;color:var(--text2);margin:10px 0">Deposit <span id="depTokSym2">USDC</span> straight from your Phantom wallet to top up your in-game <b style="color:var(--purple)">$EXT</b>. One click — your wallet signs the transfer.</div>
-    <div style="margin-bottom:6px">
-      <div style="font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Amount (<span id="depTokSym3">USDC</span>)</div>
-      <input id="depTokAmt" type="number" min="0" step="0.01" placeholder="0.00" oninput="_depTokPreview()" style="width:100%;box-sizing:border-box;background:var(--bg4);border:1px solid var(--border3);border-radius:8px;color:var(--text);padding:8px 10px;font-family:'Space Mono',monospace;font-size:11px">
-      <div id="depTokGet" style="font-size:10px;color:var(--text3);margin-top:5px">You'll receive: — $EXT</div>
+    <div class="settings-title"><i class="ti ti-download" style="color:#90c848"></i> Deposit $EXT <i class="ti ti-x" style="cursor:pointer;font-size:14px;color:var(--text3);float:right" onclick="closeDeposit()"></i></div>
+    <!-- STEP 1: amount -->
+    <div id="depStep1">
+      <div style="font-size:11px;color:var(--text2);margin:10px 0">Type how many <b style="color:var(--purple)">$EXT</b> you want to send. They'll land in your account.</div>
+      <div style="font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Amount ($EXT)</div>
+      <input id="depTokAmt" type="number" min="0" step="1" placeholder="0" style="width:100%;box-sizing:border-box;background:var(--bg4);border:1px solid var(--border3);border-radius:8px;color:var(--text);padding:10px 12px;font-family:'Space Mono',monospace;font-size:14px">
+      <div id="depTokMsg" style="font-size:11px;min-height:16px;margin:8px 0;color:var(--red)"></div>
+      <button onclick="_depReview()" style="width:100%;padding:12px;border-radius:8px;border:1.5px solid #90c848;background:#051a0a;color:#90c848;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.1em;cursor:pointer;text-transform:uppercase">Review</button>
     </div>
-    <div id="depTokMsg" style="font-size:11px;min-height:16px;margin:8px 0 10px;color:var(--red)"></div>
-    <button id="depTokBtn" onclick="depositTokens()" style="width:100%;padding:12px;border-radius:8px;border:1.5px solid #90c848;background:#051a0a;color:#90c848;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.1em;cursor:pointer;text-transform:uppercase">Deposit</button>
-    <div style="font-size:9px;color:var(--text4);margin-top:8px;text-align:center">Sent to <span id="depTokDest" style="font-family:'Space Mono',monospace">—</span></div>
+    <!-- STEP 2: confirm -->
+    <div id="depStep2" style="display:none">
+      <div style="background:var(--bg4);border:1px solid var(--border3);border-radius:10px;padding:14px;margin:12px 0;text-align:center">
+        <div style="font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">You are sending</div>
+        <div style="font-size:26px;font-weight:800;color:#90c848;font-family:'Space Mono',monospace;margin:4px 0"><span id="depConfAmt">0</span> $EXT</div>
+        <div style="font-size:10px;color:var(--text3)">to <span id="depTokDest" style="font-family:'Space Mono',monospace;color:var(--text2)">—</span></div>
+        <div style="font-size:11px;color:var(--text2);margin-top:8px">You'll receive <b style="color:var(--purple)"><span id="depConfGet">0</span> $EXT</b> in your account.</div>
+      </div>
+      <div id="depConfMsg" style="font-size:11px;min-height:16px;margin-bottom:8px;color:var(--red)"></div>
+      <button id="depTokBtn" onclick="depositTokens()" style="width:100%;padding:12px;border-radius:8px;border:1.5px solid #90c848;background:#0a2010;color:#a8e060;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.1em;cursor:pointer;text-transform:uppercase;font-weight:700">Confirm &amp; Send</button>
+      <button onclick="_depBack()" style="width:100%;margin-top:6px;padding:8px;border-radius:8px;border:1px solid var(--border3);background:transparent;color:var(--text3);font-family:'Space Mono',monospace;font-size:10px;cursor:pointer">Back</button>
+    </div>
   </div>
 </div>
 
@@ -1803,44 +1814,51 @@ function openWithdraw(){
 }
 function closeWithdraw(){document.getElementById('withdrawModal').classList.remove('open');}
 
-// Deposit address — the wallet that RECEIVES deposits (set this to the wallet you'll launch $EXT with)
+// Deposit address — the wallet that RECEIVES the deposited $EXT
 var DEPOSIT_ADDRESS='B8ubxUGnvhDTGGRkkN8DkyAfnoLEfnjTPdXfQn3TnVQa';
-// ════════════════════ DEPOSIT CONFIG ════════════════════
-//  NOW (pre-launch): players deposit USDC, profile credited 10,000 $EXT per $1  ($10 = 100k).
-//  AT $EXT LAUNCH: the deposit button already pulls from the player's connected Phantom wallet —
-//  just swap the 4 values below to your EXT token and players deposit EXT straight into their profile 1:1.
-//      _DEPOSIT_MINT   = '<your EXT token mint address>';
-//      _DEPOSIT_DECIMALS = <your EXT token decimals>;       // e.g. 9 or 6
-//      _DEPOSIT_SYMBOL = 'EXT';
-//      _DEPOSIT_RATE   = 1;                                 // 1 EXT deposited = 1 $EXT in profile
-//  Also set DEPOSIT_ADDRESS (above) to the wallet you launch EXT with.
-var _DEPOSIT_MINT='EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'; // USDC mint (placeholder)
-var _DEPOSIT_DECIMALS=6;             // USDC = 6 decimals
-var _DEPOSIT_SYMBOL='USDC';          // display label
-var _DEPOSIT_WALLET=DEPOSIT_ADDRESS; // receives the deposited tokens
-var _DEPOSIT_RATE=10000;             // $EXT credited per 1 token deposited (set to 1 once depositing EXT)
-// ═════════════════════════════════════════════════════════
-function _depTokPreview(){var v=parseFloat((document.getElementById('depTokAmt')||{}).value)||0;var g=document.getElementById('depTokGet');if(g)g.textContent='You\u2019ll receive: '+(v*_DEPOSIT_RATE).toLocaleString()+' $EXT';}
+// ════════════════════ DEPOSIT CONFIG — $EXT ════════════════════
+//  Players type how many $EXT to send → review → confirm → their wallet signs → credited 1:1.
+//  >>> SET THESE TWO TO YOUR $EXT TOKEN: <<<
+var _DEPOSIT_MINT='PASTE_YOUR_EXT_MINT_ADDRESS_HERE'; // ⇦ your $EXT token mint address
+var _DEPOSIT_DECIMALS=6;             // ⇦ your $EXT token decimals (usually 6, or 9 for default SPL)
+var _DEPOSIT_SYMBOL='EXT';
+var _DEPOSIT_WALLET=DEPOSIT_ADDRESS; // receives the deposited $EXT
+var _DEPOSIT_RATE=1;                 // 1 $EXT sent = 1 $EXT credited
+// ═══════════════════════════════════════════════════════════════
 function openDeposit(){
   closeSettings();
   var _xd=null;try{_xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');}catch(e){}
   if(!_xd||!_xd.username){alert('You must be signed in to deposit.');return;}
-  ['depTokSym','depTokSym2','depTokSym3'].forEach(function(id){var e=document.getElementById(id);if(e)e.textContent=_DEPOSIT_SYMBOL;});
-  var dst=document.getElementById('depTokDest');if(dst)dst.textContent=_DEPOSIT_WALLET.substr(0,4)+'...'+_DEPOSIT_WALLET.substr(-4);
   document.getElementById('depTokAmt').value='';
   document.getElementById('depTokMsg').textContent='';
-  _depTokPreview();
-  var b=document.getElementById('depTokBtn');if(b){b.disabled=false;b.textContent='Deposit';}
+  document.getElementById('depConfMsg').textContent='';
+  document.getElementById('depStep1').style.display='block';
+  document.getElementById('depStep2').style.display='none';
   document.getElementById('depositModal').classList.add('open');
 }
 function closeDeposit(){document.getElementById('depositModal').classList.remove('open');}
-// One-click deposit: player's Phantom wallet signs an SPL transfer to the deposit wallet, then we credit $EXT
+// Step 1 → 2: validate the amount, then show the confirm card
+function _depReview(){
+  var msg=document.getElementById('depTokMsg');msg.style.color='var(--red)';
+  var amt=parseFloat(document.getElementById('depTokAmt').value);
+  if(!amt||amt<=0){msg.textContent='Enter how many $EXT to send.';return;}
+  document.getElementById('depConfAmt').textContent=amt.toLocaleString();
+  document.getElementById('depConfGet').textContent=(amt*_DEPOSIT_RATE).toLocaleString();
+  document.getElementById('depTokDest').textContent=_DEPOSIT_WALLET.substr(0,4)+'...'+_DEPOSIT_WALLET.substr(-4);
+  document.getElementById('depConfMsg').textContent='';
+  var b=document.getElementById('depTokBtn');b.disabled=false;b.textContent='Confirm & Send';
+  document.getElementById('depStep1').style.display='none';
+  document.getElementById('depStep2').style.display='block';
+}
+function _depBack(){document.getElementById('depStep2').style.display='none';document.getElementById('depStep1').style.display='block';}
+// Confirm: wallet signs the $EXT transfer, then we credit it 1:1 after it actually lands
 async function depositTokens(){
-  var msg=document.getElementById('depTokMsg');
+  var msg=document.getElementById('depConfMsg');
   var _xd=null;try{_xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');}catch(e){}
   if(!_xd||!_xd.username){msg.style.color='var(--red)';msg.textContent='Sign in to deposit.';return;}
   if(!walletConnected||!walletAddress){msg.style.color='var(--red)';msg.textContent='Connect your Phantom wallet first.';return;}
   if(!window.solanaWeb3){msg.style.color='var(--red)';msg.textContent='Web3 not loaded — refresh and retry.';return;}
+  if(_DEPOSIT_MINT.indexOf('PASTE_')===0){msg.style.color='var(--red)';msg.textContent='Set your $EXT mint address in the code first.';return;}
   var amt=parseFloat(document.getElementById('depTokAmt').value);
   if(!amt||amt<=0){msg.style.color='var(--red)';msg.textContent='Enter a valid amount.';return;}
   var btn=document.getElementById('depTokBtn');
@@ -1854,23 +1872,23 @@ async function depositTokens(){
     var destATA=_getATA(destPk,mintPk);
     var _bh=await _fetchBlockhash();
     var tx=new solanaWeb3.Transaction();
-    tx.add(_createATAIx(fromPk,destPk,mintPk));    // idempotent: makes sure the deposit wallet's token account exists
-    tx.add(_usdcIx(fromATA,destATA,fromPk,units)); // SPL transfer (works for USDC now and $EXT later)
+    tx.add(_createATAIx(fromPk,destPk,mintPk));    // creates the deposit wallet's token account if missing
+    tx.add(_usdcIx(fromATA,destATA,fromPk,units)); // SPL transfer of $EXT
     tx.feePayer=fromPk;tx.recentBlockhash=_bh.blockhash;
     btn.textContent='Approve in wallet...';
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
     var signed=await provider.signAndSendTransaction(tx);
     btn.textContent='Confirming...';
-    await _pollConfirm(signed.signature);
+    await _pollConfirm(signed.signature);   // throws if the transfer failed — no credit on failure
     var credited=amt*_DEPOSIT_RATE;
     tokens=(tokens||0)+credited;saveGame();uiAll();
-    msg.style.color='var(--green)';msg.textContent='\u2713 Deposited '+amt+' '+_DEPOSIT_SYMBOL+' \u2014 +'+credited.toLocaleString()+' $EXT credited!';
-    setTimeout(closeDeposit,2600);
+    msg.style.color='var(--green)';msg.textContent='\u2713 '+credited.toLocaleString()+' $EXT arrived in your account!';
+    setTimeout(closeDeposit,2400);
   }catch(e){
     console.error('Deposit error:',e);
     msg.style.color='var(--red)';
-    msg.textContent=(e&&e.message)?e.message.substr(0,120):'Deposit failed.';
-    btn.disabled=false;btn.textContent='Deposit';
+    msg.textContent=(e&&e.message)?e.message.substr(0,120):'Deposit failed — nothing was sent.';
+    btn.disabled=false;btn.textContent='Confirm & Send';
   }
 }
 function submitWithdraw(){
