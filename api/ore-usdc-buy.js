@@ -24,7 +24,6 @@ function getATA(walletAddress, mintAddress) {
   return ata.toBase58();
 }
 
-// Fetch a parsed transaction via raw RPC with fallback across endpoints
 async function getParsedTx(signature) {
   const rpcs = [
     'https://api.mainnet-beta.solana.com',
@@ -67,31 +66,21 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing fields' });
     }
 
-    // Verify session
     const { data: player, error: playerErr } = await supabase
-      .from('players')
-      .select('session_token')
-      .eq('username', username)
-      .single();
+      .from('players').select('session_token').eq('username', username).single();
     if (playerErr || !player) return res.status(403).json({ error: 'Player not found' });
     if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session' });
 
-    // Fetch ore listing
     const { data: listing, error: listErr } = await supabase
-      .from('ore_listings')
-      .select('*')
-      .eq('id', lid)
-      .single();
+      .from('ore_listings').select('*').eq('id', lid).single();
     if (listErr || !listing) return res.status(404).json({ error: 'Listing not found' });
     if (listing.seller === username) return res.status(400).json({ error: 'Cannot buy your own listing' });
     if (!listing.seller_wallet) return res.status(400).json({ error: 'Listing has no seller wallet' });
 
-    // Verify Solana transaction (multi-RPC fallback)
     const tx = await getParsedTx(signature);
-    if (!tx)          return res.status(400).json({ error: 'Transaction not found on chain yet. If USDC was deducted, contact support with your TX signature.' });
-    if (tx.meta?.err) return res.status(400).json({ error: 'Transaction failed on chain' });
+    if (!tx) return res.status(400).json({ error: 'Transaction not found on chain yet. If USDC was deducted, contact support with your TX signature.' });
+    if (tx.meta && tx.meta.err) return res.status(400).json({ error: 'Transaction failed on chain' });
 
-    // Expected USDC amounts
     const totalUsdc   = parseFloat(listing.price) * listing.qty;
     const totalUnits  = Math.round(totalUsdc * 1e6);
     const sellerUnits = Math.round(totalUnits * 0.95);
@@ -100,17 +89,19 @@ export default async function handler(req, res) {
     const sellerATA = getATA(listing.seller_wallet, USDC_MINT);
     const devATA    = getATA(DEV_WALLET, USDC_MINT);
 
-    // Parse SPL token transfers
+    const innerIx = (tx.meta && tx.meta.innerInstructions) ? tx.meta.innerInstructions : [];
     const allIx = [
-      ...(tx.transaction.message.instructions || []),
-      ...((tx.meta?.innerInstructions || []).flatMap(ii => ii.instructions) || [])
+      ...((tx.transaction.message.instructions) || []),
+      ...(innerIx.flatMap(ii => ii.instructions) || [])
     ];
     const transfers = allIx
-      .filter(ix => ix.program === 'spl-token' && (ix.parsed?.type === 'transfer' || ix.parsed?.type === 'transferChecked'))
-      .map(ix => ({
-        to:     ix.parsed.info.destination,
-        amount: parseInt(ix.parsed.info.amount ?? ix.parsed.info.tokenAmount?.amount ?? '0')
-      }));
+      .filter(ix => ix.program === 'spl-token' && ix.parsed && (ix.parsed.type === 'transfer' || ix.parsed.type === 'transferChecked'))
+      .map(ix => {
+        const info = ix.parsed.info;
+        let amt = info.amount;
+        if (amt == null && info.tokenAmount) amt = info.tokenAmount.amount;
+        return { to: info.destination, amount: parseInt(amt || '0') };
+      });
 
     const sellerTransfer = transfers.find(t => t.to === sellerATA);
     if (!sellerTransfer) return res.status(400).json({ error: 'No transfer to seller found' });
@@ -124,28 +115,20 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Marketplace fee incorrect' });
     }
 
-    // Delete listing
-    const { error: deleteErr } = await supabase
-      .from('ore_listings')
-      .delete()
-      .eq('id', lid);
+    const { error: deleteErr } = await supabase.from('ore_listings').delete().eq('id', lid);
     if (deleteErr) {
       console.error('Delete ore listing error:', deleteErr);
       return res.status(500).json({ error: 'Failed to claim ore. Contact support with TX: ' + signature });
     }
 
-    // Log the sale (non-fatal)
     try {
       await supabase.from('sales').insert({
-        listing_id: lid,
-        seller:     listing.seller,
-        buyer:      username,
-        price_usdc: parseFloat(listing.price) * listing.qty,
-        signature,
-        item_data:  { ore_name: listing.ore_name, qty: listing.qty },
-        sold_at:    new Date().toISOString()
+        listing_id: lid, seller: listing.seller, buyer: username,
+        price_usdc: parseFloat(listing.price) * listing.qty, signature,
+        item_data: { ore_name: listing.ore_name, qty: listing.qty },
+        sold_at: new Date().toISOString()
       });
-    } catch (e) { /* ignore logging errors */ }
+    } catch (e) { /* ignore */ }
 
     return res.status(200).json({ ok: true, ore_name: listing.ore_name, qty: listing.qty });
 
