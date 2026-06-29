@@ -3270,7 +3270,11 @@ function dBuildFloors(){
   for(var fi=0;fi<numFloors;fi++){
     var c=cfgs[fi],W=c.w,plats=[];
     plats.push({x:0,y:DGY,w:130,h:36,sol:true,safe:true});var cx=130;
-    while(cx<W-160){var gap=40+Math.random()*40,pw=60+Math.random()*80;cx+=gap;if(cx+pw>W-160)break;plats.push({x:cx,y:DGY,w:pw,h:36,sol:true});cx+=pw;}
+    // Scaling difficulty: floors 1-3 get fewer fall-through holes so new players aren't killed instantly; floor 4+ = full density
+    var maxHoles=fi>=3?999:(2+Math.floor(Math.random()*2))*(fi===0?1:fi===1?2:4); // fi0:2-3 · fi1:4-6 · fi2:8-12
+    var _holes=0,_capped=false;
+    while(cx<W-160){if(_holes>=maxHoles){_capped=true;break;}var gap=40+Math.random()*40,pw=60+Math.random()*80;cx+=gap;if(cx+pw>W-160)break;plats.push({x:cx,y:DGY,w:pw,h:36,sol:true});cx+=pw;_holes++;}
+    if(_capped&&cx<W-120){plats.push({x:cx,y:DGY,w:(W-120)-cx,h:36,sol:true});} // fill rest solid so a cap never leaves one giant gap
     plats.push({x:W-120,y:DGY,w:120,h:36,sol:true,safe:true});
     var ladX=W-65,placed=[];
     for(var i=0;i<c.nP;i++){for(var at=0;at<60;at++){
