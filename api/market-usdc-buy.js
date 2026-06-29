@@ -107,7 +107,7 @@ export default async function handler(req, res) {
     const sellerReceived = transfers.filter(t => t.to === sellerATA).reduce((s, t) => s + t.amount, 0);
     const feeReceived    = transfers.filter(t => t.to === feeATA).reduce((s, t) => s + t.amount, 0);
 
-    // Seller + fee together must cover the full price (within slippage)
+    // Seller + fee together must cover the full price (fee is optional / may be 0)
     if ((sellerReceived + feeReceived) < totalUnits * (1 - SLIPPAGE)) {
       return res.status(400).json({ error: 'Payment incorrect. Seller got ' + sellerReceived + ', fee got ' + feeReceived + ', needed ' + totalUnits });
     }
