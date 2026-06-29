@@ -2982,6 +2982,13 @@ function _spawnFallSpikes(){
   dFallSpikes.push({x:wx,y:-40}); // start above the screen
 }
 var dPickHeadWorld=null; // {x,y} world-coords of pickaxe head tip — updated every draw frame
+// ── Spider tunables ──
+var SPIDER_PATROL_SPD=1.3;      // horizontal walk speed (was 4.5 — much slower now)
+var SPIDER_DROP_SPD=1.1;        // web descent speed px/frame (slow + noticeable)
+var SPIDER_CLIMB_SPD=0.9;       // web climb-back speed px/frame
+var SPIDER_HANG_TIME=130;       // frames the spider dangles at the bottom before climbing (~2.2s)
+var SPIDER_DROP_DEPTH=130;      // how far down the web it lowers
+var SPIDER_DROP_GAP_MIN=180,SPIDER_DROP_GAP_MAX=540; // random gap between ambient drops (3-9s) — happens on its own, no player trigger
 var dDeathParts=[];   // enemy death particles {x,y,vx,vy,life,maxLife,c,r}
 var dChips=[];        // rock chip particles {x,y,vx,vy,life,maxLife,c}
 var dAmbientParts=[]; // ambient dust/ember motes {x,y,vx,vy,life,maxLife,r,c}
@@ -4375,7 +4382,7 @@ function dLoop(){
   if(dp.spkCd===0){for(var i=0;i<f.spikes.length;i++){var s=f.spikes[i];var _sh=s.small?8:15;var _sw=s.small?12:21;var _syo=s.y>=DGY?_terrBump(s.x):0;if(dp.x+dp.w>s.x-_sw&&dp.x<s.x+_sw&&dp.y+dp.h>s.y+_syo-_sh&&dp.y+dp.h<=s.y+_syo+2){dp.hp-=10;dDamageTaken+=10;dp.spkCd=25;dp.vy=-7;dShake=7;sndDamage();dtoasts.push({x:s.x,y:s.y-30,t:'-10',c:'#e84b4b',life:45});dUpdHUD();if(dp.hp<=0){dEndGame(true);return;}break;}}}
   for(var i=0;i<f.enemies.length;i++){
     var e=f.enemies[i];e.ph+=.03*_dt;if(e.hit>0)e.hit--;if(e.atkTimer>0)e.atkTimer--;
-    var spd=e.type==='boss'?2.2:e.type==='bat'?3.2:e.type==='golem'?1.0:e.type==='spider'?4.5:e.type==='wraith'?1.8:e.type==='archer'?1.5:e.type==='crusher'?1.2:e.type==='phantom'?2.0:2.2;
+    var spd=e.type==='boss'?2.2:e.type==='bat'?3.2:e.type==='golem'?1.0:e.type==='spider'?SPIDER_PATROL_SPD:e.type==='wraith'?1.8:e.type==='archer'?1.5:e.type==='crusher'?1.2:e.type==='phantom'?2.0:2.2;
     if(e.type==='phantom'){var pdx=dp.x-e.x,pdy=dp.y-e.y,pm=Math.sqrt(pdx*pdx+pdy*pdy)||1;e.x+=spd*(pdx/pm)*_dt;e.y+=spd*(pdy/pm)*0.6*_dt;}
     else if(e.type==='wraith'){
       e.x+=spd*e.dir*_dt;
@@ -4471,20 +4478,22 @@ function dLoop(){
       else{if(e.windT>0)e.windT=Math.max(0,e.windT-_dt*0.5);e.x+=spd*e.dir*_dt;}
     }
     else if(e.type==='spider'){
-      // Web-drop: descend toward player when below, then climb back
+      // Web-drop: slowly lower toward the player, dangle for a couple seconds, then climb back to the platform top
       if(!e.webState)e.webState='patrol';
       if(e.webState==='patrol'){
         e.x+=spd*e.dir*_dt;
-        var _spdx=Math.abs(dp.x+9-e.x),_spdy=dp.y-(e.y+12);
-        if(_spdy>20&&_spdx<55&&Math.random()<0.0025*_dt){
-          e.webState='dropping';e.webAnchorX=e.x;e.webAnchorY=e.y;
-        }
+        if(e.dropCd===undefined)e.dropCd=SPIDER_DROP_GAP_MIN+Math.random()*(SPIDER_DROP_GAP_MAX-SPIDER_DROP_GAP_MIN);
+        e.dropCd-=_dt;                                              // ambient timer — drops on its own, no player needed
+        if(e.dropCd<=0){e.webState='dropping';e.webAnchorX=e.x;e.webAnchorY=e.y;}
       }else if(e.webState==='dropping'){
-        e.y+=2.5*_dt;
-        if(e.y>=e.by+130||e.y>=dp.y-10){e.webState='climbing';}
+        e.y+=SPIDER_DROP_SPD*_dt;                                   // slow, visible descent down the thread
+        if(e.y>=e.by+SPIDER_DROP_DEPTH){e.webState='hanging';e.hangT=SPIDER_HANG_TIME;}
+      }else if(e.webState==='hanging'){
+        e.hangT-=_dt;                                               // dangle on the web for a couple seconds
+        if(e.hangT<=0)e.webState='climbing';
       }else if(e.webState==='climbing'){
-        e.y-=1.8*_dt;
-        if(e.y<=e.webAnchorY){e.y=e.webAnchorY;e.webState='patrol';}
+        e.y-=SPIDER_CLIMB_SPD*_dt;                                  // slow climb back up to the platform top
+        if(e.y<=e.webAnchorY){e.y=e.webAnchorY;e.webState='patrol';e.dropCd=SPIDER_DROP_GAP_MIN+Math.random()*(SPIDER_DROP_GAP_MAX-SPIDER_DROP_GAP_MIN);}
       }
     }
     else{e.x+=spd*e.dir*_dt;}
@@ -5074,7 +5083,7 @@ function dDraw(){
     if(e.type==='bat'){var wing=Math.sin(dtk*.15)*9;DC.fillStyle=w?'#fff':'#3a2868';DC.beginPath();DC.moveTo(ex-6,e.y+5);DC.lineTo(ex-12-wing,e.y);DC.lineTo(ex-8-wing,e.y+9);DC.fill();DC.beginPath();DC.moveTo(ex+6,e.y+5);DC.lineTo(ex+12+wing,e.y);DC.lineTo(ex+8+wing,e.y+9);DC.fill();DC.fillStyle=w?'#fff':'#6050a0';DC.fillRect(ex-6,e.y,12,12);DC.fillStyle='#e84b4b';DC.fillRect(ex-3,e.y+3,2,2);DC.fillRect(ex+2,e.y+3,2,2);}
     else if(e.type==='spider'){
       var leg=Math.sin(dtk*.12)*3;
-      if(e.webState==='dropping'||e.webState==='climbing'){
+      if(e.webState==='dropping'||e.webState==='climbing'||e.webState==='hanging'){
         DC.save();DC.strokeStyle='rgba(210,210,235,0.55)';DC.lineWidth=1;DC.setLineDash([2,3]);
         DC.beginPath();DC.moveTo(ex,(e.webAnchorY||e.by));DC.lineTo(ex,e.y+6);DC.stroke();
         DC.setLineDash([]);DC.restore();
