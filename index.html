@@ -2975,13 +2975,11 @@ var dProjectiles=[];  // {x,y,vx,vy,life,dmg,c}
 var dFallSpikes=[],dFallSpikeTmr=0;
 var FALLSPIKE_SPEED=1.6;        // fall speed ≈ 40% of the player's 4px/frame move speed
 var FALLSPIKE_DMG=15;           // damage on hit
-var FALLSPIKE_GAP_MIN=900,FALLSPIKE_GAP_MAX=1200; // wave interval in 60fps-frames (15-20s)
+var FALLSPIKE_GAP_MIN=60,FALLSPIKE_GAP_MAX=480; // gap between individual drops in 60fps-frames (1-8s, random each time)
 function _spawnFallSpikes(){
-  var n=1+Math.floor(Math.random()*3); // 1-3 per wave
-  for(var i=0;i<n;i++){
-    var wx=dcam+60+Math.random()*680; // somewhere across the visible 800px viewport
-    dFallSpikes.push({x:wx,y:-40}); // start above the screen
-  }
+  var fw=(dflData&&dflData[dfl])?dflData[dfl].w:800;
+  var wx=20+Math.random()*(fw-40); // one spike at a random x across the WHOLE floor, even off-screen
+  dFallSpikes.push({x:wx,y:-40}); // start above the screen
 }
 var dPickHeadWorld=null; // {x,y} world-coords of pickaxe head tip — updated every draw frame
 var dDeathParts=[];   // enemy death particles {x,y,vx,vy,life,maxLife,c,r}
@@ -4532,10 +4530,10 @@ function dLoop(){
     if(!_stomped&&dp.inv===0){var ex2=Math.abs(dp.x+dp.w/2-e.x),ey2=Math.abs(dp.y+dp.h/2-e.y-(e.type==='golem'||e.type==='crusher'?10:0));var hRng=e.type==='crusher'?22:18;if(ex2<hRng&&ey2<20){var dmg=e.type==='boss'?(12+Math.floor(Math.random()*9)):{golem:25,wraith:18,bat:15,spider:12,archer:8,crusher:30,phantom:20,slime:10}[e.type]||10;dp.hp-=dmg;dDamageTaken+=dmg;dp.inv=40;dp.vx=dp.x<e.x?-6:6;if(e.type!=='slime')dp.vy=-5;e.hit=10;dShake=10;sndDamage();dtoasts.push({x:dp.x,y:dp.y-10,t:'-'+dmg,c:'#e84b4b',life:45});dUpdHUD();if(dp.hp<=0){dEndGame(true);return;}}}
   }
   for(var i=dProjectiles.length-1;i>=0;i--){var pr=dProjectiles[i];pr.x+=pr.vx*_dt;pr.y+=pr.vy*_dt;if(!pr.fireball)pr.vy+=0.12*_dt;pr.life--;if(pr.life<=0){dProjectiles.splice(i,1);continue;}var hplt=false;for(var j=0;j<f.plats.length;j++){var pj=f.plats[j];if(pr.x>pj.x&&pr.x<pj.x+pj.w&&pr.y>pj.y&&pr.y<pj.y+pj.h){hplt=true;break;}}if(hplt){dProjectiles.splice(i,1);continue;}if(dp.inv===0&&pr.x>dp.x&&pr.x<dp.x+dp.w&&pr.y>dp.y&&pr.y<dp.y+dp.h){dp.hp-=pr.dmg;dDamageTaken+=pr.dmg;dp.inv=30;dShake=6;sndDamage();if(pr.burn){dp.burnTicks=5;dp.burnTimer=120;dtoasts.push({x:dp.x,y:dp.y-10,t:'-'+pr.dmg+' BURN!',c:'#ff6020',life:50});}else{dtoasts.push({x:dp.x,y:dp.y-10,t:'-'+pr.dmg,c:'#ff6060',life:45});}dUpdHUD();dProjectiles.splice(i,1);if(dp.hp<=0){dEndGame(true);return;}}}
-  // ── Falling stalactites: 1-3 per wave every 15-20s, drop from off-screen, shatter on terrain or the player ──
+  // ── Falling stalactites: one at a time, random 1-8s gap between drops, floor 4+ only, shatter on terrain or the player ──rrain or the player ──
   if(!dDescending){
     dFallSpikeTmr-=_dt;
-    if(dFallSpikeTmr<=0){_spawnFallSpikes();dFallSpikeTmr=FALLSPIKE_GAP_MIN+Math.random()*(FALLSPIKE_GAP_MAX-FALLSPIKE_GAP_MIN);}
+    if(dFallSpikeTmr<=0){if(dfl>=3)_spawnFallSpikes();dFallSpikeTmr=FALLSPIKE_GAP_MIN+Math.random()*(FALLSPIKE_GAP_MAX-FALLSPIKE_GAP_MIN);}
     for(var _fsi=dFallSpikes.length-1;_fsi>=0;_fsi--){var _fs=dFallSpikes[_fsi];
       _fs.y+=FALLSPIKE_SPEED*_dt;
       if(dp.inv===0&&Math.abs(_fs.x-(dp.x+dp.w/2))<13&&_fs.y<dp.y+dp.h&&_fs.y+34>dp.y){
