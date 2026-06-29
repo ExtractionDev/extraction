@@ -340,6 +340,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 .bp-slot .sl-name{font-size:13px;color:var(--gold);letter-spacing:.06em;text-transform:uppercase}
 .bp-slot .sl-mat{font-size:14px;font-weight:700;line-height:1.1;color:var(--gold)}
 .bp-slot .sl-hint{font-size:11px;color:var(--gold)}
+.bp-slot[title="Coming soon"] i{opacity:.5}
+.bp-slot[title="Coming soon"] .sl-name{opacity:1;color:var(--gold)}
 .bp-slot-sm{width:160px;height:160px}
 .bp-slot-pick{width:160px;height:160px}
 .bp-inv-grid{display:grid;grid-template-columns:repeat(4,155px);gap:10px;justify-content:start}
@@ -982,15 +984,15 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
         <canvas id="bpMannCv" width="760" height="680" style="position:absolute;top:0;left:0;pointer-events:none;image-rendering:pixelated;opacity:0.65;z-index:0"></canvas>
         <img id="bpHandPick" src="" draggable="false" title="Drag to position the pickaxe in his hands · double-click to reset" style="display:none;position:absolute;width:150px;height:150px;image-rendering:pixelated;z-index:3;cursor:grab;user-select:none;filter:drop-shadow(0 3px 6px rgba(0,0,0,.6))"/>
         <!-- Row 1: Amulet left of head, Head on character face (all positions ×2) -->
-        <div id="slotAmulet"  class="bp-slot bp-slot-sm"  style="position:absolute;left:196px;top:50px;opacity:.35;cursor:default"  title="Coming soon"><i class="ti ti-diamond"></i><span class="sl-name">Amulet</span></div>
-        <div id="slotHead"    class="bp-slot bp-slot-sm"  style="position:absolute;left:368px;top:50px;opacity:.35;cursor:default"  title="Coming soon"><i class="ti ti-hardhat"></i><span class="sl-name">Head</span></div>
+        <div id="slotAmulet"  class="bp-slot bp-slot-sm"  style="position:absolute;left:196px;top:50px;cursor:default"  title="Coming soon"><i class="ti ti-diamond"></i><span class="sl-name">Amulet</span></div>
+        <div id="slotHead"    class="bp-slot bp-slot-sm"  style="position:absolute;left:368px;top:50px;cursor:default"  title="Coming soon"><i class="ti ti-hardhat"></i><span class="sl-name">Head</span></div>
         <!-- Row 2: Ring + Body + Pickaxe -->
-        <div id="slotRing"    class="bp-slot bp-slot-sm"  style="position:absolute;left:196px;top:260px;opacity:.35;cursor:default"  title="Coming soon"><i class="ti ti-circle-filled"></i><span class="sl-name">Ring</span></div>
-        <div id="slotBody"    class="bp-slot bp-slot-sm"  style="position:absolute;left:368px;top:260px;opacity:.35;cursor:default"  title="Coming soon"><i class="ti ti-shirt"></i><span class="sl-name">Body</span></div>
+        <div id="slotRing"    class="bp-slot bp-slot-sm"  style="position:absolute;left:196px;top:260px;cursor:default"  title="Coming soon"><i class="ti ti-circle-filled"></i><span class="sl-name">Ring</span></div>
+        <div id="slotBody"    class="bp-slot bp-slot-sm"  style="position:absolute;left:368px;top:260px;cursor:default"  title="Coming soon"><i class="ti ti-shirt"></i><span class="sl-name">Body</span></div>
         <div id="slotPickaxe" class="bp-slot bp-slot-pick" style="position:absolute;left:540px;top:260px"                           onclick="unequipSlot('pickaxe')"><i class="ti ti-pickaxe"></i><span class="sl-name">Pickaxe</span></div>
         <!-- Row 3: Pet bottom-left, Boots on feet -->
-        <div id="slotPet"     class="bp-slot bp-slot-sm"  style="position:absolute;left:100px;top:470px;opacity:.35;cursor:default"  title="Coming soon"><i class="ti ti-paw"></i><span class="sl-name">Pet</span></div>
-        <div id="slotBoots"   class="bp-slot bp-slot-sm"  style="position:absolute;left:368px;top:470px;opacity:.35;cursor:default"  title="Coming soon"><i class="ti ti-shoe"></i><span class="sl-name">Boots</span></div>
+        <div id="slotPet"     class="bp-slot bp-slot-sm"  style="position:absolute;left:100px;top:470px;cursor:default"  title="Coming soon"><i class="ti ti-paw"></i><span class="sl-name">Pet</span></div>
+        <div id="slotBoots"   class="bp-slot bp-slot-sm"  style="position:absolute;left:368px;top:470px;cursor:default"  title="Coming soon"><i class="ti ti-shoe"></i><span class="sl-name">Boots</span></div>
       </div>
     </div>
 
