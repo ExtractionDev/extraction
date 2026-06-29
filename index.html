@@ -2086,6 +2086,7 @@ function buyListedItem(lid){
 // ── USDC Marketplace ────────────────────────────────────────────────────────
 var _USDC_MINT='EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 var _DEV_WALLET='B8ubxUGnvhDTGGRkkN8DkyAfnoLEfnjTPdXfQn3TnVQa';
+var _FEE_WALLET='8TJ2QxVzYR4USc9cbpnCaeXgtXjMwE9jaJpJgvMaxgMs';
 var _TOKEN_PROG='TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 var _ASSOC_PROG='ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe1bRS';
 
@@ -2176,22 +2177,19 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
     var bh={blockhash:_bhResult.blockhash};
     var buyerPk=new solanaWeb3.PublicKey(walletAddress);
     var sellerPk=new solanaWeb3.PublicKey(sellerWallet);
-    var devPk=new solanaWeb3.PublicKey(_DEV_WALLET);
+    var feePk=new solanaWeb3.PublicKey(_FEE_WALLET);
     var mintPk=new solanaWeb3.PublicKey(_USDC_MINT);
     var totalUnits=Math.round(priceUsdc*1e6);
     var sellerUnits=Math.round(totalUnits*0.95);
-    var devUnits=totalUnits-sellerUnits;
+    var feeUnits=totalUnits-sellerUnits;
     var buyerATA=_getATA(buyerPk,mintPk);
     var sellerATA=_getATA(sellerPk,mintPk);
-    var devATA=_getATA(devPk,mintPk);
+    var feeATA=_getATA(feePk,mintPk);
     var tx=new solanaWeb3.Transaction();
-    // Create seller/dev USDC accounts only if missing
-    var _needSeller=!(await _ataExists(sellerATA));
-    var _needDev=!(await _ataExists(devATA));
-    if(_needSeller)tx.add(_createATAIx(buyerPk,sellerPk,mintPk));
-    if(_needDev)tx.add(_createATAIx(buyerPk,devPk,mintPk));
+    if(!(await _ataExists(sellerATA)))tx.add(_createATAIx(buyerPk,sellerPk,mintPk));
+    if(!(await _ataExists(feeATA)))tx.add(_createATAIx(buyerPk,feePk,mintPk));
     tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
-    tx.add(_usdcIx(buyerATA,devATA,buyerPk,devUnits));
+    tx.add(_usdcIx(buyerATA,feeATA,buyerPk,feeUnits));
     tx.feePayer=buyerPk;
     tx.recentBlockhash=bh.blockhash;
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
@@ -2447,19 +2445,19 @@ async function buyOreWithUSDC(lid,sellerWallet,pricePerUnit,qty){
     var bh={blockhash:_bhResult.blockhash};
     var buyerPk=new solanaWeb3.PublicKey(walletAddress);
     var sellerPk=new solanaWeb3.PublicKey(sellerWallet);
-    var devPk=new solanaWeb3.PublicKey(_DEV_WALLET);
+    var feePk=new solanaWeb3.PublicKey(_FEE_WALLET);
     var mintPk=new solanaWeb3.PublicKey(_USDC_MINT);
     var totalUnits=Math.round(totalUsdc*1e6);
     var sellerUnits=Math.round(totalUnits*0.95);
-    var devUnits=totalUnits-sellerUnits;
+    var feeUnits=totalUnits-sellerUnits;
     var buyerATA=_getATA(buyerPk,mintPk);
     var sellerATA=_getATA(sellerPk,mintPk);
-    var devATA=_getATA(devPk,mintPk);
+    var feeATA=_getATA(feePk,mintPk);
     var tx=new solanaWeb3.Transaction();
     if(!(await _ataExists(sellerATA)))tx.add(_createATAIx(buyerPk,sellerPk,mintPk));
-    if(!(await _ataExists(devATA)))tx.add(_createATAIx(buyerPk,devPk,mintPk));
+    if(!(await _ataExists(feeATA)))tx.add(_createATAIx(buyerPk,feePk,mintPk));
     tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
-    tx.add(_usdcIx(buyerATA,devATA,buyerPk,devUnits));
+    tx.add(_usdcIx(buyerATA,feeATA,buyerPk,feeUnits));
     tx.feePayer=buyerPk;
     tx.recentBlockhash=bh.blockhash;
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
