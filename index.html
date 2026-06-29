@@ -2859,11 +2859,11 @@ var ORE_ROLL_MIN=1, ORE_ROLL_MAX=6;   // each regular rock drops this many of it
 var ORE_DEATH_PENALTY=0.30;           // fraction of THIS RUN's ore lost on a penalised death
 function rollOre(maxQ){var mx=maxQ||ORE_ROLL_MAX;return ORE_ROLL_MIN+Math.floor(Math.random()*(mx-ORE_ROLL_MIN+1));}
 // ===== TUNABLE: ore -> $EXT refinery (run-summary) =====
-var REFINE_RATE=2.0;      // EXT paid per point of ore value — direct "cash in your ore" (begins at 0). All ore worth 20% less than before. Tune in playtest.
-var REFINE_CAP=1.5;       // safety ceiling as a multiple of entry fee — only a big haul reaches it (no single rare ore caps it)
+var REFINE_DIVISOR=500;   // ore-value that refines for 1x your entry fee. Payout = entry × (value/500), capped. Lower = more generous. Calibrated so ~245 value = ~0.49x entry.
+var REFINE_CAP=1.5;       // safety ceiling as a multiple of entry fee — only a huge haul (~750 value) reaches it
 var _runRefined=false;    // guard: one refine per summary
 function oreHaulValue(bag){var v=0;for(var k in bag){for(var i=0;i<DORES.length;i++){if(DORES[i].n===k){v+=bag[k]*(DORES[i].rv||DORES[i].v);break;}}}return v;}
-function refinePayout(bag){var val=oreHaulValue(bag);var ext=Math.round(val*REFINE_RATE);if(extFee>0)ext=Math.min(ext,Math.round(REFINE_CAP*extFee));return{ext:ext,val:val,mult:(extFee>0?ext/extFee:0)};}
+function refinePayout(bag){var val=oreHaulValue(bag);var ratio=Math.min(REFINE_CAP,val/REFINE_DIVISOR);var ext=Math.round((extFee>0?extFee:0)*ratio);return{ext:ext,val:val,mult:ratio};}
 var dRockBreaks=[]; // active "crack in half" break animations
 function _rockSpriteKey(r){
   var m={Coal:'stone_1',Copper:'copper_node',Iron:'stone_2',Silver:'silver_node',Gold:'gold_node',Mystrile:'mystrile_node'};
