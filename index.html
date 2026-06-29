@@ -4200,18 +4200,19 @@ function drawMinerFrame(ctx,state,frame,dx,dy,dw,dh,flipX,glowColor,aimX,aimY){
       if(typeof MC!=='undefined'&&ctx===MC){
         _idlePickHead={x:_hcx,y:_hcy};
       }
-      // Rarity glow at head tip — bigger + brighter during a swing
+      // Rarity glow at head tip — colored by rarity, bigger + brighter during a swing
       if(equipped&&equipped.rar&&equipped.rar.c){
-        var _swinging=(typeof dMineAnim!=='undefined'&&dMineAnim>0);
-        var _glowR=_swinging?16:9;
-        var _tk3=(typeof dtk!=='undefined'?dtk:0);
-        var _glowA=(_swinging?0.42:0.20)+Math.sin(_tk3*0.18)*0.08;
+        var _swinging=(typeof dMineAnim!=='undefined'&&dMineAnim>0)||(typeof mSwAnim!=='undefined'&&mSwAnim>0);
+        var _glowR=_swinging?22:14;
+        var _tk3=(typeof dtk!=='undefined'?dtk:(typeof mTk!=='undefined'?mTk:0));
+        var _glowA=(_swinging?0.62:0.40)+Math.sin(_tk3*0.18)*0.10;
         ctx.save();
         ctx.globalCompositeOperation='lighter';
-        ctx.globalAlpha=_glowA;
+        ctx.globalAlpha=Math.max(0,_glowA);
         var _hgrd=ctx.createRadialGradient(_hcx,_hcy,0,_hcx,_hcy,_glowR);
-        _hgrd.addColorStop(0,equipped.rar.c);
-        _hgrd.addColorStop(0.5,equipped.rar.c);
+        _hgrd.addColorStop(0,'#ffffff');
+        _hgrd.addColorStop(0.35,equipped.rar.c);
+        _hgrd.addColorStop(0.65,equipped.rar.c);
         _hgrd.addColorStop(1,'rgba(0,0,0,0)');
         ctx.fillStyle=_hgrd;
         ctx.beginPath();ctx.arc(_hcx,_hcy,_glowR,0,6.28);ctx.fill();
