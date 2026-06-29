@@ -2859,11 +2859,12 @@ var ORE_ROLL_MIN=1, ORE_ROLL_MAX=6;   // each regular rock drops this many of it
 var ORE_DEATH_PENALTY=0.30;           // fraction of THIS RUN's ore lost on a penalised death
 function rollOre(maxQ){var mx=maxQ||ORE_ROLL_MAX;return ORE_ROLL_MIN+Math.floor(Math.random()*(mx-ORE_ROLL_MIN+1));}
 // ===== TUNABLE: ore -> $EXT refinery (run-summary) =====
-var REFINE_DIVISOR=500;   // ore-value that refines for 1x your entry fee. Payout = entry × (value/500), capped. Lower = more generous. Calibrated so ~245 value = ~0.49x entry.
-var REFINE_CAP=1.5;       // safety ceiling as a multiple of entry fee — only a huge haul (~750 value) reaches it
+var REFINE_DIVISOR=400;   // ore-value that refines for 1x your entry fee. Payout = entry × (value/400), clamped between floor and cap.
+var REFINE_CAP=1.5;       // ceiling as a multiple of entry fee — only a big haul (~600 value) reaches it
+var REFINE_FLOOR=0.2;     // minimum: any run with ≥1 mined rock refines for at least 20% of entry
 var _runRefined=false;    // guard: one refine per summary
 function oreHaulValue(bag){var v=0;for(var k in bag){for(var i=0;i<DORES.length;i++){if(DORES[i].n===k){v+=bag[k]*(DORES[i].rv||DORES[i].v);break;}}}return v;}
-function refinePayout(bag){var val=oreHaulValue(bag);var ratio=Math.min(REFINE_CAP,val/REFINE_DIVISOR);var ext=Math.round((extFee>0?extFee:0)*ratio);return{ext:ext,val:val,mult:ratio};}
+function refinePayout(bag){var val=oreHaulValue(bag);var ratio=Math.max(REFINE_FLOOR,Math.min(REFINE_CAP,val/REFINE_DIVISOR));var ext=Math.round((extFee>0?extFee:0)*ratio);return{ext:ext,val:val,mult:ratio};}
 var dRockBreaks=[]; // active "crack in half" break animations
 function _rockSpriteKey(r){
   var m={Coal:'stone_1',Copper:'copper_node',Iron:'stone_2',Silver:'silver_node',Gold:'gold_node',Mystrile:'mystrile_node'};
@@ -2970,6 +2971,18 @@ function closeChestLootModal(){
  // cached Ancient pickaxe image for Excalibur stone
 // New systems
 var dProjectiles=[];  // {x,y,vx,vy,life,dmg,c}
+// ── Falling stalactites: spikes that drop from off-screen above ──
+var dFallSpikes=[],dFallSpikeTmr=0;
+var FALLSPIKE_SPEED=1.6;        // fall speed ≈ 40% of the player's 4px/frame move speed
+var FALLSPIKE_DMG=15;           // damage on hit
+var FALLSPIKE_GAP_MIN=900,FALLSPIKE_GAP_MAX=1200; // wave interval in 60fps-frames (15-20s)
+function _spawnFallSpikes(){
+  var n=1+Math.floor(Math.random()*3); // 1-3 per wave
+  for(var i=0;i<n;i++){
+    var wx=dcam+60+Math.random()*680; // somewhere across the visible 800px viewport
+    dFallSpikes.push({x:wx,y:-40}); // start above the screen
+  }
+}
 var dPickHeadWorld=null; // {x,y} world-coords of pickaxe head tip — updated every draw frame
 var dDeathParts=[];   // enemy death particles {x,y,vx,vy,life,maxLife,c,r}
 var dChips=[];        // rock chip particles {x,y,vx,vy,life,maxLife,c}
@@ -3527,6 +3540,7 @@ function startDungeon(){
   dp={x:40,y:DGY-30,vx:0,vy:0,w:18,h:26,gnd:false,onThin:false,face:1,hp:100,inv:0,spkCd:0,dropT:0,pullSt:0,jumps:0,coyoteT:0,jumpCharge:0,chargedJump:false,burnTicks:0,burnTimer:0};
   dcam=0;dbag={};dcoins=0;dtoasts=[];dtk=0;dRunning=true;DK={l:0,r:0,jumpHeld:false};dRockBreaks=[];
   dProjectiles=[];dDeathParts=[];dChips=[];dAmbientParts=[];_excIceParts=[];_mythPickParts=[];dHitPause=0;dCombo=0;dComboTimer=0;dBestCombo=0;dRunKills=0;dRunRocksMined=0;dRunStartTime=Date.now();dDamageTaken=0;dFloorTransition=40;
+  dFallSpikes=[];dFallSpikeTmr=FALLSPIKE_GAP_MIN+Math.random()*(FALLSPIKE_GAP_MAX-FALLSPIKE_GAP_MIN);
   dDeathAnim=0;dDeathDone=false;dAnim={frame:0,timer:0,state:'idle'};
   // Init minimap
   if(!mmcv){mmcv=document.getElementById('mmcv');if(mmcv)MMC=mmcv.getContext('2d');}
@@ -4315,6 +4329,7 @@ function dLoop(){
     if(dDescendT>=70&&!dDescendDone){
       dDescendDone=true;
       dfl++;dp.x=40;dp.y=DGY-30;dp.vx=0;dp.vy=0;dp.dropT=0;dp.jumps=0;dp.coyoteT=0;dp.inv=120;
+      dFallSpikes=[];dFallSpikeTmr=FALLSPIKE_GAP_MIN+Math.random()*(FALLSPIKE_GAP_MAX-FALLSPIKE_GAP_MIN);
       dFloorTransition=30;sndFloorClear();playAmbient(dfl);_seedAmbient(dfl);dUpdHUD();
       if(dflData[dfl]&&dflData[dfl].vein){
         var _vb=document.getElementById('veinBanner');
@@ -4517,6 +4532,22 @@ function dLoop(){
     if(!_stomped&&dp.inv===0){var ex2=Math.abs(dp.x+dp.w/2-e.x),ey2=Math.abs(dp.y+dp.h/2-e.y-(e.type==='golem'||e.type==='crusher'?10:0));var hRng=e.type==='crusher'?22:18;if(ex2<hRng&&ey2<20){var dmg=e.type==='boss'?(12+Math.floor(Math.random()*9)):{golem:25,wraith:18,bat:15,spider:12,archer:8,crusher:30,phantom:20,slime:10}[e.type]||10;dp.hp-=dmg;dDamageTaken+=dmg;dp.inv=40;dp.vx=dp.x<e.x?-6:6;if(e.type!=='slime')dp.vy=-5;e.hit=10;dShake=10;sndDamage();dtoasts.push({x:dp.x,y:dp.y-10,t:'-'+dmg,c:'#e84b4b',life:45});dUpdHUD();if(dp.hp<=0){dEndGame(true);return;}}}
   }
   for(var i=dProjectiles.length-1;i>=0;i--){var pr=dProjectiles[i];pr.x+=pr.vx*_dt;pr.y+=pr.vy*_dt;if(!pr.fireball)pr.vy+=0.12*_dt;pr.life--;if(pr.life<=0){dProjectiles.splice(i,1);continue;}var hplt=false;for(var j=0;j<f.plats.length;j++){var pj=f.plats[j];if(pr.x>pj.x&&pr.x<pj.x+pj.w&&pr.y>pj.y&&pr.y<pj.y+pj.h){hplt=true;break;}}if(hplt){dProjectiles.splice(i,1);continue;}if(dp.inv===0&&pr.x>dp.x&&pr.x<dp.x+dp.w&&pr.y>dp.y&&pr.y<dp.y+dp.h){dp.hp-=pr.dmg;dDamageTaken+=pr.dmg;dp.inv=30;dShake=6;sndDamage();if(pr.burn){dp.burnTicks=5;dp.burnTimer=120;dtoasts.push({x:dp.x,y:dp.y-10,t:'-'+pr.dmg+' BURN!',c:'#ff6020',life:50});}else{dtoasts.push({x:dp.x,y:dp.y-10,t:'-'+pr.dmg,c:'#ff6060',life:45});}dUpdHUD();dProjectiles.splice(i,1);if(dp.hp<=0){dEndGame(true);return;}}}
+  // ── Falling stalactites: 1-3 per wave every 15-20s, drop from off-screen, shatter on terrain or the player ──
+  if(!dDescending){
+    dFallSpikeTmr-=_dt;
+    if(dFallSpikeTmr<=0){_spawnFallSpikes();dFallSpikeTmr=FALLSPIKE_GAP_MIN+Math.random()*(FALLSPIKE_GAP_MAX-FALLSPIKE_GAP_MIN);}
+    for(var _fsi=dFallSpikes.length-1;_fsi>=0;_fsi--){var _fs=dFallSpikes[_fsi];
+      _fs.y+=FALLSPIKE_SPEED*_dt;
+      if(dp.inv===0&&Math.abs(_fs.x-(dp.x+dp.w/2))<13&&_fs.y<dp.y+dp.h&&_fs.y+34>dp.y){
+        dp.hp-=FALLSPIKE_DMG;dDamageTaken+=FALLSPIKE_DMG;dp.inv=40;dp.vy=-4;dp.vx=dp.x<_fs.x?-5:5;dShake=8;sndDamage();
+        dtoasts.push({x:_fs.x,y:dp.y-12,t:'-'+FALLSPIKE_DMG,c:'#e84b4b',life:45});dUpdHUD();
+        dFallSpikes.splice(_fsi,1);if(dp.hp<=0){dEndGame(true);return;}continue;
+      }
+      var _tip=_fs.y+34,_hit=false;
+      for(var _pj=0;_pj<f.plats.length;_pj++){var _pp=f.plats[_pj];if(_fs.x>_pp.x&&_fs.x<_pp.x+_pp.w&&_tip>_pp.y&&_tip<_pp.y+_pp.h+6){_hit=true;break;}}
+      if(_hit||_fs.y>440){dShake=Math.max(dShake,3);dFallSpikes.splice(_fsi,1);}
+    }
+  }
   // Burn damage ticks (fireball afterburn: 5 ticks × 2s = 10s total, -2 each)
   if(dp.burnTicks>0){dp.burnTimer-=_dt;if(dp.burnTimer<=0){dp.hp-=2;dDamageTaken+=2;dp.burnTicks--;dp.burnTimer=120;dShake=3;dtoasts.push({x:dp.x,y:dp.y-14,t:'-2 burn',c:'#ff4800',life:40});dUpdHUD();if(dp.hp<=0){dEndGame(true);return;}}}
   if(dMineAnim>0)dMineAnim--;
@@ -4658,6 +4689,13 @@ function dDraw(){
       DC.strokeStyle='rgba(190,235,248,0.45)';DC.lineWidth=1;DC.beginPath();DC.moveTo(bx+_bw/2,_base-_sh);DC.lineTo(bx+0.6,_base-1);DC.stroke();
     }
   }
+  // ── Falling stalactites: 2x glassy teal spike pointing down (no crimson, no telegraph) ──
+  if(dFallSpikes){for(var _fsi=0;_fsi<dFallSpikes.length;_fsi++){var _fs=dFallSpikes[_fsi],_fsx=_fs.x-dcam;if(_fsx<-30||_fsx>W+30)continue;
+    var _ty=_fs.y,_fg=DC.createLinearGradient(0,_ty,0,_ty+34);
+    _fg.addColorStop(0,'rgba(31,134,168,0.55)');_fg.addColorStop(0.5,'rgba(45,150,180,0.72)');_fg.addColorStop(1,'rgba(150,220,240,0.94)');
+    DC.fillStyle=_fg;DC.beginPath();DC.moveTo(_fsx-5,_ty);DC.lineTo(_fsx+5,_ty);DC.lineTo(_fsx,_ty+34);DC.closePath();DC.fill();
+    DC.strokeStyle='rgba(195,238,250,0.5)';DC.lineWidth=1;DC.beginPath();DC.moveTo(_fsx-4.4,_ty+1);DC.lineTo(_fsx,_ty+34);DC.stroke();
+  }}
   // Torches — flickering flame + warm glow on platforms
   if(f.torches){for(var _toi=0;_toi<f.torches.length;_toi++){
     var _tc=f.torches[_toi],_tx=_tc.x-dcam;if(_tx<-40||_tx>W+40)continue;
