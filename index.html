@@ -2116,12 +2116,10 @@ async function _fetchBlockhash(){
 
 
 function _getATA(walletPk,mintPk){
-  var r=solanaWeb3.PublicKey.findProgramAddressSync(
+  return solanaWeb3.PublicKey.findProgramAddressSync(
     [walletPk.toBuffer(),new solanaWeb3.PublicKey(_TOKEN_PROG).toBuffer(),mintPk.toBuffer()],
     new solanaWeb3.PublicKey(_ASSOC_PROG)
   )[0];
-  console.log('_getATA('+walletPk.toBase58()+') TOKEN_PROG='+_TOKEN_PROG+' ASSOC='+_ASSOC_PROG+' => '+r.toBase58());
-  return r;
 }
 function _usdcIx(fromATA,toATA,ownerPk,amount){
   // plain Transfer (discriminator 3): data = [3, amount(8 LE)]
@@ -2183,11 +2181,6 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
     var _bhResult=await _fetchBlockhash();
     var bh={blockhash:_bhResult.blockhash};
     var buyerPk=new solanaWeb3.PublicKey(walletAddress);
-    var sellerPk=new solanaWeb3.PublicKey(sellerWallet);
-    console.log('SELLER WALLET from listing:',sellerWallet);
-    console.log('SELLER WALLET should be: Esgg315FKDkcNjja79HoaAtBHDNG5ygJvbEMExRSS8M8');
-    var feePk=new solanaWeb3.PublicKey(_FEE_WALLET);
-    var mintPk=new solanaWeb3.PublicKey(_USDC_MINT);
     var totalUnits=Math.round(priceUsdc*1e6);
     var sellerUnits=Math.round(totalUnits*0.95);
     var feeUnits=totalUnits-sellerUnits;
@@ -2199,7 +2192,6 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
       return;
     }
     var buyerATA=new solanaWeb3.PublicKey(_baD.account);
-    console.log('REAL buyerATA from chain:',_baD.account);
     // Fetch the REAL on-chain USDC account for the seller (derivation can mismatch non-standard accounts)
     var _saR=await fetch('/api/load?usdc_account='+encodeURIComponent(sellerWallet));
     var _saD=await _saR.json();
@@ -2209,11 +2201,20 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
       return;
     }
     var sellerATA=new solanaWeb3.PublicKey(_saD.account);
-    console.log('REAL sellerATA from chain:',_saD.account);
+    // Fee wallet — look up its real USDC account; skip fee gracefully if not set up
+    var feeATA=null;
+    try{
+      var _feR=await fetch('/api/load?usdc_account='+encodeURIComponent(_FEE_WALLET));
+      var _feD=await _feR.json();
+      if(_feD.exists&&_feD.account)feeATA=new solanaWeb3.PublicKey(_feD.account);
+    }catch(e){}
     var tx=new solanaWeb3.Transaction();
-    // Single transfer: full price to seller (fee disabled until fee wallet USDC account is set up)
-    tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,totalUnits));
-    console.log('BUY VERSION: DEPLOY-CHECK-v3-TOBUFFER');
+    if(feeATA){
+      tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
+      tx.add(_usdcIx(buyerATA,feeATA,buyerPk,feeUnits));
+    }else{
+      tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,totalUnits));
+    }
     tx.feePayer=buyerPk;
     tx.recentBlockhash=bh.blockhash;
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
@@ -2230,8 +2231,7 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
       if(activeTab===3)renderMarket(mkFilter);
       showAchieve('🛒','Purchase Complete!','Got '+d.item.mat+' '+d.item.type+' for $'+priceUsdc.toFixed(2)+' USDC!');
     }else{
-      console.error('Buy failed:',d.error,d.logs||'');
-      alert((d.error||'Item transfer failed.')+'\n\nLOGS: '+(d.logs||'none')+'\n\nTX: '+signed.signature);
+      alert((d.error||'Item transfer failed.')+'\nTX: '+signed.signature+'\nContact support if USDC was deducted.');
     }
   }catch(e){
     console.error('USDC buy error:',e);
@@ -2468,18 +2468,27 @@ async function buyOreWithUSDC(lid,sellerWallet,pricePerUnit,qty){
     var _bhResult=await _fetchBlockhash();
     var bh={blockhash:_bhResult.blockhash};
     var buyerPk=new solanaWeb3.PublicKey(walletAddress);
-    var sellerPk=new solanaWeb3.PublicKey(sellerWallet);
-    var feePk=new solanaWeb3.PublicKey(_FEE_WALLET);
-    var mintPk=new solanaWeb3.PublicKey(_USDC_MINT);
     var totalUnits=Math.round(totalUsdc*1e6);
     var sellerUnits=Math.round(totalUnits*0.95);
     var feeUnits=totalUnits-sellerUnits;
-    var buyerATA=_getATA(buyerPk,mintPk);
-    var sellerATA=_getATA(sellerPk,mintPk);
-    var feeATA=_getATA(feePk,mintPk);
+    // Fetch REAL on-chain USDC accounts
+    var _baR=await fetch('/api/load?usdc_account='+encodeURIComponent(walletAddress));
+    var _baD=await _baR.json();
+    if(!_baD.exists||!_baD.account){if(btn){btn.disabled=false;btn.textContent='Buy ×'+qty+' USDC';}alert('Your wallet has no USDC account. Add USDC first.');return;}
+    var buyerATA=new solanaWeb3.PublicKey(_baD.account);
+    var _saR=await fetch('/api/load?usdc_account='+encodeURIComponent(sellerWallet));
+    var _saD=await _saR.json();
+    if(!_saD.exists||!_saD.account){if(btn){btn.disabled=false;btn.textContent='Buy ×'+qty+' USDC';}alert('The seller has no USDC account yet.');return;}
+    var sellerATA=new solanaWeb3.PublicKey(_saD.account);
+    var feeATA=null;
+    try{var _feR=await fetch('/api/load?usdc_account='+encodeURIComponent(_FEE_WALLET));var _feD=await _feR.json();if(_feD.exists&&_feD.account)feeATA=new solanaWeb3.PublicKey(_feD.account);}catch(e){}
     var tx=new solanaWeb3.Transaction();
-    tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
-    tx.add(_usdcIx(buyerATA,feeATA,buyerPk,feeUnits));
+    if(feeATA){
+      tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,sellerUnits));
+      tx.add(_usdcIx(buyerATA,feeATA,buyerPk,feeUnits));
+    }else{
+      tx.add(_usdcIx(buyerATA,sellerATA,buyerPk,totalUnits));
+    }
     tx.feePayer=buyerPk;
     tx.recentBlockhash=bh.blockhash;
     var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
