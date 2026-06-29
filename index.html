@@ -4472,7 +4472,7 @@ function dDraw(){
     for(var i=-1;i<7;i++){var bx=i*110-(px2*0.18)%110;DC.globalAlpha=0.12;DC.fillStyle='#c03000';DC.beginPath();DC.arc(bx+55,DGY-5,8+Math.sin(dtk*.07+i)*3,0,6.28);DC.fill();DC.globalAlpha=1;}
   }
   for(var i=0;i<f.plats.length;i++){var p=f.plats[i],pxp=p.x-dcam;if(pxp+p.w<-5||pxp>W+5)continue;
-    var _ppl='#0b2a3c',_ppm='#114c66',_ppt='#2f86a8',_pph='#74e2f7';
+    var _ppl='rgba(40,165,205,0.8)',_ppm='#3fb4d7',_ppt='#6fd4ee',_pph='#d8faff';
     var _TSTEP=7; // terrain sample step in world-pixels
     if(p.sol){
       // ── Solid ground: jagged terrain surface with depth layers ──────────
@@ -4524,16 +4524,16 @@ function dDraw(){
       // Subtle vertical grain texture
       DC.globalAlpha=0.08;
       for(var _ti=2;_ti<p.w-2;_ti+=4+((p.x+_ti)%4)){
-        DC.fillStyle=((p.x+_ti)%3===0)?'#aceaf9':'#06141e';
+        DC.fillStyle=((p.x+_ti)%3===0)?'#e2fbff':'#06141e';
         DC.fillRect(pxp+_ti,p.y+1,1,_ph-1);
       }
       DC.globalAlpha=1;
       // Small crack pixels on top surface
-      DC.fillStyle='#07212e';DC.globalAlpha=0.4;
+      DC.fillStyle='#0a3346';DC.globalAlpha=0.4;
       for(var _ci=5;_ci<p.w-4;_ci+=9+((p.x+_ci)%5)){DC.fillRect(pxp+_ci,p.y,1,2);}
       DC.globalAlpha=1;
       // Stalactites hanging from underside — key part of the natural look
-      DC.fillStyle='#0a2a3a';
+      DC.fillStyle='#103a4e';
       for(var _si=4;_si<p.w-3;_si+=5+((p.x+_si)%5)){
         var _sh=3+((p.x*3+_si)%4); // 3–6px drop
         DC.beginPath();DC.moveTo(pxp+_si-1,p.y+_ph);DC.lineTo(pxp+_si+1,p.y+_ph);
