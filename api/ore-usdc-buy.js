@@ -25,6 +25,28 @@ function getATA(walletAddress, mintAddress) {
   return ata.toBase58();
 }
 
+async function getRealUsdcAccount(wallet) {
+  const rpcs = ['https://api.mainnet-beta.solana.com','https://rpc.ankr.com/solana'];
+  for (const rpc of rpcs) {
+    try {
+      const r = await fetch(rpc, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0', id: 1,
+          method: 'getTokenAccountsByOwner',
+          params: [wallet, { mint: USDC_MINT }, { encoding: 'jsonParsed' }]
+        })
+      });
+      const d = await r.json();
+      if (d.error) continue;
+      const accounts = d.result?.value || [];
+      if (!accounts.length) return null;
+      return accounts[0].pubkey;
+    } catch(e) { continue; }
+  }
+  return null;
+}
+
 async function getParsedTx(signature) {
   const rpcs = [
     'https://api.mainnet-beta.solana.com',
@@ -89,7 +111,8 @@ export default async function handler(req, res) {
     const totalUsdc   = parseFloat(listing.price) * listing.qty;
     const totalUnits  = Math.round(totalUsdc * 1e6);
 
-    const sellerATA = getATA(listing.seller_wallet, USDC_MINT);
+    const sellerATA = await getRealUsdcAccount(listing.seller_wallet);
+    if (!sellerATA) return res.status(400).json({ error: 'Seller has no USDC account' });
     const feeATA    = getATA(FEE_WALLET, USDC_MINT);
 
     const innerIx = (tx.meta && tx.meta.innerInstructions) ? tx.meta.innerInstructions : [];
