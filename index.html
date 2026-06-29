@@ -1533,8 +1533,17 @@ function getSpd(){return(0.5+ups.speed*0.015)*(1+getItemBonus('speed')/100);}
 function getPow(){return(1+ups.power*0.12)*(1+getItemBonus('power')/100);}
 function getSell(){return(0.01+ups.sell*0.003)*(1+getItemBonus('sell')/100);}
 var UP_BASE={speed:40,power:50,sell:45,luck:65}; // per-track starting cost
+// ===== TUNABLE: every idle upgrade ALSO costs ore (cheapest-first), scaling with level =====
+var ORE_UP_BASE=3, ORE_UP_GROWTH=1.04;
+function getOreCost(t){return Math.ceil(ORE_UP_BASE*Math.pow(ORE_UP_GROWTH,ups[t]));}
+function _oreTotal(){var n=0;for(var k in oreStash)n+=oreStash[k];return n;}
+function _oreUnitVal(name){for(var i=0;i<DORES.length;i++)if(DORES[i].n===name)return DORES[i].v;return 1;}
+function _oreSpend(n){ // consume n ore units, cheapest value first (keeps Gold/Mystrile for refine/market)
+  var keys=Object.keys(oreStash).filter(function(k){return oreStash[k]>0;}).sort(function(a,b){return _oreUnitVal(a)-_oreUnitVal(b);});
+  for(var i=0;i<keys.length&&n>0;i++){var k=keys[i],take=Math.min(n,oreStash[k]);oreStash[k]-=take;n-=take;if(oreStash[k]<=0)delete oreStash[k];}
+}
 function getCost(t){return Math.floor((UP_BASE[t]||40)*Math.pow(1.08,ups[t]));} // +8%/level — smooth curve to lvl 500
-function buyUp(t){if(ups[t]>=500)return;var c=getCost(t);if(gold>=c){gold-=c;ups[t]++;sndLevelUp();saveGame();uiAll();}}
+function buyUp(t){if(ups[t]>=500)return;var c=getCost(t),oc=getOreCost(t);if(gold>=c&&_oreTotal()>=oc){gold-=c;_oreSpend(oc);ups[t]++;sndLevelUp();saveGame();uiAll();}}
 function equipItem(id){
   var it=inventory.find(function(x){return x.id===id});
   if(!it)return;
@@ -2562,7 +2571,7 @@ function uiAll(){
               function(){var lk=ups.luck+1;return'Silver→'+((0.10+lk*0.001)*100).toFixed(1)+'%';}];
   for(var i=0;i<4;i++){var c=getCost(ts[i]),btn=el(ids[i]+'Bt'),tip=el(ids[i]+'BtTip');
     if(ups[ts[i]]>=500){btn.className='up-btn maxed';btn.innerHTML='MAXED';}
-    else{btn.className='up-btn'+(gold<c?' off':'');btn.innerHTML='<i class="ti ti-arrow-up"></i> Upgrade · '+c+' 🪙';}
+    else{var oc=getOreCost(ts[i]),aff=(gold>=c&&_oreTotal()>=oc);btn.className='up-btn'+(aff?'':' off');btn.innerHTML='<i class="ti ti-arrow-up"></i> Upgrade · '+c+' 🪙 · '+oc+' ⛏';}
     if(tip)tip.textContent=ups[ts[i]]>=500?'Maxed':tipFns[i]();
   }
   el('mrN').textContent=mRockNum;el('mrD').textContent=totalRocks;
