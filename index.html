@@ -2862,7 +2862,7 @@ function rollOre(){return ORE_ROLL_MIN+Math.floor(Math.random()*(ORE_ROLL_MAX-OR
 var REFINE_EDGE=0.9;      // house edge: average haul pays this fraction of entry fee
 var REFINE_AVG_HAUL=600;  // expected ore-value of a typical paid run (calibrate via playtest)
 var REFINE_CAP=1.5;       // max payout as multiple of entry fee
-var REFINE_FLOOR=0.5;     // min payout as multiple of entry fee
+var REFINE_FLOOR=0.2;     // min payout as multiple of entry fee (only reachable after mining ≥1 rock)
 var _runRefined=false;    // guard: one refine per summary
 function oreHaulValue(bag){var v=0;for(var k in bag){for(var i=0;i<DORES.length;i++){if(DORES[i].n===k){v+=bag[k]*DORES[i].v;break;}}}return v;}
 function refinePayout(bag){var ratio=oreHaulValue(bag)/REFINE_AVG_HAUL;var mult=Math.max(REFINE_FLOOR,Math.min(REFINE_CAP,ratio*REFINE_EDGE));return{mult:mult,ext:Math.round(extFee*mult)};}
@@ -4259,7 +4259,7 @@ function showRunSummary(died,final,runLootItems,excMsg){
   var refEl=document.getElementById('rRefine');
   _runRefined=false;
   var _hv=oreHaulValue(dbag);
-  if(mode!=='free'&&_hv>0&&extFee>0){
+  if(mode!=='free'&&dRunRocksMined>=1&&_hv>0&&extFee>0){
     var _p=refinePayout(dbag);
     var _haulStr=Object.keys(dbag).filter(function(k){return dbag[k]>0;}).map(function(k){return dbag[k]+' '+k;}).join(' · ');
     refEl.innerHTML=
@@ -4273,7 +4273,7 @@ function showRunSummary(died,final,runLootItems,excMsg){
   el.classList.add('show');
 }
 function refineRun(){
-  if(_runRefined||mode==='free'||extFee<=0)return;
+  if(_runRefined||mode==='free'||extFee<=0||dRunRocksMined<1)return;
   var _p=refinePayout(dbag);
   if(_p.ext<=0)return;
   // Remove this run's ore from the stash (it was just banked) and pay out $EXT
