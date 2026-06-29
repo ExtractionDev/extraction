@@ -1757,7 +1757,7 @@ function loadGame(){
 // Auto-save every 20s
 setInterval(saveGame,20000);
 
-// Fetch the shared global Excalibur pool every 2.5 minutes
+// Fetch the shared global Excalibur pool every 15 seconds
 function _fetchGlobalPool(){
   fetch('/api/load?pool=1')
     .then(function(r){return r.ok?r.json():null;})
@@ -1767,7 +1767,7 @@ function _fetchGlobalPool(){
     .catch(function(){});
 }
 _fetchGlobalPool();
-setInterval(_fetchGlobalPool,150000); // 2.5 min
+setInterval(_fetchGlobalPool,15000); // 15 sec
 
 var _soundOn=true;
 function openSettings(){document.getElementById('settingsModal').classList.add('open');}
@@ -2684,18 +2684,15 @@ function mp(x,y,w,h,c){MC.fillStyle=c;MC.fillRect(x*MPS,y*MPS,w*MPS,h*MPS);}
 var _mLastT=0;
 // ── Jackpot Jar — painted into the idle-miner scene, left wall, opaque glass ──
 var JAR_FULL_EXT=1000000;  // pool value ($EXT) that completely fills the jar
-var JAR_DROP_EXT=10000;    // every +10k $EXT in the pool drops a fresh ball into the jar
 var JAR_CX=508,JAR_BW=76,JAR_BH=100; // scene position: centre-x (tucked against the right wall), body width/height (base on the floor MGY)
 var _jarFill=0,_jarDrops=[],_jarPulse=0,_jarLastPool=null,_jarDropQueue=0,_jarDropCd=0;
 function _fmtJarPool(v){v=v||0;return v>=1000?Math.round(v).toLocaleString()+' $EXT':v.toFixed(3)+' $EXT';}
 function _jarSurfY(fill){return (MGY-8)-fill*(JAR_BH-16);} // surface y of the packed ore for a given fill 0..1
 function _jarTick(){
-  // Detect pool changes → queue one ball drop per 10k added to the pool
+  // Any time the jackpot grows, a coin falls in
   if(_jarLastPool===null){_jarLastPool=globalPool;_jarFill=Math.max(0,Math.min(1,globalPool/JAR_FULL_EXT));}
-  else if(globalPool>_jarLastPool){
-    var dd=Math.floor((globalPool-_jarLastPool)/JAR_DROP_EXT);
-    if(dd>0){_jarDropQueue=Math.min(_jarDropQueue+dd,14);_jarLastPool+=dd*JAR_DROP_EXT;} // catch up fully, cap visible drops
-  }else if(globalPool<_jarLastPool){_jarLastPool=globalPool;_jarDropQueue=0;} // pool claimed/reset → settle down
+  else if(globalPool>_jarLastPool){_jarDropQueue=Math.min(_jarDropQueue+1,20);_jarLastPool=globalPool;} // increase → one coin
+  else if(globalPool<_jarLastPool){_jarLastPool=globalPool;_jarDropQueue=0;} // pool claimed/reset → settle down
   _jarFill+=(Math.max(0,Math.min(1,globalPool/JAR_FULL_EXT))-_jarFill)*0.05; // ease toward true level
   if(_jarDropCd>0)_jarDropCd--;
   if(_jarDropQueue>0&&_jarDropCd<=0){_jarDrops.push({x:JAR_CX+(Math.random()-0.5)*8,y:MGY-JAR_BH-26,vy:1.1});_jarDropQueue--;_jarDropCd=10;}
