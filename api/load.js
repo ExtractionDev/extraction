@@ -92,56 +92,50 @@ export default async function handler(req, res) {
     // Verify the player's session once, up front
     const { data: player, error: pErr } = await supabase
       .from('players')
-      .select('session_token, tokens')
+      .select('session_token, tokens, banned')
       .eq('username', username)
       .single();
 
     if (pErr || !player) return res.status(403).json({ error: 'Player not found' });
     if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session' });
+    if (player.banned) return res.status(403).json({ error: 'Account suspended.' });
 
     // ---------- JACKPOT PULL ----------
     if (action === 'jackpot') {
-      // Live odds: each pull rolls a random win chance between 1% and 6%
-      const WIN_CHANCE = (0.01 + Math.random() * 0.05);
+      // Anti-drain gate: a pull requires a paid entry that hasn't been used yet.
+      // This atomically consumes one pull "ticket" (set when the entry fee was
+      // paid). No ticket → no pull. Since 80% of every entry fee feeds the pool,
+      // pulls are self-funding and the endpoint can't be scripted to drain it.
+      const { data: eligible, error: elErr } = await supabase
+        .rpc('claim_jackpot_pull', { p_username: username });
+      if (elErr) return res.status(500).json({ error: 'Eligibility check failed: ' + elErr.message });
+      if (!eligible) return res.status(403).json({ error: 'No jackpot pull available — enter a paid run first.' });
 
+      // Win roll — server-side; the client cannot influence it.
+      const WIN_CHANCE = (0.01 + Math.random() * 0.05);
       const won = Math.random() < WIN_CHANCE;
       if (!won) {
         return res.status(200).json({ ok: true, won: false });
       }
 
-      // Read the pool
-      const wonAmount = await getPoolAmount();
+      // Award the pool atomically (lock + read + zero + credit in one txn).
+      const { data: wonRaw, error: awardErr } = await supabase
+        .rpc('award_jackpot', { p_username: username });
+      if (awardErr) return res.status(500).json({ error: 'Award failed: ' + awardErr.message });
 
-      if (wonAmount <= 0) {
-        // Nothing to win, but still a valid "win" with 0 payout
-        return res.status(200).json({ ok: true, won: true, amount: 0, newTokens: player.tokens || 0 });
+      const amount = parseFloat(wonRaw) || 0;
+      const newTokens = (player.tokens || 0) + amount;
+
+      // Log the win (non-fatal)
+      if (amount > 0) {
+        try {
+          await supabase.from('jackpot_wins').insert({
+            username, amount, won_at: new Date().toISOString()
+          });
+        } catch (e) { /* ignore logging errors */ }
       }
 
-      // 1) Credit the player FIRST (so a later failure can't lose the pool)
-      const newBalance = (player.tokens || 0) + wonAmount;
-      const { error: creditErr } = await supabase
-        .from('players')
-        .update({ tokens: newBalance })
-        .eq('username', username);
-      if (creditErr) {
-        return res.status(500).json({ error: 'Credit failed: ' + creditErr.message });
-      }
-
-      // 2) Reset the pool to 0
-      const { error: resetErr } = await supabase.rpc('reset_pool');
-      if (resetErr) {
-        // Player already paid — log but don't fail the response
-        console.error('reset_pool failed (player was paid):', resetErr.message);
-      }
-
-      // 3) Log the win (non-fatal)
-      try {
-        await supabase.from('jackpot_wins').insert({
-          username, amount: wonAmount, won_at: new Date().toISOString()
-        });
-      } catch (e) { /* ignore logging errors */ }
-
-      return res.status(200).json({ ok: true, won: true, amount: wonAmount, newTokens: newBalance });
+      return res.status(200).json({ ok: true, won: true, amount, newTokens });
     }
 
     // ---------- DUNGEON ENTRY FEE ----------
@@ -157,7 +151,8 @@ export default async function handler(req, res) {
     await supabase.from('players').update({
       tokens: newTokens,
       last_entry_fee: fee,
-      last_entry_at: new Date().toISOString()
+      last_entry_at: new Date().toISOString(),
+      jackpot_eligible_at: new Date().toISOString()  // grants ONE jackpot pull for this paid run
     }).eq('username', username);
 
     const poolAdd = fee * 0.80;
@@ -299,6 +294,7 @@ export default async function handler(req, res) {
 
   if (loadErr || !player) return res.status(404).json({ error: 'Player not found' });
   if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session' });
+  if (player.banned) return res.status(403).json({ error: 'Account suspended.' });
 
   return res.status(200).json(publicPlayer(player));
 }
