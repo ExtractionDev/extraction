@@ -924,7 +924,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     </div>
     <div style="margin-bottom:14px">
       <div style="font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Amount <span id="withdrawMaxLabel" style="color:var(--sol)"></span></div>
-      <input id="withdrawAmt" type="number" min="25000" placeholder="Min 25,000 $EXT..." style="width:100%;box-sizing:border-box;background:var(--bg4);border:1px solid var(--border3);border-radius:8px;color:var(--text);padding:8px 10px;font-family:'Space Mono',monospace;font-size:11px">
+      <input id="withdrawAmt" type="number" min="50000" placeholder="Min 50,000 $EXT..." style="width:100%;box-sizing:border-box;background:var(--bg4);border:1px solid var(--border3);border-radius:8px;color:var(--text);padding:8px 10px;font-family:'Space Mono',monospace;font-size:11px">
     </div>
     <div id="withdrawMsg" style="font-size:11px;min-height:16px;margin-bottom:10px;color:var(--red)"></div>
     <button onclick="submitWithdraw()" style="width:100%;padding:12px;border-radius:8px;border:1.5px solid var(--sol);background:#0c0520;color:var(--sol);font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.1em;cursor:pointer;text-transform:uppercase">Submit Request</button>
@@ -1017,7 +1017,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
       <div class="docs-loop-step"><div class="docs-loop-num">5</div><div><div class="docs-loop-title">Hunt the Excalibur Stone ⚔</div><div class="docs-loop-desc">One <b>⚔ Excalibur Stone</b> is hidden per paid run — spawns per floor: <b>3% on floor 3</b>, <b>4% on floor 4</b>, <b>5% on floors 5+</b>. Mine it and roll the <b>1% jackpot pull</b>. Win and you receive the <b>entire prize pool</b> sent to your Solana wallet. The pool then resets. <span style="color:#40c8f0">★ 5% secondary chance</span> to also receive the ultra-rare <b>Mythic Prismatic Pickaxe</b> — the game's rarest item, unobtainable any other way.</div></div></div>
       <div class="docs-loop-step"><div class="docs-loop-num">6</div><div><div class="docs-loop-title">Equip &amp; Mine Idle</div><div class="docs-loop-desc">Equip your best pickaxe in Backpack. Your miner auto-swings 24/7 against the crystal cave, earning $EXT. Rare rocks give up to 25× payout.</div></div></div>
       <div class="docs-loop-step"><div class="docs-loop-num">7</div><div><div class="docs-loop-title">Reforge at the Blacksmith</div><div class="docs-loop-desc">Spend $EXT at the Blacksmith tab to re-roll a pickaxe's stats. Select a pickaxe from the grid, then hit Re-roll — you see Before vs After before committing. Costs scale with rarity.</div></div></div>
-      <div class="docs-loop-step"><div class="docs-loop-num">8</div><div><div class="docs-loop-title">Withdraw Your $EXT</div><div class="docs-loop-desc">Your in-game $EXT balance is real. Request a withdrawal from the Home screen and it will be sent to your connected Solana wallet within 24 hours. Minimum withdrawal: <b>25,000 $EXT</b>. Your balance carries over between sessions — never expires.</div></div></div>
+      <div class="docs-loop-step"><div class="docs-loop-num">8</div><div><div class="docs-loop-title">Withdraw Your $EXT</div><div class="docs-loop-desc">Your in-game $EXT balance is real. Request a withdrawal from the Home screen and it will be sent to your connected Solana wallet within 24 hours. Minimum withdrawal: <b>50,000 $EXT</b>. Your balance carries over between sessions — never expires.</div></div></div>
     </div>
   </div>
 
@@ -1164,7 +1164,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
   <div class="docs-section">
     <div class="docs-h2"><i class="ti ti-arrows-exchange" style="color:#90c848"></i> Deposit &amp; Withdraw</div>
     <div class="docs-callout green"><strong style="color:#90c848">Deposit:</strong> Tap <b>Deposit</b> in the top bar — your connected Phantom wallet signs the transfer and your in-game <b>$EXT</b> is credited instantly. Deposits are in <b>USDC</b> for now at <b>$10 = 100,000 $EXT</b> (10,000 $EXT per $1). Once the $EXT token launches, you'll deposit $EXT directly, 1:1.</div>
-    <div class="docs-callout" style="border-left-color:var(--sol);margin-top:6px"><strong style="color:var(--sol)">Withdraw:</strong> Request a withdrawal from Settings — your $EXT is sent to your connected Solana wallet within 24 hours. Minimum withdrawal: <b>25,000 $EXT</b>. Your balance carries between sessions and never expires.</div>
+    <div class="docs-callout" style="border-left-color:var(--sol);margin-top:6px"><strong style="color:var(--sol)">Withdraw:</strong> Request a withdrawal from Settings — your $EXT is sent to your connected Solana wallet within 24 hours. Minimum withdrawal: <b>50,000 $EXT</b>. Your balance carries between sessions and never expires.</div>
   </div>
 
   <!-- ECONOMY -->
@@ -1915,7 +1915,7 @@ function submitWithdraw(){
   var msg=document.getElementById('withdrawMsg');
   if(!wallet||wallet.length<32){msg.textContent='Please enter a valid Solana wallet address.';return;}
   if(!amt||amt<=0){msg.textContent='Please enter a valid amount.';return;}
-  if(amt<25000){msg.textContent='Minimum withdrawal is 25,000 $EXT.';return;}
+  if(amt<50000){msg.textContent='Minimum withdrawal is 50,000 $EXT.';return;}
   if(amt>tokens){msg.textContent='Amount exceeds your balance of '+tokens.toFixed(4)+' $EXT.';return;}
   var _xd=null;try{_xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');}catch(e){}
   if(!_xd||!_xd.username){msg.textContent='Not signed in.';return;}
