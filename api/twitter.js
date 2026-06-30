@@ -1,42 +1,72 @@
 import crypto from 'crypto';
 
-// base64url helper
-function b64url(buf) {
-  return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+// ── OAuth 1.0a "Sign in with Twitter" — step 1: get a request token ──────────
+// This flow returns the user's screen_name during the token exchange, so we
+// never call the paid v2 /2/users/me endpoint. Uses the OAuth 1.0 Consumer Key
+// + Secret (set TWITTER_CONSUMER_KEY / TWITTER_CONSUMER_SECRET in Vercel).
+const CONSUMER_KEY    = process.env.TWITTER_CONSUMER_KEY;
+const CONSUMER_SECRET = process.env.TWITTER_CONSUMER_SECRET;
+const CALLBACK_URL    = 'https://extraction.one/callback';
+
+// RFC3986 percent-encoding (stricter than encodeURIComponent).
+function pct(s) {
+  return encodeURIComponent(String(s)).replace(/[!*'()]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
 }
 
-// Sign a value so the callback can trust the cookie wasn't tampered with.
-function sign(value) {
-  const secret = process.env.OAUTH_COOKIE_SECRET;
-  const mac = crypto.createHmac('sha256', secret).update(value).digest('hex');
+// HMAC-SHA1 signature over the OAuth 1.0a signature base string.
+function sign(method, url, params, tokenSecret) {
+  const pstr = Object.keys(params).sort().map(k => pct(k) + '=' + pct(params[k])).join('&');
+  const base = method.toUpperCase() + '&' + pct(url) + '&' + pct(pstr);
+  const key  = pct(CONSUMER_SECRET) + '&' + pct(tokenSecret || '');
+  return crypto.createHmac('sha1', key).update(base).digest('base64');
+}
+
+function authHeader(params) {
+  return 'OAuth ' + Object.keys(params).sort().map(k => pct(k) + '="' + pct(params[k]) + '"').join(', ');
+}
+
+function signCookie(value) {
+  const mac = crypto.createHmac('sha256', process.env.OAUTH_COOKIE_SECRET).update(value).digest('hex');
   return `${value}.${mac}`;
 }
 
-export default function handler(req, res) {
-  // 1. Per-request random secrets
-  const codeVerifier = b64url(crypto.randomBytes(32));  // PKCE verifier
-  const state        = b64url(crypto.randomBytes(16));  // CSRF token
+export default async function handler(req, res) {
+  try {
+    const url = 'https://api.twitter.com/oauth/request_token';
+    const oauth = {
+      oauth_callback:         CALLBACK_URL,
+      oauth_consumer_key:     CONSUMER_KEY,
+      oauth_nonce:            crypto.randomBytes(16).toString('hex'),
+      oauth_signature_method: 'HMAC-SHA1',
+      oauth_timestamp:        Math.floor(Date.now() / 1000).toString(),
+      oauth_version:          '1.0'
+    };
+    oauth.oauth_signature = sign('POST', url, oauth, '');
 
-  // 2. PKCE S256 challenge (NOT 'plain', NOT a constant)
-  const challenge = b64url(
-    crypto.createHash('sha256').update(codeVerifier).digest()
-  );
+    const r = await fetch(url, { method: 'POST', headers: { Authorization: authHeader(oauth) } });
+    const text = await r.text();
+    if (!r.ok) {
+      console.error('request_token failed. HTTP', r.status, '— body:', text.slice(0, 500));
+      return res.redirect('/?autherror=' + encodeURIComponent('Twitter sign-in failed, please try again'));
+    }
 
-  // 3. Stash verifier+state in a signed, HttpOnly cookie (10 min TTL)
-  const payload = sign(`${state}:${codeVerifier}`);
-  res.setHeader('Set-Cookie',
-    `oauth_flow=${payload}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`
-  );
+    const p = new URLSearchParams(text);
+    const oauth_token        = p.get('oauth_token');
+    const oauth_token_secret = p.get('oauth_token_secret');
+    if (!oauth_token || !oauth_token_secret) {
+      console.error('request_token: no token in response:', text.slice(0, 500));
+      return res.redirect('/?autherror=' + encodeURIComponent('Twitter sign-in failed, please try again'));
+    }
 
-  const params = new URLSearchParams({
-    response_type: 'code',
-    client_id: process.env.TWITTER_CLIENT_ID,
-    redirect_uri: 'https://extraction.one/callback',
-    scope: 'tweet.read users.read',
-    state,
-    code_challenge: challenge,
-    code_challenge_method: 'S256'
-  });
+    // Stash request token + secret in a signed, HttpOnly cookie (10 min). The
+    // callback needs the secret to sign the access-token exchange.
+    const payload = signCookie(`${oauth_token}:${oauth_token_secret}`);
+    res.setHeader('Set-Cookie',
+      `oauth1_flow=${payload}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`);
 
-  res.redirect(`https://twitter.com/i/oauth2/authorize?${params}`);
+    return res.redirect(`https://api.twitter.com/oauth/authenticate?oauth_token=${encodeURIComponent(oauth_token)}`);
+  } catch (e) {
+    console.error('twitter request_token crashed:', e);
+    return res.redirect('/?autherror=' + encodeURIComponent('Sign-in error, please try again'));
+  }
 }
