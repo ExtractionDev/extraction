@@ -4111,7 +4111,7 @@ function dEndGame(died){
     try{
       var _xd2=JSON.parse(localStorage.getItem(_xAuthKey)||'null');
       if(_xd2&&_xd2.username){
-        var _extPayload={username:_xd2.username,floor:dfl+1,damage_taken:dDamageTaken,gc_earned:final};
+        var _extPayload={username:_xd2.username,token:_xd2.token||'',floor:dfl+1,damage_taken:dDamageTaken,gc_earned:final};
         console.log('[EXTRACT] Reporting extraction:',_extPayload);
         fetch('/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify(_extPayload)
@@ -5532,6 +5532,11 @@ function _setSignedInUI(username){
       _renderStreak((_ad&&_ad.streak)||1);
     }catch(e){_renderStreak(1);}
   },200);
+  // Session token for authenticated /api/load (sent under both names so it
+  // matches whichever the server reads). THIS is the wipe fix.
+  var _authTok='';
+  try{var _aa=JSON.parse(localStorage.getItem(_xAuthKey)||'null');if(_aa)_authTok=_aa.token||'';}catch(e){}
+  var _tq='&token='+encodeURIComponent(_authTok)+'&session_token='+encodeURIComponent(_authTok);
   // Load from localStorage first (most recent — saves happen instantly)
   var _localKey='extraction_v1_'+username;
   var _localData=null;
@@ -5541,10 +5546,10 @@ function _setSignedInUI(username){
     loadGame();uiAll();
     // Sync tokens/gold from Supabase if higher, but NEVER overwrite local inventory or equipment
     // Items only move via explicit actions (buy, loot, withdraw) which force-save immediately
-    fetch('/api/load?username='+username)
+    fetch('/api/load?username='+encodeURIComponent(username)+_tq)
       .then(function(r){return r.ok?r.json():null;})
       .then(function(d){
-        if(d&&d.updated_at){
+        if(d&&!d.error&&d.updated_at){
           var _sbTokens=d.tokens||0;
           var _sbGold=d.gold||0;
           var _localTokens=_localData.tokens||0;
@@ -5570,10 +5575,12 @@ function _setSignedInUI(username){
       }).catch(function(){});
   } else {
     // No local data — fetch from Supabase
-    fetch('/api/load?username='+username)
+    fetch('/api/load?username='+encodeURIComponent(username)+_tq)
       .then(function(r){return r.ok?r.json():null;})
       .then(function(d){
-        if(d){
+        // Only persist REAL player data. An error/empty/unauthorized response must
+        // never overwrite local storage, or the autosave would wipe the account.
+        if(d&&!d.error&&(d.updated_at||typeof d.gold==='number')){
           var mapped={gold:d.gold,tokens:d.tokens,totalRocks:d.total_rocks,runs:d.runs,chests:d.chests,
             ups:d.ups,oreStash:d.ore_stash,inventory:d.inventory,eqSlots:d.equipped_slots,
             gameStats:d.game_stats,_achiev:d.achievements,
