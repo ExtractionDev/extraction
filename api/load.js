@@ -4,6 +4,35 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// ---------------------------------------------------------------------------
+// FIX C-3 (CORS): no more wildcard. Only echo the Origin header back if it is
+// on an explicit allowlist. Set ALLOWED_ORIGINS in your Vercel env vars, e.g.
+//   ALLOWED_ORIGINS=https://yourgame.com,https://www.yourgame.com
+// (comma-separated). Falls back to same-origin only if unset.
+// ---------------------------------------------------------------------------
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+function applyCors(req, res) {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+// Fields that must NEVER be returned to the client.
+// session_token is a login credential — leaking it = full account takeover.
+function publicPlayer(player) {
+  if (!player) return player;
+  const { session_token, ...safe } = player;
+  return safe;
+}
+
 // Helper: fetch the current shared pool amount
 async function getPoolAmount() {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/global_pool?id=eq.1&select=pool`, {
@@ -41,7 +70,12 @@ async function getSolanaBlockhash() {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
+
+  // Preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
 
   // =====================================================================
   // POST — handles: jackpot pull, dungeon entry fee
@@ -67,10 +101,8 @@ export default async function handler(req, res) {
 
     // ---------- JACKPOT PULL ----------
     if (action === 'jackpot') {
-      // TEST MODE: true => guaranteed win for testing. Set to false for live odds.
-      const TEST_MODE = false;
       // Live odds: each pull rolls a random win chance between 1% and 6%
-      const WIN_CHANCE = TEST_MODE ? 1.0 : (0.01 + Math.random() * 0.05);
+      const WIN_CHANCE = (0.01 + Math.random() * 0.05);
 
       const won = Math.random() < WIN_CHANCE;
       if (!won) {
@@ -137,14 +169,14 @@ export default async function handler(req, res) {
   // GET — handles: blockhash proxy, pool amount, player load
   // =====================================================================
 
-  // ---------- BLOCKHASH PROXY ----------
+  // ---------- BLOCKHASH PROXY (public on-chain data, no auth needed) ----------
   if (req.query.blockhash) {
     const result = await getSolanaBlockhash();
     if (!result) return res.status(503).json({ error: 'All Solana RPC endpoints unavailable. Try again shortly.' });
     return res.status(200).json(result);
   }
 
-  // ---------- SIGNATURE STATUS CHECK ----------
+  // ---------- SIGNATURE STATUS CHECK (public on-chain data) ----------
   if (req.query.sig) {
     const sig = req.query.sig;
     const rpcs = ['https://api.mainnet-beta.solana.com','https://rpc.ankr.com/solana'];
@@ -167,7 +199,7 @@ export default async function handler(req, res) {
     return res.json({ confirmed: false, finalized: false });
   }
 
-  // ---------- ATA EXISTENCE CHECK ----------
+  // ---------- ATA EXISTENCE CHECK (public on-chain data) ----------
   if (req.query.ata_exists) {
     const ata = req.query.ata_exists;
     const rpcs = ['https://api.mainnet-beta.solana.com','https://rpc.ankr.com/solana'];
@@ -185,7 +217,7 @@ export default async function handler(req, res) {
     return res.json({ exists: false });
   }
 
-  // ---------- GET REAL USDC TOKEN ACCOUNT ADDRESS ----------
+  // ---------- GET REAL USDC TOKEN ACCOUNT ADDRESS (public on-chain data) ----------
   if (req.query.usdc_account) {
     const wallet = req.query.usdc_account;
     const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
@@ -204,14 +236,13 @@ export default async function handler(req, res) {
         if (d.error) continue;
         const accounts = d.result?.value || [];
         if (!accounts.length) return res.json({ account: null, exists: false });
-        // Return the actual on-chain token account address
         return res.json({ account: accounts[0].pubkey, exists: true });
       } catch(e) { continue; }
     }
     return res.json({ account: null, exists: false });
   }
 
-  // ---------- USDC BALANCE CHECK ----------
+  // ---------- USDC BALANCE CHECK (public on-chain data) ----------
   if (req.query.usdc_balance) {
     const wallet = req.query.usdc_balance;
     const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
@@ -243,13 +274,24 @@ export default async function handler(req, res) {
     return res.status(200).json({ pool });
   }
 
-  const { username } = req.query;
-  if (!username) return res.status(400).json({ error: 'Missing username' });
+  // ---------- PLAYER LOAD ----------
+  // FIX C-1 / H-2 / H-3: this used to return ANY player's full row (including
+  // session_token) to ANYONE with no auth. Now it requires a valid session
+  // token that matches the requested account, and strips the credential out
+  // of the response.
+  const { username, token } = req.query;
+  if (!username || !token) {
+    return res.status(400).json({ error: 'Missing username or token' });
+  }
 
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/players?username=eq.${encodeURIComponent(username)}&select=*`, {
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-  });
-  const rows = await response.json();
-  if (!rows.length) return res.status(404).json({ error: 'Player not found' });
-  return res.status(200).json(rows[0]);
+  const { data: player, error: loadErr } = await supabase
+    .from('players')
+    .select('*')
+    .eq('username', username)
+    .single();
+
+  if (loadErr || !player) return res.status(404).json({ error: 'Player not found' });
+  if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session' });
+
+  return res.status(200).json(publicPlayer(player));
 }
