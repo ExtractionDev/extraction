@@ -8,25 +8,19 @@ const supabase = createClient(
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
-  // First try simple query with no filters
   const { data, error } = await supabase
     .from('players')
-    .select('username, gc_extracted, runs, game_stats, is_banned')
+    .select('username, gc_extracted, runs, game_stats, banned')
     .order('gc_extracted', { ascending: false })
-    .limit(50);
+    .limit(100);
 
   if (error) {
-    // Return error message in response so we can see it in browser
-    return res.status(500).json({ 
-      error: error.message, 
-      code: error.code,
-      details: error.details,
-      hint: error.hint
-    });
+    return res.status(500).json({ error: error.message });
   }
 
   const rows = (data || [])
-    .filter(p => !p.is_banned)
+    .filter(p => !p.banned)              // unified ban flag
+    .slice(0, 50)
     .map((p, i) => ({
       rank: i + 1,
       username: p.username,
