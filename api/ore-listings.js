@@ -13,7 +13,7 @@ function applyCors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-const VALID_ORES = ['Coal','Copper','Iron','Silver','Gold','Mystrile'];
+const VALID_ORES = ['Coal','Copper','Iron','Silver','Gold','Mystrile','Adamant'];
 
 async function verifyToken(username, token) {
   const { data, error } = await supabase
