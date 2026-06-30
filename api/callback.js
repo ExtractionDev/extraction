@@ -148,7 +148,7 @@ export default async function handler(req, res) {
     // in the Referer header — so the session token (a full-account credential)
     // stays out of server logs, proxies, and analytics. The client reads these
     // from window.location.hash.
-    return res.redirect(`/#username=${encodeURIComponent(data.username)}&name=${name}&token=${sessionToken}&streak=${streak}&bonus=${streakBonus.toFixed(2)}`);
+    return res.redirect(`/?username=${encodeURIComponent(data.username)}&name=${name}&token=${sessionToken}&streak=${streak}&bonus=${streakBonus.toFixed(2)}`);
 
   } catch (e) {
     console.error('Callback crashed:', e);
