@@ -114,6 +114,7 @@ export default async function handler(req, res) {
     if (listErr || !listing) return res.status(404).json({ error: 'Listing not found' });
     if (listing.seller === username) return res.status(400).json({ error: 'Cannot buy your own listing' });
     if (!listing.seller_wallet) return res.status(400).json({ error: 'Listing has no seller wallet' });
+    if (listing.status && listing.status !== 'active') return res.status(409).json({ error: 'Listing no longer available' });
 
     // Replay protection: a given on-chain payment can only ever claim ONE item.
     const { data: usedSig } = await supabase
@@ -176,10 +177,17 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Total payment incorrect. Paid ' + (sellerReceived + feeReceived) + ', needed ' + totalUnits });
     }
 
-    const { error: deleteErr } = await supabase.from('ore_listings').delete().eq('id', lid);
+    // ATOMIC CLAIM: delete ONLY if still active so two concurrent buyers can't
+    // both receive the ore. Exactly one wins; .select() returns deleted rows.
+    const { data: claimed, error: deleteErr } = await supabase
+      .from('ore_listings').delete().eq('id', lid).eq('status', 'active').select();
     if (deleteErr) {
       console.error('Delete ore listing error:', deleteErr);
       return res.status(500).json({ error: 'Failed to claim ore. Contact support with TX: ' + signature });
+    }
+    if (!claimed || claimed.length === 0) {
+      console.error('DOUBLE-BUY refund needed: ore listing', lid, 'buyer', username, 'TX', signature);
+      return res.status(409).json({ error: 'Ore was just bought by someone else. Your USDC payment needs a refund — contact support with your TX signature.' });
     }
 
     try {
