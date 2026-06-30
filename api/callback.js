@@ -1,11 +1,55 @@
 import crypto from 'crypto';
 
+function sign(value) {
+  const secret = process.env.OAUTH_COOKIE_SECRET;
+  const mac = crypto.createHmac('sha256', secret).update(value).digest('hex');
+  return `${value}.${mac}`;
+}
+
+function verifyCookie(raw) {
+  if (!raw) return null;
+  const idx = raw.lastIndexOf('.');
+  if (idx < 0) return null;
+  const value = raw.slice(0, idx);
+  const expected = sign(value); // re-sign and compare full token
+  const a = Buffer.from(`${value}.${raw.slice(idx + 1)}`);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  const sep = value.indexOf(':');
+  if (sep < 0) return null;
+  const state = value.slice(0, sep);
+  const codeVerifier = value.slice(sep + 1);
+  if (!state || !codeVerifier) return null;
+  return { state, codeVerifier };
+}
+
+function parseCookies(header) {
+  const out = {};
+  (header || '').split(';').forEach(p => {
+    const i = p.indexOf('=');
+    if (i > -1) out[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim());
+  });
+  return out;
+}
+
 export default async function handler(req, res) {
   try {
-    const { code } = req.query;
+    const { code, state: returnedState } = req.query;
     if (!code) return res.redirect('/?autherror=' + encodeURIComponent('No authorization code received'));
 
-    // 1. Exchange code for access token
+    // ── Verify PKCE + CSRF state from the signed cookie ──────────────────
+    const cookies = parseCookies(req.headers.cookie);
+    const flow = verifyCookie(cookies.oauth_flow);
+    if (!flow) {
+      return res.redirect('/?autherror=' + encodeURIComponent('Login session expired, please try again'));
+    }
+    if (!returnedState || returnedState !== flow.state) {
+      return res.redirect('/?autherror=' + encodeURIComponent('Invalid login state, please try again'));
+    }
+    // Clear the one-time cookie immediately
+    res.setHeader('Set-Cookie', 'oauth_flow=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0');
+
+    // 1. Exchange code for access token — using the REAL verifier
     const tokenRes = await fetch('https://api.twitter.com/2/oauth2/token', {
       method: 'POST',
       headers: {
@@ -18,7 +62,7 @@ export default async function handler(req, res) {
         code,
         grant_type: 'authorization_code',
         redirect_uri: 'https://extraction.one/callback',
-        code_verifier: 'challenge'
+        code_verifier: flow.codeVerifier   // ← was hardcoded 'challenge'
       })
     });
 
