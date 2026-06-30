@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
   .split(',').map(s => s.trim()).filter(Boolean);
@@ -13,7 +13,7 @@ function applyCors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-const VALID_ORES = ['Coal','Copper','Iron','Silver','Gold','Mystrile','Adamant'];
+const VALID_ORES = ['Coal','Copper','Iron','Silver','Gold','Mystrile'];
 
 async function verifyToken(username, token) {
   const { data, error } = await supabase
