@@ -68,9 +68,20 @@ export default async function handler(req, res) {
       })
     });
 
-    const tokens = await tokenRes.json();
+    // Read as text first — Twitter returns an HTML error page (not JSON) when the
+    // token request is rejected (bad redirect_uri, invalid_client, etc.). Parsing
+    // that as JSON crashes the function, hiding the real reason.
+    const tokenStatus = tokenRes.status;
+    const tokenRaw = await tokenRes.text();
+    let tokens;
+    try {
+      tokens = JSON.parse(tokenRaw);
+    } catch (e) {
+      console.error('Token exchange non-JSON response. HTTP', tokenStatus, '— body:', tokenRaw.slice(0, 500));
+      return res.redirect('/?autherror=' + encodeURIComponent('Twitter sign-in failed, please try again'));
+    }
     if (!tokens || !tokens.access_token) {
-      console.error('Token exchange failed:', tokens);
+      console.error('Token exchange failed. HTTP', tokenStatus, JSON.stringify(tokens));
       return res.redirect('/?autherror=' + encodeURIComponent('Twitter sign-in failed, please try again'));
     }
     // Surfaces whether the granted scopes actually include users.read.
