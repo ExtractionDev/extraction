@@ -5,7 +5,7 @@ const VALID_ORES = ['Coal','Copper','Iron','Silver','Gold','Mystrile'];
 
 async function verifyToken(username, token) {
   const { data, error } = await supabase
-    .from('players').select('session_token, tokens').eq('username', username).single();
+    .from('players').select('session_token, tokens, banned').eq('username', username).single();
   if (error || !data) return null;
   if (data.session_token !== token) return null;
   return data;
@@ -32,6 +32,7 @@ export default async function handler(req, res) {
 
   const player = await verifyToken(username, token);
   if (!player) return res.status(403).json({ error: 'Invalid session' });
+  if (player.banned) return res.status(403).json({ error: 'Account suspended.' });
 
   if (action === 'list') {
     if (!VALID_ORES.includes(ore_name)) return res.status(400).json({ error: 'Invalid ore' });
@@ -61,20 +62,19 @@ export default async function handler(req, res) {
 
   if (action === 'buy') {
     if (!lid) return res.status(400).json({ error: 'Missing lid' });
-    const { data: listing, error: fetchErr } = await supabase
-      .from('ore_listings').select('*').eq('id', lid).single();
-    if (fetchErr || !listing) return res.status(404).json({ error: 'Not found' });
-    if (listing.status !== 'active') return res.status(400).json({ error: 'Already sold' });
-    if (listing.seller === username) return res.status(400).json({ error: 'Cannot buy own listing' });
-    const totalCost = listing.price * listing.qty;
-    if (player.tokens < totalCost) return res.status(400).json({ error: 'Insufficient EXT' });
-
-    await supabase.from('ore_listings').update({ status: 'sold', buyer: username }).eq('id', lid);
-    await supabase.from('players').update({ tokens: player.tokens - totalCost }).eq('username', username);
-    const { data: seller } = await supabase.from('players').select('tokens').eq('username', listing.seller).single();
-    if (seller) await supabase.from('players').update({ tokens: (seller.tokens || 0) + totalCost }).eq('username', listing.seller);
-
-    return res.status(200).json({ ok: true, ore_name: listing.ore_name, qty: listing.qty, cost: totalCost });
+    // ATOMIC: locks the listing, debits buyer (only if funded + not banned),
+    // credits seller, marks sold — all in one transaction. No race, no stale
+    // read/modify/write, no double-credit token minting.
+    const { data: result, error: rpcErr } = await supabase
+      .rpc('buy_ore_listing', { p_lid: String(lid), p_buyer: username });
+    if (rpcErr) {
+      console.error('buy_ore_listing error:', rpcErr);
+      return res.status(500).json({ error: 'Purchase failed. Try again.' });
+    }
+    if (!result || !result.ok) {
+      return res.status(400).json({ error: (result && result.error) || 'Purchase failed' });
+    }
+    return res.status(200).json({ ok: true, ore_name: result.ore_name, qty: result.qty, cost: result.cost });
   }
 
   return res.status(400).json({ error: 'Unknown action' });
