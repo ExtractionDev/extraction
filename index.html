@@ -689,7 +689,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
           </div>
           <div class="ctrl-row">
             <div class="ctrl-keys"><span class="ctrl-key">W</span><span class="ctrl-key">↑</span><span class="ctrl-key" style="font-size:9px">SPC</span></div>
-            <span class="ctrl-desc">Jump <span style="color:var(--text4);font-size:9px">(hold Space to charge)</span></span>
+            <span class="ctrl-desc">Jump <span style="color:var(--text4);font-size:9px">(Space = big jump · 3s cooldown)</span></span>
           </div>
           <div class="ctrl-row">
             <div class="ctrl-keys"><span class="ctrl-key">S</span><span class="ctrl-key">↓</span></div>
@@ -1144,7 +1144,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     <div class="docs-h2"><i class="ti ti-keyboard"></i> Controls</div>
     <div class="docs-grid">
       <div class="docs-card"><div class="docs-card-title">← → / A D</div><div class="docs-card-desc">Move left / right</div></div>
-      <div class="docs-card"><div class="docs-card-title">↑ / W / Space</div><div class="docs-card-desc">Jump · hold Space to charge for a higher jump · double-jump supported</div></div>
+      <div class="docs-card"><div class="docs-card-title">↑ / W / Space</div><div class="docs-card-desc">↑ / W to jump (double-jump supported) · Space = a big jump on a 3s cooldown</div></div>
       <div class="docs-card"><div class="docs-card-title">↓ / S</div><div class="docs-card-desc">Drop through thin platforms</div></div>
       <div class="docs-card"><div class="docs-card-title" style="color:var(--green)">E</div><div class="docs-card-desc">Mine ore · attack enemies · interact with shrines &amp; chests</div></div>
       <div class="docs-card"><div class="docs-card-title" style="color:var(--purple)">🖱 Left Click</div><div class="docs-card-desc">Mine ore block · attack enemies</div></div>
@@ -3686,7 +3686,7 @@ function startDungeon(){
   }
   dGameOver=false;excMsg=null;cavMusicStart();dBuildFloors();_placeExcalibur();dfl=0;
   _deathPenaltyActive=false;_descPending=false;
-  dp={x:40,y:DGY-30,vx:0,vy:0,w:18,h:26,gnd:false,onThin:false,face:1,hp:100,inv:0,spkCd:0,dropT:0,pullSt:0,jumps:0,coyoteT:0,jumpCharge:0,chargedJump:false,burnTicks:0,burnTimer:0};
+  dp={x:40,y:DGY-30,vx:0,vy:0,w:18,h:26,gnd:false,onThin:false,face:1,hp:100,inv:0,spkCd:0,dropT:0,pullSt:0,jumps:0,coyoteT:0,jumpCharge:0,chargedJump:false,burnTicks:0,burnTimer:0,bigJumpCD:0};
   dcam=0;dbag={};dcoins=0;dtoasts=[];dtk=0;dRunning=true;DK={l:0,r:0,jumpHeld:false};dRockBreaks=[];
   dProjectiles=[];dDeathParts=[];dChips=[];dAmbientParts=[];_excIceParts=[];_mythPickParts=[];dHitPause=0;dCombo=0;dComboTimer=0;dBestCombo=0;dRunKills=0;dRunRocksMined=0;dRunStartTime=Date.now();dDamageTaken=0;dFloorTransition=40;
   dFallSpikes=[];dFallSpikeTmr=FALLSPIKE_GAP_MIN+Math.random()*(FALLSPIKE_GAP_MAX-FALLSPIKE_GAP_MIN);
@@ -3701,7 +3701,7 @@ function startDungeon(){
   dLoop();
 }
 function dGiveUp(){if(!dRunning)return;if(confirm('Give up this run? You keep GC earned so far.')){dEndGame(false);}}
-function dKD(e){if(!dRunning)return;var _k=e.key.length===1?e.key.toLowerCase():e.key;if(_k==='ArrowLeft'||_k==='a'){DK.l=1;e.preventDefault();}if(_k==='ArrowRight'||_k==='d'){DK.r=1;e.preventDefault();}if(_k==='ArrowUp'||_k==='w'){dJump();e.preventDefault();}if(_k==='ArrowDown'||_k==='s'){dDrop();e.preventDefault();}if(_k===' '){if(dp&&dp.gnd&&!dp.pullSt){DK.jumpHeld=true;}else{dJump();}e.preventDefault();}if(_k==='e'){
+function dKD(e){if(!dRunning)return;var _k=e.key.length===1?e.key.toLowerCase():e.key;if(_k==='ArrowLeft'||_k==='a'){DK.l=1;e.preventDefault();}if(_k==='ArrowRight'||_k==='d'){DK.r=1;e.preventDefault();}if(_k==='ArrowUp'||_k==='w'){dJump();e.preventDefault();}if(_k==='ArrowDown'||_k==='s'){dDrop();e.preventDefault();}if(_k===' '){if(dp&&!dp.pullSt&&(dp.bigJumpCD||0)<=0){dp.vy=-16;dp.gnd=false;dp.jumps=1;dp.coyoteT=0;dp.bigJumpCD=180;dShake=3;sndJump();}e.preventDefault();}if(_k==='e'){
   dMine(); // E mines if near a rock
   var _ef=dflData[dfl];
   // Shrine interaction
@@ -3729,17 +3729,7 @@ function dKD(e){if(!dRunning)return;var _k=e.key.length===1?e.key.toLowerCase():
 function dKU(e){var _k=e.key.length===1?e.key.toLowerCase():e.key;
   if(_k==='ArrowLeft'||_k==='a')DK.l=0;
   if(_k==='ArrowRight'||_k==='d')DK.r=0;
-  if(e.key===' '){
-    DK.jumpHeld=false;
-    if(dp&&dp.gnd&&!dp.pullSt){
-      var cr=Math.min((dp.jumpCharge||0)/60,1);
-      dp.vy=-10-(5*cr); // -10 normal → -15 fully charged (1.5x)
-      dp.gnd=false;dp.jumps=1;dp.coyoteT=0;
-      dp.jumpCharge=0;
-      sndJump();
-    }
-    e.preventDefault();
-  }
+  if(e.key===' '){e.preventDefault();}
 }
 function dUpdHUD(){
   document.getElementById('dhpB').style.width=Math.max(0,dp.hp)+'%';
@@ -4513,15 +4503,8 @@ function dLoop(){
   for(var i=0;i<f.plats.length;i++){var p=f.plats[i];if(!p.sol&&dp.dropT>0)continue;var _cx=dp.x+9;if(_cx>p.x&&_cx<p.x+p.w)if(dp.vy>=0&&dp.y+dp.h>p.y&&dp.y+dp.h<=p.y+p.h+dp.vy+4){dp.y=p.y-dp.h;dp.vy=0;dp.gnd=true;dp.jumps=0;if(!p.sol)dp.onThin=true;}}
   // Coyote time: 0.5s grace window after walking off a platform edge
   if(dp.gnd){dp.coyoteT=30;}else if(dp.coyoteT>0){dp.coyoteT=Math.max(0,dp.coyoteT-_dt);}
-  // Charged jump: build power while space held on ground, auto-fire at 1s
-  if(DK.jumpHeld&&dp.gnd&&!dp.pullSt){
-    dp.jumpCharge=Math.min((dp.jumpCharge||0)+_dt,60);
-    if(dp.jumpCharge>=60){
-      dp.vy=-15;dp.gnd=false;dp.jumps=1;dp.coyoteT=0;dp.jumpCharge=0;DK.jumpHeld=false;sndJump();
-    }
-  }else if(!dp.gnd&&DK.jumpHeld&&dp.jumpCharge>0){
-    dp.jumpCharge=0;
-  }
+  // Big-jump (Space) cooldown ticks down each frame
+  if(dp.bigJumpCD>0)dp.bigJumpCD=Math.max(0,dp.bigJumpCD-_dt);
   if(dp.y>420){dEndGame(true);return;}
   if(dDescending){dp.inv=120;}else if(dp.inv>0)dp.inv--;if(dp.spkCd>0)dp.spkCd--;
   if(dp.spkCd===0){for(var i=0;i<f.spikes.length;i++){var s=f.spikes[i];var _sh=s.small?8:15;var _sw=s.small?12:21;var _syo=s.y>=DGY?_terrBump(s.x):0;if(dp.x+dp.w>s.x-_sw&&dp.x<s.x+_sw&&dp.y+dp.h>s.y+_syo-_sh&&dp.y+dp.h<=s.y+_syo+2){dp.hp-=10;dDamageTaken+=10;dp.spkCd=25;dp.vy=-7;dShake=7;sndDamage();dtoasts.push({x:s.x,y:s.y-30,t:'-10',c:'#e84b4b',life:45});dUpdHUD();if(dp.hp<=0){dEndGame(true);return;}break;}}}
@@ -5279,6 +5262,12 @@ function dDraw(){
     var pFlip=(f2<0);
     // Draw sprite — flip horizontally when facing left
     var drawn=drawMinerFrame(DC,pAnimState,pFrame,dSprX,dSprY,dDstW,dDstH,pFlip,equipped?equipped.rar.c:null,dMouseX,dMouseY);
+    // Big-jump (Space) cooldown bar above head — fills cyan as it recharges, hidden when ready
+    if(dp.bigJumpCD>0){
+      var _cdx=px-1,_cdy=dp.y-9,_cdw=20;
+      DC.fillStyle='rgba(0,0,0,0.55)';DC.fillRect(_cdx,_cdy,_cdw,3);
+      DC.fillStyle='#6fd4ee';DC.fillRect(_cdx,_cdy,_cdw*(1-dp.bigJumpCD/180),3);
+    }
     // Fallback pixel art if sprite not loaded
     if(!drawn){
       DC.fillStyle='#504010';DC.fillRect(px+3,dp.y,14,3);DC.fillStyle='#d08840';DC.fillRect(px+1,dp.y+3,18,10);
