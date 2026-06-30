@@ -6,6 +6,18 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY
 );
 
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
+  .split(',').map(s => s.trim()).filter(Boolean);
+function applyCors(req, res) {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
 const DEV_WALLET = 'B8ubxUGnvhDTGGRkkN8DkyAfnoLEfnjTPdXfQn3TnVQa';
 const FEE_WALLET = '72MJWgvcqEb43mbuSTiHme6oYr4rEvwc7f3kaETHdNaN';
 const USDC_MINT  = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
@@ -78,7 +90,8 @@ async function getParsedTx(signature) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
@@ -138,11 +151,10 @@ export default async function handler(req, res) {
     const sellerReceived = transfers.filter(t => t.to === sellerATA).reduce((s, t) => s + t.amount, 0);
     const feeReceived    = feeATA ? transfers.filter(t => t.to === feeATA).reduce((s, t) => s + t.amount, 0) : 0;
 
-    if ((sellerReceived + feeReceived) < totalUnits * (1 - SLIPPAGE)) {
-      return res.status(400).json({ error: 'Payment incorrect. Seller got ' + sellerReceived + ', fee got ' + feeReceived + ', needed ' + totalUnits });
-    }
-    if (sellerReceived <= 0) {
-      return res.status(400).json({ error: 'No transfer to seller found' });
+    // FIX #4: the SELLER's receipt alone must cover the listing price (minus
+    // slippage). Previously seller+fee combined could satisfy the check.
+    if (sellerReceived < totalUnits * (1 - SLIPPAGE)) {
+      return res.status(400).json({ error: 'Payment to seller incorrect. Seller got ' + sellerReceived + ', needed ' + totalUnits });
     }
 
     const { error: deleteErr } = await supabase.from('ore_listings').delete().eq('id', lid);
