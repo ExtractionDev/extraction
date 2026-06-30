@@ -5609,7 +5609,11 @@ function _unlockNav(){
 }
 // Handle Twitter OAuth callback — picks up ?username=&name=&token=&streak=&bonus= from /api/callback redirect
 (function(){
-  var _p=new URLSearchParams(window.location.search);
+  // Read login params from the URL fragment (#) first — the callback now
+  // sends them there so the session token stays out of server logs/Referer.
+  // Fall back to the query string for backward compatibility.
+  var _hash=(window.location.hash||'').replace(/^#/,'');
+  var _p=new URLSearchParams(_hash||window.location.search);
   var _u=_p.get('username'),_n=_p.get('name'),_t=_p.get('token');
   var _streak=parseInt(_p.get('streak')||'0');
   var _bonus=parseFloat(_p.get('bonus')||'0');
@@ -5628,7 +5632,7 @@ function _unlockNav(){
       },1500);
     }
     // Clean the URL
-    window.history.replaceState({},'',window.location.pathname);
+    window.history.replaceState({},'',window.location.pathname+window.location.search.replace(/[?&](username|name|token|streak|bonus)=[^&]*/g,'').replace(/^&/,'?'));
   } else {
     // Page load — restore streak from saved auth data
     try{
