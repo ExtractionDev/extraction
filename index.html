@@ -2571,15 +2571,16 @@ function confirmOreList(){
   if(price<0.01){alert('Enter a valid USDC price per unit (min $0.01)');return;}
   if(!walletConnected||!walletAddress){alert('Connect your Phantom wallet to list ores.');return;}
   var _xd=_getAuth();if(!_xd||!_xd.username){alert('Sign in to list.');return;}
-  oreStash[_oreListingName]=avail-qty;
-  if(oreStash[_oreListingName]<=0)delete oreStash[_oreListingName];
+  var _oreNm=_oreListingName;
+  oreStash[_oreNm]=avail-qty;
+  if(oreStash[_oreNm]<=0)delete oreStash[_oreNm];
   saveGame();closeOreListModal();renderOreMarket();
   fetch('/api/ore-listings',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action:'list',username:_xd.username,token:_xd.token||'',ore_name:_oreListingName,qty:qty,price:price,seller_wallet:walletAddress})
+    body:JSON.stringify({action:'list',username:_xd.username,token:_xd.token||'',ore_name:_oreNm,qty:qty,price:price,seller_wallet:walletAddress})
   }).then(function(r){return r.json();}).then(function(d){
-    if(!d.ok){oreStash[_oreListingName]=(oreStash[_oreListingName]||0)+qty;saveGame();renderOreMarket();alert('Listing failed: '+(d.error||'Try again'));}
+    if(!d.ok){oreStash[_oreNm]=(oreStash[_oreNm]||0)+qty;saveGame();renderOreMarket();alert('Listing failed: '+(d.error||'Try again'));}
     else renderOreMarket();
-  }).catch(function(){oreStash[_oreListingName]=(oreStash[_oreListingName]||0)+qty;saveGame();renderOreMarket();});
+  }).catch(function(){oreStash[_oreNm]=(oreStash[_oreNm]||0)+qty;saveGame();renderOreMarket();});
 }
 function withdrawOreListing(lid){
   var _xd=_getAuth();if(!_xd)return;
