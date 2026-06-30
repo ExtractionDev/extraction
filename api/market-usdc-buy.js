@@ -109,7 +109,7 @@ export default async function handler(req, res) {
     if (player.banned) return res.status(403).json({ error: 'Account suspended.' });
 
     const { data: listing, error: listErr } = await supabase
-      .from('listings').select('*').eq('id', lid).single();
+      .from('ore_listings').select('*').eq('id', lid).single();
     if (listErr || !listing) return res.status(404).json({ error: 'Listing not found' });
     if (listing.seller === username) return res.status(400).json({ error: 'Cannot buy your own listing' });
     if (!listing.seller_wallet) return res.status(400).json({ error: 'Listing has no seller wallet' });
@@ -123,12 +123,13 @@ export default async function handler(req, res) {
     if (!tx) return res.status(400).json({ error: 'Transaction not found on chain yet. If USDC was deducted, contact support with your TX signature.' });
     if (tx.meta && tx.meta.err) {
       const errDetail = JSON.stringify(tx.meta.err);
-      const logs = (tx.meta.logMessages || []).slice(-5).join(' | ');
+      const logs = (tx.meta.logMessages || []).slice(-6).join(' | ');
       return res.status(400).json({ error: 'Transaction failed on chain: ' + errDetail, logs: logs });
     }
 
-    const totalUnits  = Math.round(parseFloat(listing.price) * 1e6);
-    // Use the REAL on-chain USDC account (derivation can mismatch non-standard accounts)
+    const totalUsdc   = parseFloat(listing.price) * listing.qty;
+    const totalUnits  = Math.round(totalUsdc * 1e6);
+
     const sellerATA = await getRealUsdcAccount(listing.seller_wallet);
     if (!sellerATA) return res.status(400).json({ error: 'Seller has no USDC account' });
     const feeATA    = await getRealUsdcAccount(FEE_WALLET);
@@ -151,30 +152,30 @@ export default async function handler(req, res) {
     const feeReceived    = feeATA ? transfers.filter(t => t.to === feeATA).reduce((s, t) => s + t.amount, 0) : 0;
 
     // FIX #4: the SELLER's receipt alone must cover the listing price (minus
-    // slippage). Previously seller+fee combined could satisfy the check, letting
-    // a buyer route nearly everything to the fee wallet and underpay the seller.
+    // slippage). Previously seller+fee combined could satisfy the check.
     if (sellerReceived < totalUnits * (1 - SLIPPAGE)) {
       return res.status(400).json({ error: 'Payment to seller incorrect. Seller got ' + sellerReceived + ', needed ' + totalUnits });
     }
 
-    const { error: deleteErr } = await supabase.from('listings').delete().eq('id', lid);
+    const { error: deleteErr } = await supabase.from('ore_listings').delete().eq('id', lid);
     if (deleteErr) {
-      console.error('Delete listing error:', deleteErr);
-      return res.status(500).json({ error: 'Failed to claim item. Contact support with TX: ' + signature });
+      console.error('Delete ore listing error:', deleteErr);
+      return res.status(500).json({ error: 'Failed to claim ore. Contact support with TX: ' + signature });
     }
 
     try {
       await supabase.from('sales').insert({
         listing_id: lid, seller: listing.seller, buyer: username,
-        price_usdc: listing.price, signature, item_data: listing.item_data,
+        price_usdc: parseFloat(listing.price) * listing.qty, signature,
+        item_data: { ore_name: listing.ore_name, qty: listing.qty },
         sold_at: new Date().toISOString()
       });
     } catch (e) { /* ignore */ }
 
-    return res.status(200).json({ ok: true, item: listing.item_data });
+    return res.status(200).json({ ok: true, ore_name: listing.ore_name, qty: listing.qty });
 
   } catch (e) {
-    console.error('market-usdc-buy fatal error:', e);
+    console.error('ore-usdc-buy fatal error:', e);
     return res.status(500).json({ error: 'Server error: ' + (e.message || 'unknown') });
   }
 }
