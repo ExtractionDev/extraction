@@ -1,152 +1,180 @@
-import crypto from 'crypto';
+import { createClient } from '@supabase/supabase-js';
+import { PublicKey } from '@solana/web3.js';
 
-function sign(value) {
-  const secret = process.env.OAUTH_COOKIE_SECRET;
-  const mac = crypto.createHmac('sha256', secret).update(value).digest('hex');
-  return `${value}.${mac}`;
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
+
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
+  .split(',').map(s => s.trim()).filter(Boolean);
+function applyCors(req, res) {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-function verifyCookie(raw) {
-  if (!raw) return null;
-  const idx = raw.lastIndexOf('.');
-  if (idx < 0) return null;
-  const value = raw.slice(0, idx);
-  const expected = sign(value); // re-sign and compare full token
-  const a = Buffer.from(`${value}.${raw.slice(idx + 1)}`);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
-  const sep = value.indexOf(':');
-  if (sep < 0) return null;
-  const state = value.slice(0, sep);
-  const codeVerifier = value.slice(sep + 1);
-  if (!state || !codeVerifier) return null;
-  return { state, codeVerifier };
+const DEV_WALLET = 'B8ubxUGnvhDTGGRkkN8DkyAfnoLEfnjTPdXfQn3TnVQa';
+const FEE_WALLET = '72MJWgvcqEb43mbuSTiHme6oYr4rEvwc7f3kaETHdNaN';
+const USDC_MINT  = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+const TOKEN_PROG = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+const ASSOC_PROG = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe1bRS';
+const SLIPPAGE   = 0.01;
+
+function getATA(walletAddress, mintAddress) {
+  const [ata] = PublicKey.findProgramAddressSync(
+    [
+      new PublicKey(walletAddress).toBytes(),
+      new PublicKey(TOKEN_PROG).toBytes(),
+      new PublicKey(mintAddress).toBytes()
+    ],
+    new PublicKey(ASSOC_PROG)
+  );
+  return ata.toBase58();
 }
 
-function parseCookies(header) {
-  const out = {};
-  (header || '').split(';').forEach(p => {
-    const i = p.indexOf('=');
-    if (i > -1) out[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim());
+async function getRealUsdcAccount(wallet) {
+  const rpcs = ['https://api.mainnet-beta.solana.com','https://rpc.ankr.com/solana'];
+  for (const rpc of rpcs) {
+    try {
+      const r = await fetch(rpc, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0', id: 1,
+          method: 'getTokenAccountsByOwner',
+          params: [wallet, { mint: USDC_MINT }, { encoding: 'jsonParsed' }]
+        })
+      });
+      const d = await r.json();
+      if (d.error) continue;
+      const accounts = d.result?.value || [];
+      if (!accounts.length) return null;
+      return accounts[0].pubkey;
+    } catch(e) { continue; }
+  }
+  return null;
+}
+
+async function getParsedTx(signature) {
+  const rpcs = [
+    'https://api.mainnet-beta.solana.com',
+    'https://rpc.ankr.com/solana',
+    'https://solana-mainnet.rpc.extrnode.com',
+    'https://solana.public-rpc.com'
+  ];
+  const body = JSON.stringify({
+    jsonrpc: '2.0', id: 1,
+    method: 'getTransaction',
+    params: [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' }]
   });
-  return out;
+  for (const rpc of rpcs) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const r = await fetch(rpc, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+        if (!r.ok) break;
+        const d = await r.json();
+        if (d.error) break;
+        if (d.result) return d.result;
+        await new Promise(res => setTimeout(res, 1500));
+      } catch (e) {
+        console.warn('getTransaction failed:', rpc, e.message);
+        break;
+      }
+    }
+  }
+  return null;
 }
 
 export default async function handler(req, res) {
+  applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
   try {
-    const { code, state: returnedState } = req.query;
-    if (!code) return res.redirect('/?autherror=' + encodeURIComponent('No authorization code received'));
-
-    // ── Verify PKCE + CSRF state from the signed cookie ──────────────────
-    const cookies = parseCookies(req.headers.cookie);
-    const flow = verifyCookie(cookies.oauth_flow);
-    if (!flow) {
-      return res.redirect('/?autherror=' + encodeURIComponent('Login session expired, please try again'));
-    }
-    if (!returnedState || returnedState !== flow.state) {
-      return res.redirect('/?autherror=' + encodeURIComponent('Invalid login state, please try again'));
-    }
-    // Clear the one-time cookie immediately
-    res.setHeader('Set-Cookie', 'oauth_flow=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0');
-
-    // 1. Exchange code for access token — using the REAL verifier
-    const tokenRes = await fetch('https://api.twitter.com/2/oauth2/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Basic ' + Buffer.from(
-          process.env.TWITTER_CLIENT_ID + ':' + process.env.TWITTER_CLIENT_SECRET
-        ).toString('base64')
-      },
-      body: new URLSearchParams({
-        code,
-        grant_type: 'authorization_code',
-        redirect_uri: 'https://extraction.one/callback',
-        code_verifier: flow.codeVerifier   // ← was hardcoded 'challenge'
-      })
-    });
-
-    const tokens = await tokenRes.json();
-    if (!tokens || !tokens.access_token) {
-      console.error('Token exchange failed:', tokens);
-      return res.redirect('/?autherror=' + encodeURIComponent('Twitter sign-in failed, please try again'));
+    let body = req.body;
+    if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = {}; } }
+    const { username, token, lid, signature } = body || {};
+    if (!username || !token || !lid || !signature) {
+      return res.status(400).json({ error: 'Missing fields' });
     }
 
-    // 2. Get the user's profile
-    const userRes = await fetch('https://api.twitter.com/2/users/me', {
-      headers: { 'Authorization': `Bearer ${tokens.access_token}` }
-    });
-    const userJson = await userRes.json();
-    const data = userJson && userJson.data;
-    if (!data || !data.username) {
-      console.error('User fetch failed:', userJson);
-      return res.redirect('/?autherror=' + encodeURIComponent('Could not read Twitter profile, please try again'));
+    const { data: player, error: playerErr } = await supabase
+      .from('players').select('session_token, banned').eq('username', username).single();
+    if (playerErr || !player) return res.status(403).json({ error: 'Player not found' });
+    if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session' });
+    if (player.banned) return res.status(403).json({ error: 'Account suspended.' });
+
+    const { data: listing, error: listErr } = await supabase
+      .from('listings').select('*').eq('id', lid).single();
+    if (listErr || !listing) return res.status(404).json({ error: 'Listing not found' });
+    if (listing.seller === username) return res.status(400).json({ error: 'Cannot buy your own listing' });
+    if (!listing.seller_wallet) return res.status(400).json({ error: 'Listing has no seller wallet' });
+
+    // Replay protection: a given on-chain payment can only ever claim ONE item.
+    const { data: usedSig } = await supabase
+      .from('sales').select('id').eq('signature', signature).maybeSingle();
+    if (usedSig) return res.status(400).json({ error: 'This transaction has already been used.' });
+
+    const tx = await getParsedTx(signature);
+    if (!tx) return res.status(400).json({ error: 'Transaction not found on chain yet. If USDC was deducted, contact support with your TX signature.' });
+    if (tx.meta && tx.meta.err) {
+      const errDetail = JSON.stringify(tx.meta.err);
+      const logs = (tx.meta.logMessages || []).slice(-5).join(' | ');
+      return res.status(400).json({ error: 'Transaction failed on chain: ' + errDetail, logs: logs });
     }
 
-    // 3. Session token
-    const sessionToken = crypto.randomBytes(32).toString('hex');
+    const totalUnits  = Math.round(parseFloat(listing.price) * 1e6);
+    // Use the REAL on-chain USDC account (derivation can mismatch non-standard accounts)
+    const sellerATA = await getRealUsdcAccount(listing.seller_wallet);
+    if (!sellerATA) return res.status(400).json({ error: 'Seller has no USDC account' });
+    const feeATA    = await getRealUsdcAccount(FEE_WALLET);
 
-    // 4. Fetch existing player (for streak)
-    let player = null;
+    const innerIx = (tx.meta && tx.meta.innerInstructions) ? tx.meta.innerInstructions : [];
+    const allIx = [
+      ...((tx.transaction.message.instructions) || []),
+      ...(innerIx.flatMap(ii => ii.instructions) || [])
+    ];
+    const transfers = allIx
+      .filter(ix => ix.program === 'spl-token' && ix.parsed && (ix.parsed.type === 'transfer' || ix.parsed.type === 'transferChecked'))
+      .map(ix => {
+        const info = ix.parsed.info;
+        let amt = info.amount;
+        if (amt == null && info.tokenAmount) amt = info.tokenAmount.amount;
+        return { to: info.destination, amount: parseInt(amt || '0') };
+      });
+
+    const sellerReceived = transfers.filter(t => t.to === sellerATA).reduce((s, t) => s + t.amount, 0);
+    const feeReceived    = feeATA ? transfers.filter(t => t.to === feeATA).reduce((s, t) => s + t.amount, 0) : 0;
+
+    // FIX #4: the SELLER's receipt alone must cover the listing price (minus
+    // slippage). Previously seller+fee combined could satisfy the check, letting
+    // a buyer route nearly everything to the fee wallet and underpay the seller.
+    if (sellerReceived < totalUnits * (1 - SLIPPAGE)) {
+      return res.status(400).json({ error: 'Payment to seller incorrect. Seller got ' + sellerReceived + ', needed ' + totalUnits });
+    }
+
+    const { error: deleteErr } = await supabase.from('listings').delete().eq('id', lid);
+    if (deleteErr) {
+      console.error('Delete listing error:', deleteErr);
+      return res.status(500).json({ error: 'Failed to claim item. Contact support with TX: ' + signature });
+    }
+
     try {
-      const existingRes = await fetch(
-        `${process.env.SUPABASE_URL}/rest/v1/players?username=eq.${encodeURIComponent(data.username)}&select=*`,
-        { headers: { apikey: process.env.SUPABASE_ANON_KEY, Authorization: `Bearer ${process.env.SUPABASE_ANON_KEY}` } }
-      );
-      const existing = await existingRes.json();
-      player = Array.isArray(existing) ? existing[0] : null;
-    } catch (e) {
-      console.error('Existing player fetch error:', e);
-    }
+      await supabase.from('sales').insert({
+        listing_id: lid, seller: listing.seller, buyer: username,
+        price_usdc: listing.price, signature, item_data: listing.item_data,
+        sold_at: new Date().toISOString()
+      });
+    } catch (e) { /* ignore */ }
 
-    // 5. Streak calc
-    const today = new Date().toISOString().split('T')[0];
-    let streak = 1;
-    let streakBonus = 0;
-    if (player) {
-      const lastDate = player.last_streak_date || '';
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-      if (lastDate === today) {
-        streak = player.login_streak || 1;
-      } else if (lastDate === yesterday) {
-        streak = (player.login_streak || 0) + 1;
-      } else {
-        streak = 1;
-      }
-      streakBonus = Math.min(streak, 30) * 0.5;
-    }
-
-    // 6. Upsert player
-    const upsertRes = await fetch(`${process.env.SUPABASE_URL}/rest/v1/players`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: process.env.SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${process.env.SUPABASE_ANON_KEY}`,
-        Prefer: 'resolution=merge-duplicates'
-      },
-      body: JSON.stringify({
-        username: data.username,
-        name: data.name || data.username,
-        session_token: sessionToken,
-        last_login: new Date().toISOString(),
-        login_streak: streak,
-        last_streak_date: today
-      })
-    });
-
-    if (!upsertRes.ok) {
-      const errText = await upsertRes.text();
-      console.error('Player upsert failed:', upsertRes.status, errText);
-      return res.redirect('/?autherror=' + encodeURIComponent('Could not save your profile, please try again'));
-    }
-
-    // 7. Success — redirect into the game
-    const name = encodeURIComponent(data.name || data.username);
-    return res.redirect(`/?username=${encodeURIComponent(data.username)}&name=${name}&token=${sessionToken}&streak=${streak}&bonus=${streakBonus.toFixed(2)}`);
+    return res.status(200).json({ ok: true, item: listing.item_data });
 
   } catch (e) {
-    console.error('Callback crashed:', e);
-    return res.redirect('/?autherror=' + encodeURIComponent('Sign-in error, please try again'));
+    console.error('market-usdc-buy fatal error:', e);
+    return res.status(500).json({ error: 'Server error: ' + (e.message || 'unknown') });
   }
 }
