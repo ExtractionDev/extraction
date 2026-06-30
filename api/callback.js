@@ -1,9 +1,22 @@
 import crypto from 'crypto';
 
-function sign(value) {
-  const secret = process.env.OAUTH_COOKIE_SECRET;
-  const mac = crypto.createHmac('sha256', secret).update(value).digest('hex');
-  return `${value}.${mac}`;
+// ── OAuth 1.0a "Sign in with Twitter" — step 2: exchange for access token ────
+// The access_token response includes screen_name + user_id directly, so we get
+// the username WITHOUT calling the paid v2 /2/users/me endpoint.
+const CONSUMER_KEY    = process.env.TWITTER_CONSUMER_KEY;
+const CONSUMER_SECRET = process.env.TWITTER_CONSUMER_SECRET;
+
+function pct(s) {
+  return encodeURIComponent(String(s)).replace(/[!*'()]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+}
+function sign(method, url, params, tokenSecret) {
+  const pstr = Object.keys(params).sort().map(k => pct(k) + '=' + pct(params[k])).join('&');
+  const base = method.toUpperCase() + '&' + pct(url) + '&' + pct(pstr);
+  const key  = pct(CONSUMER_SECRET) + '&' + pct(tokenSecret || '');
+  return crypto.createHmac('sha1', key).update(base).digest('base64');
+}
+function authHeader(params) {
+  return 'OAuth ' + Object.keys(params).sort().map(k => pct(k) + '="' + pct(params[k]) + '"').join(', ');
 }
 
 function verifyCookie(raw) {
@@ -11,16 +24,13 @@ function verifyCookie(raw) {
   const idx = raw.lastIndexOf('.');
   if (idx < 0) return null;
   const value = raw.slice(0, idx);
-  const expected = sign(value); // re-sign and compare full token
-  const a = Buffer.from(`${value}.${raw.slice(idx + 1)}`);
-  const b = Buffer.from(expected);
+  const mac   = raw.slice(idx + 1);
+  const expected = crypto.createHmac('sha256', process.env.OAUTH_COOKIE_SECRET).update(value).digest('hex');
+  const a = Buffer.from(mac), b = Buffer.from(expected);
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
   const sep = value.indexOf(':');
   if (sep < 0) return null;
-  const state = value.slice(0, sep);
-  const codeVerifier = value.slice(sep + 1);
-  if (!state || !codeVerifier) return null;
-  return { state, codeVerifier };
+  return { oauth_token: value.slice(0, sep), oauth_token_secret: value.slice(sep + 1) };
 }
 
 function parseCookies(header) {
@@ -34,69 +44,57 @@ function parseCookies(header) {
 
 export default async function handler(req, res) {
   try {
-    const { code, state: returnedState } = req.query;
-    if (!code) return res.redirect('/?autherror=' + encodeURIComponent('No authorization code received'));
+    const { oauth_token, oauth_verifier } = req.query;
+    if (!oauth_token || !oauth_verifier) {
+      return res.redirect('/?autherror=' + encodeURIComponent('No authorization received'));
+    }
 
-    // ── Verify PKCE + CSRF state from the signed cookie ──────────────────
+    // Recover the request-token secret from the signed cookie.
     const cookies = parseCookies(req.headers.cookie);
-    const flow = verifyCookie(cookies.oauth_flow);
+    const flow = verifyCookie(cookies.oauth1_flow);
     if (!flow) {
       return res.redirect('/?autherror=' + encodeURIComponent('Login session expired, please try again'));
     }
-    if (!returnedState || returnedState !== flow.state) {
+    if (flow.oauth_token !== oauth_token) {
       return res.redirect('/?autherror=' + encodeURIComponent('Invalid login state, please try again'));
     }
-    // Clear the one-time cookie immediately
-    res.setHeader('Set-Cookie', 'oauth_flow=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0');
+    res.setHeader('Set-Cookie', 'oauth1_flow=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0');
 
-    // 1. Exchange code for access token — using the REAL verifier
-    const tokenRes = await fetch('https://api.twitter.com/2/oauth2/token', {
+    // Exchange the verifier for an access token. The response body carries
+    // screen_name + user_id — no extra (paid) profile call needed.
+    const url = 'https://api.twitter.com/oauth/access_token';
+    const oauth = {
+      oauth_consumer_key:     CONSUMER_KEY,
+      oauth_nonce:            crypto.randomBytes(16).toString('hex'),
+      oauth_signature_method: 'HMAC-SHA1',
+      oauth_timestamp:        Math.floor(Date.now() / 1000).toString(),
+      oauth_token:            oauth_token,
+      oauth_version:          '1.0'
+    };
+    // oauth_verifier must be part of the signature base and sent in the body.
+    const sigParams = Object.assign({}, oauth, { oauth_verifier });
+    oauth.oauth_signature = sign('POST', url, sigParams, flow.oauth_token_secret);
+
+    const tokenRes = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        // Trim env vars — a trailing space or newline pasted into Vercel corrupts
-        // the Basic-auth header and yields a token that 401s on users/me.
-        'Authorization': 'Basic ' + Buffer.from(
-          (process.env.TWITTER_CLIENT_ID || '').trim() + ':' + (process.env.TWITTER_CLIENT_SECRET || '').trim()
-        ).toString('base64')
-      },
-      body: new URLSearchParams({
-        code,
-        grant_type: 'authorization_code',
-        redirect_uri: 'https://extraction.one/callback',
-        code_verifier: flow.codeVerifier   // ← was hardcoded 'challenge'
-      })
+      headers: { Authorization: authHeader(oauth), 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ oauth_verifier })
     });
-
-    // Read as text first — Twitter returns an HTML error page (not JSON) when the
-    // token request is rejected (bad redirect_uri, invalid_client, etc.). Parsing
-    // that as JSON crashes the function, hiding the real reason.
-    const tokenStatus = tokenRes.status;
-    const tokenRaw = await tokenRes.text();
-    let tokens;
-    try {
-      tokens = JSON.parse(tokenRaw);
-    } catch (e) {
-      console.error('Token exchange non-JSON response. HTTP', tokenStatus, '— body:', tokenRaw.slice(0, 500));
+    const text = await tokenRes.text();
+    if (!tokenRes.ok) {
+      console.error('access_token failed. HTTP', tokenRes.status, '— body:', text.slice(0, 500));
       return res.redirect('/?autherror=' + encodeURIComponent('Twitter sign-in failed, please try again'));
     }
-    if (!tokens || !tokens.access_token) {
-      console.error('Token exchange failed. HTTP', tokenStatus, JSON.stringify(tokens));
-      return res.redirect('/?autherror=' + encodeURIComponent('Twitter sign-in failed, please try again'));
-    }
-    // Surfaces whether the granted scopes actually include users.read.
-    console.log('Token exchange OK. scope=', tokens.scope, 'token_type=', tokens.token_type);
 
-    // 2. Get the user's profile
-    const userRes = await fetch('https://api.twitter.com/2/users/me', {
-      headers: { 'Authorization': `Bearer ${tokens.access_token}` }
-    });
-    const userJson = await userRes.json();
-    const data = userJson && userJson.data;
-    if (!data || !data.username) {
-      console.error('User fetch failed: HTTP', userRes.status, JSON.stringify(userJson), 'scope=', tokens.scope);
+    const parsed = new URLSearchParams(text);
+    const screenName = parsed.get('screen_name');
+    if (!screenName) {
+      console.error('access_token: no screen_name in response:', text.slice(0, 500));
       return res.redirect('/?autherror=' + encodeURIComponent('Could not read Twitter profile, please try again'));
     }
+
+    const username = screenName;
+    const displayName = screenName; // 1.0a access_token doesn't return display name
 
     // 3. Session token
     const sessionToken = crypto.randomBytes(32).toString('hex');
@@ -105,7 +103,7 @@ export default async function handler(req, res) {
     let player = null;
     try {
       const existingRes = await fetch(
-        `${process.env.SUPABASE_URL}/rest/v1/players?username=eq.${encodeURIComponent(data.username)}&select=*`,
+        `${process.env.SUPABASE_URL}/rest/v1/players?username=eq.${encodeURIComponent(username)}&select=*`,
         { headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` } }
       );
       const existing = await existingRes.json();
@@ -141,8 +139,8 @@ export default async function handler(req, res) {
         Prefer: 'resolution=merge-duplicates'
       },
       body: JSON.stringify({
-        username: data.username,
-        name: data.name || data.username,
+        username,
+        name: displayName,
         session_token: sessionToken,
         last_login: new Date().toISOString(),
         login_streak: streak,
@@ -156,14 +154,9 @@ export default async function handler(req, res) {
       return res.redirect('/?autherror=' + encodeURIComponent('Could not save your profile, please try again'));
     }
 
-    // 7. Success — redirect into the game
-    const name = encodeURIComponent(data.name || data.username);
-    // Put the login result in the URL FRAGMENT (#), not the query (?).
-    // Fragments are never sent to the server, never logged, and never appear
-    // in the Referer header — so the session token (a full-account credential)
-    // stays out of server logs, proxies, and analytics. The client reads these
-    // from window.location.hash.
-    return res.redirect(`/?username=${encodeURIComponent(data.username)}&name=${name}&token=${sessionToken}&streak=${streak}&bonus=${streakBonus.toFixed(2)}`);
+    // 7. Success — redirect into the game (query string; index.html reads it).
+    const name = encodeURIComponent(displayName);
+    return res.redirect(`/?username=${encodeURIComponent(username)}&name=${name}&token=${sessionToken}&streak=${streak}&bonus=${streakBonus.toFixed(2)}`);
 
   } catch (e) {
     console.error('Callback crashed:', e);
