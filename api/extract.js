@@ -17,6 +17,11 @@ function applyCors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
+// ── Anti-inflation tunables ──────────────────────────────────────────────
+const MIN_EXTRACT_INTERVAL_MS = 30000;   // one extract per 30s per account
+const MAX_GC_PER_RUN          = 15000;   // per-run cap
+const MAX_GC_PER_DAY          = 150000;  // cumulative 24h ceiling (~10 maxed runs) — TUNE THIS
+
 export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -26,14 +31,12 @@ export default async function handler(req, res) {
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = {}; } }
   const { username, token, floor, damage_taken, gc_earned } = body || {};
 
-  // AUTH: this endpoint writes the leaderboard metric (gc_extracted). It used to
-  // accept any username with NO token — anyone could inflate anyone's score.
+  // AUTH: this endpoint writes the leaderboard metric (gc_extracted).
   if (!username || !token || typeof gc_earned !== 'number') {
     return res.status(400).json({ error: 'Bad request' });
   }
 
-  // Cap gc_earned (max 50 GC/s × 300s = 15000 per run)
-  const safeGc = Math.min(Math.max(0, Math.floor(gc_earned)), 15000);
+  const safeGc = Math.min(Math.max(0, Math.floor(gc_earned)), MAX_GC_PER_RUN);
 
   const { data: player, error: fetchErr } = await supabase
     .from('players')
@@ -45,11 +48,34 @@ export default async function handler(req, res) {
   if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session' });
   if (player.banned) return res.status(403).json({ error: 'Account suspended.' });
 
+  // ── Rate-limit: one extract per 30s per account ───────────────────────
+  const since = new Date(Date.now() - MIN_EXTRACT_INTERVAL_MS).toISOString();
+  const { data: recent } = await supabase
+    .from('extract_log')
+    .select('id')
+    .eq('username', username)
+    .gte('created_at', since)
+    .limit(1);
+  if (recent && recent.length) {
+    return res.status(429).json({ error: 'Extracting too fast. Wait a moment.' });
+  }
+
+  // ── Cumulative 24h cap: sum GC logged in the last day ─────────────────
+  const dayAgo = new Date(Date.now() - 86400000).toISOString();
+  const { data: dayRows } = await supabase
+    .from('extract_log')
+    .select('gc_earned')
+    .eq('username', username)
+    .gte('created_at', dayAgo);
+  const gcToday = (dayRows || []).reduce((s, r) => s + (r.gc_earned || 0), 0);
+  const remainingToday = Math.max(0, MAX_GC_PER_DAY - gcToday);
+  const grantedGc = Math.min(safeGc, remainingToday);  // credit only what's left in the daily budget
+
   const now = Date.now();
   const runRecord = {
     floor: Math.floor(floor) || 0,
     damage_taken: Math.floor(damage_taken) || 0,
-    gc_earned: safeGc,
+    gc_earned: grantedGc,
     ts: now
   };
 
@@ -67,7 +93,7 @@ export default async function handler(req, res) {
   }
 
   const updateData = {
-    gc_extracted: (player.gc_extracted || 0) + safeGc,
+    gc_extracted: (player.gc_extracted || 0) + grantedGc,
     recent_runs: recentRuns,
     suspicious_count: suspCount
   };
@@ -86,5 +112,10 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Update failed' });
   }
 
-  return res.status(200).json({ ok: true, gc_extracted: updateData.gc_extracted, banned: banNow });
+  // Log this extract for rate-limit + daily-cap accounting (non-fatal)
+  try {
+    await supabase.from('extract_log').insert({ username, gc_earned: grantedGc });
+  } catch (e) { /* ignore logging errors */ }
+
+  return res.status(200).json({ ok: true, gc_extracted: updateData.gc_extracted, banned: banNow, granted: grantedGc });
 }
