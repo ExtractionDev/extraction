@@ -5,43 +5,47 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY
 );
 
-const _rateLimits = {};
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
+  .split(',').map(s => s.trim()).filter(Boolean);
+function applyCors(req, res) {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  if (req.method !== 'POST') return res.status(405).end();
+  applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method !== 'POST')    return res.status(405).end();
 
-  const { username, floor, damage_taken, gc_earned } = req.body || {};
-  if (!username || typeof gc_earned !== 'number') {
-    return res.status(400).json({ error: 'Bad request', got: req.body });
+  let body = req.body;
+  if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = {}; } }
+  const { username, token, floor, damage_taken, gc_earned } = body || {};
+
+  // AUTH: this endpoint writes the leaderboard metric (gc_extracted). It used to
+  // accept any username with NO token — anyone could inflate anyone's score.
+  if (!username || !token || typeof gc_earned !== 'number') {
+    return res.status(400).json({ error: 'Bad request' });
   }
 
-  // Rate limit: max 1 extraction report per 10 seconds per user
-  const now = Date.now();
-  if (_rateLimits[username] && now - _rateLimits[username] < 10000) {
-    return res.status(429).json({ error: 'Rate limited' });
-  }
-  _rateLimits[username] = now;
-
-  // Cap gc_earned (max 50 GC per second * 300 seconds = 15000 per run)
+  // Cap gc_earned (max 50 GC/s × 300s = 15000 per run)
   const safeGc = Math.min(Math.max(0, Math.floor(gc_earned)), 15000);
 
-  // Get current value
   const { data: player, error: fetchErr } = await supabase
     .from('players')
-    .select('gc_extracted, recent_runs, suspicious_count, is_banned')
+    .select('session_token, gc_extracted, recent_runs, suspicious_count, banned')
     .eq('username', username)
     .single();
 
-  if (fetchErr || !player) {
-    return res.status(404).json({ error: 'Player not found', detail: fetchErr?.message });
-  }
+  if (fetchErr || !player) return res.status(404).json({ error: 'Player not found' });
+  if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session' });
+  if (player.banned) return res.status(403).json({ error: 'Account suspended.' });
 
-  if (player.is_banned) {
-    return res.status(403).json({ error: 'Banned' });
-  }
-
-  // Build run record
+  const now = Date.now();
   const runRecord = {
     floor: Math.floor(floor) || 0,
     damage_taken: Math.floor(damage_taken) || 0,
@@ -49,29 +53,28 @@ export default async function handler(req, res) {
     ts: now
   };
 
-  // Update recent runs (keep last 10)
   let recentRuns = Array.isArray(player.recent_runs) ? [...player.recent_runs] : [];
   recentRuns.push(runRecord);
   if (recentRuns.length > 10) recentRuns = recentRuns.slice(-10);
 
-  // God mode detection: floor >= 5 with 0 damage
+  // God-mode detection: deep floors with zero damage taken, repeatedly.
   let suspCount = player.suspicious_count || 0;
-  let isBanned = false;
+  let banNow = false;
   if (runRecord.floor >= 5 && runRecord.damage_taken === 0) {
     const suspInRecent = recentRuns.filter(r => r.floor >= 5 && r.damage_taken === 0).length;
     if (suspInRecent >= 3) suspCount++;
-    if (suspCount >= 5) isBanned = true;
+    if (suspCount >= 5) banNow = true;
   }
 
-  // Update player
   const updateData = {
     gc_extracted: (player.gc_extracted || 0) + safeGc,
     recent_runs: recentRuns,
     suspicious_count: suspCount
   };
-  if (isBanned) {
-    updateData.is_banned = true;
-    updateData.ban_reason = 'god_mode_detected';
+  if (banNow) {
+    updateData.banned = true;
+    updateData.banned_reason = 'god_mode_detected';
+    updateData.banned_at = new Date().toISOString();
   }
 
   const { error: updateErr } = await supabase
@@ -80,8 +83,8 @@ export default async function handler(req, res) {
     .eq('username', username);
 
   if (updateErr) {
-    return res.status(500).json({ error: 'Update failed', detail: updateErr.message });
+    return res.status(500).json({ error: 'Update failed' });
   }
 
-  return res.status(200).json({ ok: true, gc_extracted: updateData.gc_extracted, banned: isBanned });
+  return res.status(200).json({ ok: true, gc_extracted: updateData.gc_extracted, banned: banNow });
 }
