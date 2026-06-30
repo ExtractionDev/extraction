@@ -1,9 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
   .split(',').map(s => s.trim()).filter(Boolean);
@@ -13,109 +10,92 @@ function applyCors(req, res) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
   }
-  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-// ── Anti-inflation tunables ──────────────────────────────────────────────
-const MIN_EXTRACT_INTERVAL_MS = 30000;   // one extract per 30s per account
-const MAX_GC_PER_RUN          = 15000;   // per-run cap
-const MAX_GC_PER_DAY          = 150000;  // cumulative 24h ceiling (~10 maxed runs) — TUNE THIS
+async function verifyToken(username, token) {
+  const { data, error } = await supabase
+    .from('players').select('session_token, tokens').eq('username', username).single();
+  if (error || !data) return null;
+  if (data.session_token !== token) return null;
+  return data;
+}
 
 export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
-  if (req.method !== 'POST')    return res.status(405).end();
 
-  let body = req.body;
-  if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = {}; } }
-  const { username, token, floor, damage_taken, gc_earned } = body || {};
-
-  // AUTH: this endpoint writes the leaderboard metric (gc_extracted).
-  if (!username || !token || typeof gc_earned !== 'number') {
-    return res.status(400).json({ error: 'Bad request' });
+  // GET — fetch all active listings
+  if (req.method === 'GET') {
+    const { data, error } = await supabase
+      .from('listings')
+      .select('*')
+      .eq('status', 'active')
+      .order('listed_at', { ascending: false })
+      .limit(200);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ listings: data || [] });
   }
 
-  const safeGc = Math.min(Math.max(0, Math.floor(gc_earned)), MAX_GC_PER_RUN);
+  if (req.method !== 'POST') return res.status(405).end();
 
-  const { data: player, error: fetchErr } = await supabase
-    .from('players')
-    .select('session_token, gc_extracted, recent_runs, suspicious_count, banned')
-    .eq('username', username)
-    .single();
+  const { action, username, token, item, price, lid, seller_wallet } = req.body || {};
+  if (!username || !token) return res.status(400).json({ error: 'Missing credentials' });
 
-  if (fetchErr || !player) return res.status(404).json({ error: 'Player not found' });
-  if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session' });
-  if (player.banned) return res.status(403).json({ error: 'Account suspended.' });
+  const player = await verifyToken(username, token);
+  if (!player) return res.status(403).json({ error: 'Invalid session' });
 
-  // ── Rate-limit: one extract per 30s per account ───────────────────────
-  const since = new Date(Date.now() - MIN_EXTRACT_INTERVAL_MS).toISOString();
-  const { data: recent } = await supabase
-    .from('extract_log')
-    .select('id')
-    .eq('username', username)
-    .gte('created_at', since)
-    .limit(1);
-  if (recent && recent.length) {
-    return res.status(429).json({ error: 'Extracting too fast. Wait a moment.' });
+  // LIST
+  if (action === 'list') {
+    const safePrice = parseFloat(price);
+    if (!item || !safePrice || safePrice < 0.01) {
+      return res.status(400).json({ error: 'Invalid listing — price must be at least $0.01 USDC' });
+    }
+    if (!seller_wallet) {
+      return res.status(400).json({ error: 'Phantom wallet not connected' });
+    }
+    const { data, error } = await supabase.from('listings').insert({
+      seller:        username,
+      item_data:     item,
+      price:         parseFloat(safePrice.toFixed(6)),
+      seller_wallet: seller_wallet,
+      status:        'active',
+      listed_at:     new Date().toISOString()
+    }).select().single();
+    if (error) {
+      console.error('List insert error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+    return res.status(200).json({ ok: true, lid: data.id });
   }
 
-  // ── Cumulative 24h cap: sum GC logged in the last day ─────────────────
-  const dayAgo = new Date(Date.now() - 86400000).toISOString();
-  const { data: dayRows } = await supabase
-    .from('extract_log')
-    .select('gc_earned')
-    .eq('username', username)
-    .gte('created_at', dayAgo);
-  const gcToday = (dayRows || []).reduce((s, r) => s + (r.gc_earned || 0), 0);
-  const remainingToday = Math.max(0, MAX_GC_PER_DAY - gcToday);
-  const grantedGc = Math.min(safeGc, remainingToday);  // credit only what's left in the daily budget
+  // WITHDRAW
+  if (action === 'withdraw') {
+    if (!lid) return res.status(400).json({ error: 'Missing lid' });
+    const { data: listing, error: fetchErr } = await supabase
+      .from('listings').select('*').eq('id', lid).single();
+    if (fetchErr || !listing) return res.status(404).json({ error: 'Listing not found' });
+    if (listing.seller !== username) return res.status(403).json({ error: 'Not your listing' });
+    if (listing.status !== 'active') return res.status(400).json({ error: 'Listing not active' });
 
-  const now = Date.now();
-  const runRecord = {
-    floor: Math.floor(floor) || 0,
-    damage_taken: Math.floor(damage_taken) || 0,
-    gc_earned: grantedGc,
-    ts: now
-  };
+    const { error: updateErr } = await supabase
+      .from('listings')
+      .update({ status: 'withdrawn' })
+      .eq('id', lid);
 
-  let recentRuns = Array.isArray(player.recent_runs) ? [...player.recent_runs] : [];
-  recentRuns.push(runRecord);
-  if (recentRuns.length > 10) recentRuns = recentRuns.slice(-10);
+    if (updateErr) {
+      console.error('Withdraw update error:', updateErr);
+      return res.status(500).json({ error: 'Failed to withdraw listing: ' + updateErr.message });
+    }
 
-  // God-mode detection: deep floors with zero damage taken, repeatedly.
-  let suspCount = player.suspicious_count || 0;
-  let banNow = false;
-  if (runRecord.floor >= 5 && runRecord.damage_taken === 0) {
-    const suspInRecent = recentRuns.filter(r => r.floor >= 5 && r.damage_taken === 0).length;
-    if (suspInRecent >= 3) suspCount++;
-    if (suspCount >= 5) banNow = true;
+    return res.status(200).json({ ok: true, item: listing.item_data });
   }
 
-  const updateData = {
-    gc_extracted: (player.gc_extracted || 0) + grantedGc,
-    recent_runs: recentRuns,
-    suspicious_count: suspCount
-  };
-  if (banNow) {
-    updateData.banned = true;
-    updateData.banned_reason = 'god_mode_detected';
-    updateData.banned_at = new Date().toISOString();
+  // BUY — now handled by /api/market-usdc-buy
+  if (action === 'buy') {
+    return res.status(400).json({ error: 'EXT purchases disabled — use USDC via Phantom wallet' });
   }
 
-  const { error: updateErr } = await supabase
-    .from('players')
-    .update(updateData)
-    .eq('username', username);
-
-  if (updateErr) {
-    return res.status(500).json({ error: 'Update failed' });
-  }
-
-  // Log this extract for rate-limit + daily-cap accounting (non-fatal)
-  try {
-    await supabase.from('extract_log').insert({ username, gc_earned: grantedGc });
-  } catch (e) { /* ignore logging errors */ }
-
-  return res.status(200).json({ ok: true, gc_extracted: updateData.gc_extracted, banned: banNow, granted: grantedGc });
+  return res.status(400).json({ error: 'Unknown action' });
 }
