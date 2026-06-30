@@ -91,7 +91,7 @@ export default async function handler(req, res) {
     try {
       const existingRes = await fetch(
         `${process.env.SUPABASE_URL}/rest/v1/players?username=eq.${encodeURIComponent(data.username)}&select=*`,
-        { headers: { apikey: process.env.SUPABASE_ANON_KEY, Authorization: `Bearer ${process.env.SUPABASE_ANON_KEY}` } }
+        { headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` } }
       );
       const existing = await existingRes.json();
       player = Array.isArray(existing) ? existing[0] : null;
@@ -121,8 +121,8 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        apikey: process.env.SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${process.env.SUPABASE_ANON_KEY}`,
+        apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
         Prefer: 'resolution=merge-duplicates'
       },
       body: JSON.stringify({
