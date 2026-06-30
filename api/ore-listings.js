@@ -1,6 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
+  .split(',').map(s => s.trim()).filter(Boolean);
+function applyCors(req, res) {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
 const VALID_ORES = ['Coal','Copper','Iron','Silver','Gold','Mystrile'];
 
 async function verifyToken(username, token) {
@@ -12,7 +24,8 @@ async function verifyToken(username, token) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(204).end();
 
   if (req.method === 'GET') {
     const { data, error } = await supabase
@@ -27,7 +40,7 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { action, username, token, ore_name, qty, price, lid } = req.body || {};
+  const { action, username, token, ore_name, qty, price, lid, seller_wallet } = req.body || {};
   if (!username || !token) return res.status(400).json({ error: 'Missing credentials' });
 
   const player = await verifyToken(username, token);
@@ -37,11 +50,14 @@ export default async function handler(req, res) {
   if (action === 'list') {
     if (!VALID_ORES.includes(ore_name)) return res.status(400).json({ error: 'Invalid ore' });
     if (!qty || qty < 1 || !price || price < 0.01) return res.status(400).json({ error: 'Invalid listing' });
+    // seller_wallet is REQUIRED — ore-usdc-buy.js needs it to verify on-chain payment.
+    if (!seller_wallet) return res.status(400).json({ error: 'Phantom wallet not connected' });
     const { data, error } = await supabase.from('ore_listings').insert({
       seller: username,
       ore_name,
       qty: Math.floor(qty),
       price: parseFloat(price),
+      seller_wallet: seller_wallet,
       status: 'active',
       listed_at: new Date().toISOString()
     }).select().single();
@@ -63,8 +79,7 @@ export default async function handler(req, res) {
   if (action === 'buy') {
     if (!lid) return res.status(400).json({ error: 'Missing lid' });
     // ATOMIC: locks the listing, debits buyer (only if funded + not banned),
-    // credits seller, marks sold — all in one transaction. No race, no stale
-    // read/modify/write, no double-credit token minting.
+    // credits seller, marks sold — all in one transaction.
     const { data: result, error: rpcErr } = await supabase
       .rpc('buy_ore_listing', { p_lid: String(lid), p_buyer: username });
     if (rpcErr) {
