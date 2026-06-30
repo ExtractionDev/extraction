@@ -1,6 +1,7 @@
 {
   "rewrites": [
-    { "source": "/callback", "destination": "/api/callback" },
-    { "source": "/auth/twitter", "destination": "/api/twitter" }
-  ]
+    { "source": "/auth/twitter", "destination": "/api/twitter" },
+    { "source": "/callback", "destination": "/api/callback" }
+  ],
+  "trailingSlash": false
 }
