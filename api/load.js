@@ -151,7 +151,14 @@ export default async function handler(req, res) {
     if ((player.tokens || 0) < fee) return res.status(400).json({ error: 'Insufficient EXT' });
 
     const newTokens = (player.tokens || 0) - fee;
-    await supabase.from('players').update({ tokens: newTokens }).eq('username', username);
+    // Record the entry fee just paid so save.js can credit the refinery payout
+    // (entry fee x 1.65 max) without it being throttled, and can't be faked by
+    // anyone who never paid. save.js clears last_entry_fee once it's refined.
+    await supabase.from('players').update({
+      tokens: newTokens,
+      last_entry_fee: fee,
+      last_entry_at: new Date().toISOString()
+    }).eq('username', username);
 
     const poolAdd = fee * 0.80;
     const removedAdd = fee * 0.20;
