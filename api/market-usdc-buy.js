@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { PublicKey } from '@solana/web3.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -18,164 +17,105 @@ function applyCors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-const DEV_WALLET = 'B8ubxUGnvhDTGGRkkN8DkyAfnoLEfnjTPdXfQn3TnVQa';
-const FEE_WALLET = '72MJWgvcqEb43mbuSTiHme6oYr4rEvwc7f3kaETHdNaN';
-const USDC_MINT  = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-const TOKEN_PROG = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
-const ASSOC_PROG = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe1bRS';
-const SLIPPAGE   = 0.01;
-
-function getATA(walletAddress, mintAddress) {
-  const [ata] = PublicKey.findProgramAddressSync(
-    [
-      new PublicKey(walletAddress).toBytes(),
-      new PublicKey(TOKEN_PROG).toBytes(),
-      new PublicKey(mintAddress).toBytes()
-    ],
-    new PublicKey(ASSOC_PROG)
-  );
-  return ata.toBase58();
-}
-
-async function getRealUsdcAccount(wallet) {
-  const rpcs = ['https://api.mainnet-beta.solana.com','https://rpc.ankr.com/solana'];
-  for (const rpc of rpcs) {
-    try {
-      const r = await fetch(rpc, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0', id: 1,
-          method: 'getTokenAccountsByOwner',
-          params: [wallet, { mint: USDC_MINT }, { encoding: 'jsonParsed' }]
-        })
-      });
-      const d = await r.json();
-      if (d.error) continue;
-      const accounts = d.result?.value || [];
-      if (!accounts.length) return null;
-      return accounts[0].pubkey;
-    } catch(e) { continue; }
-  }
-  return null;
-}
-
-async function getParsedTx(signature) {
-  const rpcs = [
-    'https://api.mainnet-beta.solana.com',
-    'https://rpc.ankr.com/solana',
-    'https://solana-mainnet.rpc.extrnode.com',
-    'https://solana.public-rpc.com'
-  ];
-  const body = JSON.stringify({
-    jsonrpc: '2.0', id: 1,
-    method: 'getTransaction',
-    params: [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' }]
-  });
-  for (const rpc of rpcs) {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const r = await fetch(rpc, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
-        if (!r.ok) break;
-        const d = await r.json();
-        if (d.error) break;
-        if (d.result) return d.result;
-        await new Promise(res => setTimeout(res, 1500));
-      } catch (e) {
-        console.warn('getTransaction failed:', rpc, e.message);
-        break;
-      }
-    }
-  }
-  return null;
-}
+// ── Anti-inflation tunables ──────────────────────────────────────────────
+const MIN_EXTRACT_INTERVAL_MS = 30000;   // one extract per 30s per account
+const MAX_GC_PER_RUN          = 15000;   // per-run cap
+const MAX_GC_PER_DAY          = 150000;  // cumulative 24h ceiling (~10 maxed runs) — TUNE THIS
 
 export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST')    return res.status(405).end();
 
-  try {
-    let body = req.body;
-    if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = {}; } }
-    const { username, token, lid, signature } = body || {};
-    if (!username || !token || !lid || !signature) {
-      return res.status(400).json({ error: 'Missing fields' });
-    }
+  let body = req.body;
+  if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = {}; } }
+  const { username, token, floor, damage_taken, gc_earned } = body || {};
 
-    const { data: player, error: playerErr } = await supabase
-      .from('players').select('session_token, banned').eq('username', username).single();
-    if (playerErr || !player) return res.status(403).json({ error: 'Player not found' });
-    if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session' });
-    if (player.banned) return res.status(403).json({ error: 'Account suspended.' });
-
-    const { data: listing, error: listErr } = await supabase
-      .from('ore_listings').select('*').eq('id', lid).single();
-    if (listErr || !listing) return res.status(404).json({ error: 'Listing not found' });
-    if (listing.seller === username) return res.status(400).json({ error: 'Cannot buy your own listing' });
-    if (!listing.seller_wallet) return res.status(400).json({ error: 'Listing has no seller wallet' });
-
-    // Replay protection: a given on-chain payment can only ever claim ONE item.
-    const { data: usedSig } = await supabase
-      .from('sales').select('id').eq('signature', signature).maybeSingle();
-    if (usedSig) return res.status(400).json({ error: 'This transaction has already been used.' });
-
-    const tx = await getParsedTx(signature);
-    if (!tx) return res.status(400).json({ error: 'Transaction not found on chain yet. If USDC was deducted, contact support with your TX signature.' });
-    if (tx.meta && tx.meta.err) {
-      const errDetail = JSON.stringify(tx.meta.err);
-      const logs = (tx.meta.logMessages || []).slice(-6).join(' | ');
-      return res.status(400).json({ error: 'Transaction failed on chain: ' + errDetail, logs: logs });
-    }
-
-    const totalUsdc   = parseFloat(listing.price) * listing.qty;
-    const totalUnits  = Math.round(totalUsdc * 1e6);
-
-    const sellerATA = await getRealUsdcAccount(listing.seller_wallet);
-    if (!sellerATA) return res.status(400).json({ error: 'Seller has no USDC account' });
-    const feeATA    = await getRealUsdcAccount(FEE_WALLET);
-
-    const innerIx = (tx.meta && tx.meta.innerInstructions) ? tx.meta.innerInstructions : [];
-    const allIx = [
-      ...((tx.transaction.message.instructions) || []),
-      ...(innerIx.flatMap(ii => ii.instructions) || [])
-    ];
-    const transfers = allIx
-      .filter(ix => ix.program === 'spl-token' && ix.parsed && (ix.parsed.type === 'transfer' || ix.parsed.type === 'transferChecked'))
-      .map(ix => {
-        const info = ix.parsed.info;
-        let amt = info.amount;
-        if (amt == null && info.tokenAmount) amt = info.tokenAmount.amount;
-        return { to: info.destination, amount: parseInt(amt || '0') };
-      });
-
-    const sellerReceived = transfers.filter(t => t.to === sellerATA).reduce((s, t) => s + t.amount, 0);
-    const feeReceived    = feeATA ? transfers.filter(t => t.to === feeATA).reduce((s, t) => s + t.amount, 0) : 0;
-
-    // FIX #4: the SELLER's receipt alone must cover the listing price (minus
-    // slippage). Previously seller+fee combined could satisfy the check.
-    if (sellerReceived < totalUnits * (1 - SLIPPAGE)) {
-      return res.status(400).json({ error: 'Payment to seller incorrect. Seller got ' + sellerReceived + ', needed ' + totalUnits });
-    }
-
-    const { error: deleteErr } = await supabase.from('ore_listings').delete().eq('id', lid);
-    if (deleteErr) {
-      console.error('Delete ore listing error:', deleteErr);
-      return res.status(500).json({ error: 'Failed to claim ore. Contact support with TX: ' + signature });
-    }
-
-    try {
-      await supabase.from('sales').insert({
-        listing_id: lid, seller: listing.seller, buyer: username,
-        price_usdc: parseFloat(listing.price) * listing.qty, signature,
-        item_data: { ore_name: listing.ore_name, qty: listing.qty },
-        sold_at: new Date().toISOString()
-      });
-    } catch (e) { /* ignore */ }
-
-    return res.status(200).json({ ok: true, ore_name: listing.ore_name, qty: listing.qty });
-
-  } catch (e) {
-    console.error('ore-usdc-buy fatal error:', e);
-    return res.status(500).json({ error: 'Server error: ' + (e.message || 'unknown') });
+  // AUTH: this endpoint writes the leaderboard metric (gc_extracted).
+  if (!username || !token || typeof gc_earned !== 'number') {
+    return res.status(400).json({ error: 'Bad request' });
   }
+
+  const safeGc = Math.min(Math.max(0, Math.floor(gc_earned)), MAX_GC_PER_RUN);
+
+  const { data: player, error: fetchErr } = await supabase
+    .from('players')
+    .select('session_token, gc_extracted, recent_runs, suspicious_count, banned')
+    .eq('username', username)
+    .single();
+
+  if (fetchErr || !player) return res.status(404).json({ error: 'Player not found' });
+  if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session' });
+  if (player.banned) return res.status(403).json({ error: 'Account suspended.' });
+
+  // ── Rate-limit: one extract per 30s per account ───────────────────────
+  const since = new Date(Date.now() - MIN_EXTRACT_INTERVAL_MS).toISOString();
+  const { data: recent } = await supabase
+    .from('extract_log')
+    .select('id')
+    .eq('username', username)
+    .gte('created_at', since)
+    .limit(1);
+  if (recent && recent.length) {
+    return res.status(429).json({ error: 'Extracting too fast. Wait a moment.' });
+  }
+
+  // ── Cumulative 24h cap: sum GC logged in the last day ─────────────────
+  const dayAgo = new Date(Date.now() - 86400000).toISOString();
+  const { data: dayRows } = await supabase
+    .from('extract_log')
+    .select('gc_earned')
+    .eq('username', username)
+    .gte('created_at', dayAgo);
+  const gcToday = (dayRows || []).reduce((s, r) => s + (r.gc_earned || 0), 0);
+  const remainingToday = Math.max(0, MAX_GC_PER_DAY - gcToday);
+  const grantedGc = Math.min(safeGc, remainingToday);  // credit only what's left in the daily budget
+
+  const now = Date.now();
+  const runRecord = {
+    floor: Math.floor(floor) || 0,
+    damage_taken: Math.floor(damage_taken) || 0,
+    gc_earned: grantedGc,
+    ts: now
+  };
+
+  let recentRuns = Array.isArray(player.recent_runs) ? [...player.recent_runs] : [];
+  recentRuns.push(runRecord);
+  if (recentRuns.length > 10) recentRuns = recentRuns.slice(-10);
+
+  // God-mode detection: deep floors with zero damage taken, repeatedly.
+  let suspCount = player.suspicious_count || 0;
+  let banNow = false;
+  if (runRecord.floor >= 5 && runRecord.damage_taken === 0) {
+    const suspInRecent = recentRuns.filter(r => r.floor >= 5 && r.damage_taken === 0).length;
+    if (suspInRecent >= 3) suspCount++;
+    if (suspCount >= 5) banNow = true;
+  }
+
+  const updateData = {
+    gc_extracted: (player.gc_extracted || 0) + grantedGc,
+    recent_runs: recentRuns,
+    suspicious_count: suspCount
+  };
+  if (banNow) {
+    updateData.banned = true;
+    updateData.banned_reason = 'god_mode_detected';
+    updateData.banned_at = new Date().toISOString();
+  }
+
+  const { error: updateErr } = await supabase
+    .from('players')
+    .update(updateData)
+    .eq('username', username);
+
+  if (updateErr) {
+    return res.status(500).json({ error: 'Update failed' });
+  }
+
+  // Log this extract for rate-limit + daily-cap accounting (non-fatal)
+  try {
+    await supabase.from('extract_log').insert({ username, gc_earned: grantedGc });
+  } catch (e) { /* ignore logging errors */ }
+
+  return res.status(200).json({ ok: true, gc_extracted: updateData.gc_extracted, banned: banNow, granted: grantedGc });
 }
