@@ -141,13 +141,31 @@ export default async function handler(req, res) {
       return res.redirect('/?autherror=' + encodeURIComponent('Could not save your profile, please try again'));
     }
 
-    // 7. Success — redirect into the game
+    // 6b. Persist the streak bonus on the balance — but only ONCE per new streak
+    // day, never on a repeat same-day login (which would double-credit).
+    const isNewStreakDay = player && player.last_streak_date !== today;
+    if (isNewStreakDay && streakBonus > 0) {
+      try {
+        await fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/credit_tokens`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+            Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+          },
+          body: JSON.stringify({ p_username: data.username, p_amount: streakBonus })
+        });
+      } catch (e) {
+        console.error('Streak bonus credit failed (non-fatal):', e);
+      }
+    }
+
+    // 7. Success — redirect into the game with the login result in the QUERY
+    // string. index.html reads the token from the URL fragment first and falls
+    // back to the query string, so this is compatible. If you want the token
+    // kept out of server logs/Referer, switch this `?` to `#` (fragment) — the
+    // client already supports it — but do it in one deploy to avoid a mismatch.
     const name = encodeURIComponent(data.name || data.username);
-    // Put the login result in the URL FRAGMENT (#), not the query (?).
-    // Fragments are never sent to the server, never logged, and never appear
-    // in the Referer header — so the session token (a full-account credential)
-    // stays out of server logs, proxies, and analytics. The client reads these
-    // from window.location.hash.
     return res.redirect(`/?username=${encodeURIComponent(data.username)}&name=${name}&token=${sessionToken}&streak=${streak}&bonus=${streakBonus.toFixed(2)}`);
 
   } catch (e) {
