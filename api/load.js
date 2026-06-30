@@ -142,14 +142,24 @@ export default async function handler(req, res) {
     if (!entryFee) return res.status(400).json({ error: 'Missing entry fee' });
     const fee = parseFloat(entryFee);
     if (isNaN(fee) || fee <= 0) return res.status(400).json({ error: 'Invalid entry fee' });
-    if ((player.tokens || 0) < fee) return res.status(400).json({ error: 'Insufficient EXT' });
 
-    const newTokens = (player.tokens || 0) - fee;
+    // ATOMIC debit — closes the concurrent double-entry / one-fee-two-runs race.
+    // (The old read-check-write let two simultaneous entries both pass the balance
+    // check and write the same post-fee value, so the player paid once but entered
+    // twice and got two jackpot tickets.) debit_tokens subtracts only if funded.
+    const { data: newBalRaw, error: debitErr } = await supabase
+      .rpc('debit_tokens', { p_username: username, p_amount: fee });
+    if (debitErr) {
+      console.error('debit_tokens (entry fee) failed:', debitErr.message);
+      return res.status(500).json({ error: 'Try again shortly.' });
+    }
+    if (newBalRaw == null) return res.status(400).json({ error: 'Insufficient EXT' });
+    const newTokens = parseFloat(newBalRaw) || 0;
+
     // Record the entry fee just paid so save.js can credit the refinery payout
     // (entry fee x 1.65 max) without it being throttled, and can't be faked by
     // anyone who never paid. save.js clears last_entry_fee once it's refined.
     await supabase.from('players').update({
-      tokens: newTokens,
       last_entry_fee: fee,
       last_entry_at: new Date().toISOString(),
       jackpot_eligible_at: new Date().toISOString()  // grants ONE jackpot pull for this paid run
