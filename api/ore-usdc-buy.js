@@ -20,6 +20,7 @@ function applyCors(req, res) {
 
 const DEV_WALLET = 'B8ubxUGnvhDTGGRkkN8DkyAfnoLEfnjTPdXfQn3TnVQa';
 const FEE_WALLET = '72MJWgvcqEb43mbuSTiHme6oYr4rEvwc7f3kaETHdNaN';
+const FEE_RATE   = 0.05; // 5% marketplace fee, taken OUT of the listing price (buyer pays price; seller nets price*(1-FEE_RATE))
 const USDC_MINT  = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const TOKEN_PROG = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const ASSOC_PROG = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe1bRS';
@@ -151,10 +152,28 @@ export default async function handler(req, res) {
     const sellerReceived = transfers.filter(t => t.to === sellerATA).reduce((s, t) => s + t.amount, 0);
     const feeReceived    = feeATA ? transfers.filter(t => t.to === feeATA).reduce((s, t) => s + t.amount, 0) : 0;
 
-    // FIX #4: the SELLER's receipt alone must cover the listing price (minus
-    // slippage). Previously seller+fee combined could satisfy the check.
-    if (sellerReceived < totalUnits * (1 - SLIPPAGE)) {
-      return res.status(400).json({ error: 'Payment to seller incorrect. Seller got ' + sellerReceived + ', needed ' + totalUnits });
+    // OPTION B fee model: buyer pays exactly the listing total.
+    // The fee is taken OUT of the seller's cut:
+    //   seller gets total * (1 - FEE_RATE)
+    //   fee wallet gets total * FEE_RATE
+    // Verify all three so neither side can be cheated:
+    //   1. seller received at least their cut (minus slippage)
+    //   2. fee wallet received at least the fee (minus slippage)
+    //   3. seller + fee together cover the full total (buyer didn't underpay)
+    const expectedSeller = Math.round(totalUnits * (1 - FEE_RATE));
+    const expectedFee    = totalUnits - expectedSeller;
+    const minSeller      = Math.floor(expectedSeller * (1 - SLIPPAGE));
+    const minFee         = Math.floor(expectedFee * (1 - SLIPPAGE));
+    const minTotal       = Math.floor(totalUnits * (1 - SLIPPAGE));
+
+    if (sellerReceived < minSeller) {
+      return res.status(400).json({ error: 'Payment to seller incorrect. Seller got ' + sellerReceived + ', needed ' + expectedSeller });
+    }
+    if (feeReceived < minFee) {
+      return res.status(400).json({ error: 'Marketplace fee incorrect. Fee wallet got ' + feeReceived + ', needed ' + expectedFee });
+    }
+    if ((sellerReceived + feeReceived) < minTotal) {
+      return res.status(400).json({ error: 'Total payment incorrect. Paid ' + (sellerReceived + feeReceived) + ', needed ' + totalUnits });
     }
 
     const { error: deleteErr } = await supabase.from('ore_listings').delete().eq('id', lid);
