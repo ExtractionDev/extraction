@@ -5,7 +5,7 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY
 );
 
-// ── CORS (same allowlist pattern as load.js) ────────────────────────────────
+// ── CORS ────────────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
   .split(',').map(s => s.trim()).filter(Boolean);
 function applyCors(req, res) {
@@ -22,38 +22,36 @@ function applyCors(req, res) {
 const VALID_UPS    = ['speed', 'power', 'sell', 'luck'];
 const VALID_ORES   = ['Coal', 'Copper', 'Iron', 'Silver', 'Gold', 'Mystrile'];
 const MAX_UP_LEVEL = 500;
-const MAX_UP_GAIN  = 50;          // upgrades may rise at most this much per save (0→500 takes 10 saves)
+const MAX_UP_GAIN  = 50;
 const MAX_GOLD     = 9999999999;
 const MAX_TOKENS   = 9999999999;
 const MAX_ITEM_PRICE = 100000;
 const MAX_INVENTORY  = 50;
 
-// Per-save increase ceilings for monotonic counters (stop them being a backdoor).
 const MAX_RUNS_GAIN   = 50;
 const MAX_CHESTS_GAIN = 50;
 const MAX_ROCKS_GAIN  = 200000;
-const MAX_ORE_GAIN    = 500;      // per ore type, per save
+const MAX_ORE_GAIN    = 500;
 
-// Gold is earned ONLY by completing dungeon runs (gold += final; runs++), so a
-// gold INCREASE is bounded by (runs this save) × (max per run). Decreases (spending) allowed.
 const MAX_GOLD_PER_RUN = 50000;
 const GOLD_BUFFER      = 1000;
 
-// gameStats: whitelist of monotonic counters; anything else is dropped.
 const VALID_STAT_KEYS = ['bestGC','deepestFloor','enemiesKilled','totalDmg','rareRocks','goldRocks','mystrileRocks'];
 const STAT_GAIN_CAP   = 100000;
 const STAT_MAX        = 1e12;
 
 const VALID_SLOTS = ['pickaxe','head','ring','amulet'];
 
-// Refinery: payout is entry_fee × ratio, clamped to REFINE_CAP_MULT (1.65×) in
-// index.html. We let a player credit up to (their last paid entry × 1.65) as a
-// one-time burst on top of the mining ceiling, valid for ENTRY_WINDOW_MS after
-// they paid (a dungeon run takes minutes). The entry fee is consumed once used.
 const REFINE_CAP_MULT = 1.65;
-const ENTRY_WINDOW_MS = 60 * 60 * 1000; // 60 min
+const ENTRY_WINDOW_MS = 60 * 60 * 1000;
 
-// Per-rarity legitimate affix bounds (from RARS in index.html: ac=count, ar=value).
+// ── Anti-cheat thresholds (BAN only on values that are impossible or wildly
+//    beyond what the player's own activity could produce — never on merely
+//    "high" values a legit grinder could reach). ──────────────────────────────
+const GOLD_CHEAT_MARGIN  = 1000000; // gold beyond runs-justified by >1M = fabricated
+const TOKEN_CHEAT_MARGIN = 1000000; // token total beyond creditable by >1M = mint attempt
+const AFFIX_CHEAT_FACTOR = 2;       // affix value beyond 2× its rarity max = fabricated gear
+
 const RARITY = {
   Common:    { maxCount: 1, maxVal: 5 },
   Uncommon:  { maxCount: 2, maxVal: 8 },
@@ -65,7 +63,6 @@ const RARITY = {
 const VALID_AFFIX_KEYS = ['speed','power','sell','luck','dungeonGC','crystalRes'];
 const FIXED_AFFIX      = { dungeonGC: 10, crystalRes: 25 };
 
-// Generous upper bound on tokens earnable per second from (capped) upgrade levels.
 function maxEarnPerSec(ups) {
   const speed = Math.min(Math.max(0, ups.speed || 0), MAX_UP_LEVEL);
   const power = Math.min(Math.max(0, ups.power || 0), MAX_UP_LEVEL);
@@ -85,7 +82,6 @@ function clampInventory(inventory) {
     const bounds = RARITY[item.rarN];
     if (!bounds) continue;
     const slot = VALID_SLOTS.includes(item.slot) ? item.slot : 'pickaxe';
-
     let affixes = [];
     if (Array.isArray(item.affixes)) {
       const seen = {};
@@ -101,16 +97,12 @@ function clampInventory(inventory) {
         if (affixes.length >= bounds.maxCount) break;
       }
     }
-
     out.push({
-      id:       String(item.id).slice(0, 32),
-      slot,
+      id: String(item.id).slice(0, 32), slot,
       slotIcon: item.slotIcon || 'ti-pickaxe',
-      mat:      String(item.mat).slice(0, 32),
-      type:     String(item.type).slice(0, 32),
-      rarN:     item.rarN,
-      affixes,
-      price:    Math.min(Math.max(0, Math.floor(item.price || 0)), MAX_ITEM_PRICE)
+      mat: String(item.mat).slice(0, 32), type: String(item.type).slice(0, 32),
+      rarN: item.rarN, affixes,
+      price: Math.min(Math.max(0, Math.floor(item.price || 0)), MAX_ITEM_PRICE)
     });
     if (out.length >= MAX_INVENTORY) break;
   }
@@ -132,18 +124,19 @@ export default async function handler(req, res) {
   // ── Verify session ──────────────────────────────────────────────────────
   const { data: player, error: fetchErr } = await supabase
     .from('players')
-    .select('session_token, gold, tokens, total_rocks, runs, chests, ups, ore_stash, lifetime_ext, game_stats, updated_at, last_entry_fee, last_entry_at')
+    .select('session_token, gold, tokens, total_rocks, runs, chests, ups, ore_stash, lifetime_ext, game_stats, updated_at, last_entry_fee, last_entry_at, banned')
     .eq('username', username)
     .single();
 
   if (fetchErr || !player) return res.status(403).json({ error: 'Player not found' });
   if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session token' });
+  if (player.banned) return res.status(403).json({ error: 'Account suspended.' });
 
   const {
     gold, totalRocks, runs, chests, ups, oreStash,
-    inventory, eqSlots, gameStats, _achiev, lifetimeExt
+    inventory, eqSlots, gameStats, _achiev, lifetimeExt, tokens
   } = data;
-  // client-sent `tokens` is intentionally IGNORED — balance is server-authoritative.
+  // client-sent `tokens` is IGNORED for the balance — only used below to detect mint attempts.
 
   // ── Monotonic counters with per-save increase ceilings ──────────────────
   const prevRuns  = player.runs || 0;
@@ -156,17 +149,12 @@ export default async function handler(req, res) {
   // ── Gold: increase bounded by runs completed; decrease allowed ──────────
   const prevGold   = player.gold || 0;
   const clientGold = Math.max(0, Math.floor(gold || 0));
-  let safeGold;
-  if (clientGold <= prevGold) {
-    safeGold = clientGold;
-  } else {
-    const runsDelta   = Math.max(0, safeRuns - prevRuns);
-    const allowedGain = runsDelta * MAX_GOLD_PER_RUN + GOLD_BUFFER;
-    safeGold = Math.min(clientGold, prevGold + allowedGain);
-  }
+  const runsDelta  = Math.max(0, safeRuns - prevRuns);
+  const allowedGoldGain = runsDelta * MAX_GOLD_PER_RUN + GOLD_BUFFER;
+  let safeGold = (clientGold <= prevGold) ? clientGold : Math.min(clientGold, prevGold + allowedGoldGain);
   safeGold = Math.min(safeGold, MAX_GOLD);
 
-  // ── Upgrades: rise at most MAX_UP_GAIN/save, hard cap MAX_UP_LEVEL ───────
+  // ── Upgrades ────────────────────────────────────────────────────────────
   const safeUps = {};
   VALID_UPS.forEach(k => {
     const prev = player.ups ? (player.ups[k] || 0) : 0;
@@ -174,7 +162,7 @@ export default async function handler(req, res) {
     safeUps[k] = Math.max(prev, Math.min(want, Math.min(MAX_UP_LEVEL, prev + MAX_UP_GAIN)));
   });
 
-  // ── Ore stash: can only rise, bounded per save ──────────────────────────
+  // ── Ore stash ───────────────────────────────────────────────────────────
   const safeOreStash = {};
   VALID_ORES.forEach(ore => {
     const prev = player.ore_stash ? (player.ore_stash[ore] || 0) : 0;
@@ -182,7 +170,7 @@ export default async function handler(req, res) {
     safeOreStash[ore] = Math.max(prev, Math.min(want, prev + MAX_ORE_GAIN));
   });
 
-  // ── gameStats: whitelist, monotonic, per-save capped ────────────────────
+  // ── gameStats ───────────────────────────────────────────────────────────
   const prevStats = player.game_stats || {};
   const safeStats = {};
   VALID_STAT_KEYS.forEach(k => {
@@ -191,7 +179,7 @@ export default async function handler(req, res) {
     safeStats[k] = Math.min(Math.max(prev, Math.min(want, prev + STAT_GAIN_CAP)), STAT_MAX);
   });
 
-  // ── Inventory + equipped slots ──────────────────────────────────────────
+  // ── Inventory + equipped ────────────────────────────────────────────────
   const safeInventory = clampInventory(inventory);
   const invIds = new Set(safeInventory.map(it => it.id));
   const safeEqSlots = {};
@@ -202,11 +190,7 @@ export default async function handler(req, res) {
     });
   }
 
-  // ── TOKEN / LIFETIME: server-authoritative atomic credit ────────────────
-  // Mining AND refinery both raise tokens and lifetime_ext together, so claimed
-  // earnings = newLifetime - prevLifetime. Bounded by: 1M/save, the mining-rate
-  // time ceiling, PLUS a one-time refinery burst tied to the player's actual
-  // last paid entry fee (recorded by load.js). Applied as an atomic increment.
+  // ── Token / lifetime bounded credit ─────────────────────────────────────
   const prevLifetime  = parseFloat(player.lifetime_ext) || 0;
   const claimLifetime = Math.max(prevLifetime, parseFloat(lifetimeExt) || 0);
   let rawDelta = claimLifetime - prevLifetime;
@@ -219,7 +203,6 @@ export default async function handler(req, res) {
   }
   const timeCeiling = maxEarnPerSec(safeUps) * elapsedSec;
 
-  // Refinery burst — up to (last paid entry × 1.65), within the time window.
   let refineBurst = 0;
   const lastFee = parseFloat(player.last_entry_fee) || 0;
   if (lastFee > 0 && player.last_entry_at) {
@@ -231,14 +214,65 @@ export default async function handler(req, res) {
 
   let allowedDelta = Math.min(rawDelta, 1000000, timeCeiling + refineBurst);
   if (!(allowedDelta > 0)) allowedDelta = 0;
-  const headroom = Math.max(0, MAX_TOKENS - (parseFloat(player.tokens) || 0));
+  const prevTokens = parseFloat(player.tokens) || 0;
+  const headroom = Math.max(0, MAX_TOKENS - prevTokens);
   allowedDelta = Math.min(allowedDelta, headroom);
-
-  // Consume the entry fee only if the burst was actually needed (a refine
-  // happened — the claimed delta exceeded what mining alone could justify).
   const consumedBurst = refineBurst > 0 && allowedDelta > timeCeiling + 0.0001;
 
-  // ── Write everything EXCEPT tokens/lifetime_ext (those go via atomic RPC) ─
+  // ── CHEAT DETECTION → AUTO-BAN ──────────────────────────────────────────
+  // Only fires on values impossible for the real client, or wildly beyond what
+  // the player's own runs/balance could justify. Never on merely-high values.
+  const cheatReasons = [];
+
+  VALID_UPS.forEach(k => {
+    const want = Math.floor((ups && ups[k]) || 0);
+    if (want > MAX_UP_LEVEL) cheatReasons.push(`upgrade ${k}=${want} > max ${MAX_UP_LEVEL}`);
+  });
+
+  if (clientGold > prevGold + allowedGoldGain + GOLD_CHEAT_MARGIN) {
+    cheatReasons.push(`gold ${clientGold} exceeds run-earnable ${Math.floor(prevGold + allowedGoldGain)} by >${GOLD_CHEAT_MARGIN}`);
+  }
+
+  const tokenClaim = Math.floor(parseFloat(tokens) || 0);
+  if (tokenClaim > prevTokens + allowedDelta + TOKEN_CHEAT_MARGIN) {
+    cheatReasons.push(`tokens ${tokenClaim} exceeds creditable ${Math.floor(prevTokens + allowedDelta)} by >${TOKEN_CHEAT_MARGIN}`);
+  }
+
+  if (Array.isArray(inventory)) {
+    for (const item of inventory) {
+      if (!item || !item.rarN) continue;
+      const b = RARITY[item.rarN];
+      if (!b || !Array.isArray(item.affixes)) continue;
+      for (const a of item.affixes) {
+        if (!a) continue;
+        const k = a.tk || (a.t && a.t.k);
+        if (Object.prototype.hasOwnProperty.call(FIXED_AFFIX, k)) continue;
+        if ((a.v || 0) > b.maxVal * AFFIX_CHEAT_FACTOR) {
+          cheatReasons.push(`affix ${k}=${a.v} on ${item.rarN} > ${b.maxVal * AFFIX_CHEAT_FACTOR}`);
+          break;
+        }
+      }
+    }
+  }
+
+  if (cheatReasons.length) {
+    const reasonText = cheatReasons.join('; ');
+    await supabase.from('players').update({
+      banned: true,
+      banned_reason: reasonText.slice(0, 500),
+      banned_at: new Date().toISOString()
+    }).eq('username', username);
+    try {
+      await supabase.from('cheat_log').insert({
+        username,
+        reasons: reasonText.slice(0, 1000),
+        details: { clientGold, tokenClaim, ups: ups || null }
+      });
+    } catch (e) { /* ignore logging errors */ }
+    return res.status(403).json({ error: 'Account suspended for invalid game data.' });
+  }
+
+  // ── Write everything except tokens/lifetime_ext ─────────────────────────
   const row = {
     username,
     gold:           safeGold,
@@ -253,7 +287,7 @@ export default async function handler(req, res) {
     achievements:   (_achiev && typeof _achiev === 'object') ? _achiev : {},
     updated_at:     new Date().toISOString()
   };
-  if (consumedBurst) row.last_entry_fee = 0; // burn the paid entry so it can't refine twice
+  if (consumedBurst) row.last_entry_fee = 0;
 
   const { error: updateErr } = await supabase
     .from('players')
@@ -264,8 +298,8 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: updateErr.message });
   }
 
-  // ── Apply earnings atomically: tokens += delta, lifetime_ext += delta ────
-  let newTokens = parseFloat(player.tokens) || 0;
+  // ── Apply earnings atomically ───────────────────────────────────────────
+  let newTokens = prevTokens;
   if (allowedDelta > 0) {
     const { data: rpcData, error: incErr } = await supabase
       .rpc('apply_mining', { p_username: username, p_amount: allowedDelta });
@@ -274,8 +308,6 @@ export default async function handler(req, res) {
     } else if (rpcData != null) {
       newTokens = parseFloat(rpcData) || newTokens;
     }
-    // Pool contribution: 10% of bounded earnings, server-computed. Client can
-    // never set the pool — it only moves through this RPC and load.js.
     const { error: poolErr } = await supabase
       .rpc('add_to_pool', { amount: allowedDelta * 0.10 });
     if (poolErr) console.error('Pool contribution error:', poolErr);
