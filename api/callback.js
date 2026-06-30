@@ -143,7 +143,12 @@ export default async function handler(req, res) {
 
     // 7. Success — redirect into the game
     const name = encodeURIComponent(data.name || data.username);
-    return res.redirect(`/?username=${encodeURIComponent(data.username)}&name=${name}&token=${sessionToken}&streak=${streak}&bonus=${streakBonus.toFixed(2)}`);
+    // Put the login result in the URL FRAGMENT (#), not the query (?).
+    // Fragments are never sent to the server, never logged, and never appear
+    // in the Referer header — so the session token (a full-account credential)
+    // stays out of server logs, proxies, and analytics. The client reads these
+    // from window.location.hash.
+    return res.redirect(`/#username=${encodeURIComponent(data.username)}&name=${name}&token=${sessionToken}&streak=${streak}&bonus=${streakBonus.toFixed(2)}`);
 
   } catch (e) {
     console.error('Callback crashed:', e);
