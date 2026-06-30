@@ -90,15 +90,21 @@ export default async function handler(req, res) {
     }
 
     const { data: player, error: playerErr } = await supabase
-      .from('players').select('session_token').eq('username', username).single();
+      .from('players').select('session_token, banned').eq('username', username).single();
     if (playerErr || !player) return res.status(403).json({ error: 'Player not found' });
     if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session' });
+    if (player.banned) return res.status(403).json({ error: 'Account suspended.' });
 
     const { data: listing, error: listErr } = await supabase
       .from('listings').select('*').eq('id', lid).single();
     if (listErr || !listing) return res.status(404).json({ error: 'Listing not found' });
     if (listing.seller === username) return res.status(400).json({ error: 'Cannot buy your own listing' });
     if (!listing.seller_wallet) return res.status(400).json({ error: 'Listing has no seller wallet' });
+
+    // Replay protection: a given on-chain payment can only ever claim ONE item.
+    const { data: usedSig } = await supabase
+      .from('sales').select('id').eq('signature', signature).maybeSingle();
+    if (usedSig) return res.status(400).json({ error: 'This transaction has already been used.' });
 
     const tx = await getParsedTx(signature);
     if (!tx) return res.status(400).json({ error: 'Transaction not found on chain yet. If USDC was deducted, contact support with your TX signature.' });
