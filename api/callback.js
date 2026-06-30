@@ -54,8 +54,10 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        // Trim env vars — a trailing space or newline pasted into Vercel corrupts
+        // the Basic-auth header and yields a token that 401s on users/me.
         'Authorization': 'Basic ' + Buffer.from(
-          process.env.TWITTER_CLIENT_ID + ':' + process.env.TWITTER_CLIENT_SECRET
+          (process.env.TWITTER_CLIENT_ID || '').trim() + ':' + (process.env.TWITTER_CLIENT_SECRET || '').trim()
         ).toString('base64')
       },
       body: new URLSearchParams({
@@ -71,6 +73,8 @@ export default async function handler(req, res) {
       console.error('Token exchange failed:', tokens);
       return res.redirect('/?autherror=' + encodeURIComponent('Twitter sign-in failed, please try again'));
     }
+    // Surfaces whether the granted scopes actually include users.read.
+    console.log('Token exchange OK. scope=', tokens.scope, 'token_type=', tokens.token_type);
 
     // 2. Get the user's profile
     const userRes = await fetch('https://api.twitter.com/2/users/me', {
@@ -79,7 +83,7 @@ export default async function handler(req, res) {
     const userJson = await userRes.json();
     const data = userJson && userJson.data;
     if (!data || !data.username) {
-      console.error('User fetch failed:', userJson);
+      console.error('User fetch failed: HTTP', userRes.status, JSON.stringify(userJson), 'scope=', tokens.scope);
       return res.redirect('/?autherror=' + encodeURIComponent('Could not read Twitter profile, please try again'));
     }
 
