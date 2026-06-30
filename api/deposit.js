@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
   .split(',').map(s => s.trim()).filter(Boolean);
@@ -10,98 +13,86 @@ function applyCors(req, res) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-async function verifyToken(username, token) {
-  const { data, error } = await supabase
-    .from('players').select('session_token, tokens').eq('username', username).single();
-  if (error || !data) return null;
-  if (data.session_token !== token) return null;
-  return data;
-}
+// Solana tx signatures are base58, ~87-88 chars.
+const SIG = /^[1-9A-HJ-NP-Za-km-z]{43,90}$/;
 
 export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method !== 'POST')    return res.status(405).end();
 
-  // GET — fetch all active listings
-  if (req.method === 'GET') {
-    const { data, error } = await supabase
-      .from('listings')
-      .select('*')
-      .eq('status', 'active')
-      .order('listed_at', { ascending: false })
-      .limit(200);
-    if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json({ listings: data || [] });
+  let body = req.body;
+  if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = {}; } }
+  const { username, token, amount, tx_hash } = body || {};
+  if (!username || !token || !amount || !tx_hash) {
+    return res.status(400).json({ error: 'Missing fields' });
   }
 
-  if (req.method !== 'POST') return res.status(405).end();
-
-  const { action, username, token, item, price, lid, seller_wallet } = req.body || {};
-  if (!username || !token) return res.status(400).json({ error: 'Missing credentials' });
-
-  const player = await verifyToken(username, token);
-  if (!player) return res.status(403).json({ error: 'Invalid session' });
-
-  // LIST
-  if (action === 'list') {
-    const safePrice = parseFloat(price);
-    if (!item || !safePrice || safePrice < 0.01) {
-      return res.status(400).json({ error: 'Invalid listing — price must be at least $0.01 USDC' });
-    }
-    // Cap stored item_data size to prevent oversized-payload storage abuse.
-    let itemJson;
-    try { itemJson = JSON.stringify(item); } catch (e) { itemJson = ''; }
-    if (!itemJson || itemJson.length > 4000) {
-      return res.status(400).json({ error: 'Invalid item data' });
-    }
-    if (!seller_wallet) {
-      return res.status(400).json({ error: 'Phantom wallet not connected' });
-    }
-    const { data, error } = await supabase.from('listings').insert({
-      seller:        username,
-      item_data:     item,
-      price:         parseFloat(safePrice.toFixed(6)),
-      seller_wallet: seller_wallet,
-      status:        'active',
-      listed_at:     new Date().toISOString()
-    }).select().single();
-    if (error) {
-      console.error('List insert error:', error);
-      return res.status(500).json({ error: error.message });
-    }
-    return res.status(200).json({ ok: true, lid: data.id });
+  const safeAmount = parseFloat(amount);
+  if (isNaN(safeAmount) || safeAmount <= 0) {
+    return res.status(400).json({ error: 'Invalid amount.' });
+  }
+  if (typeof tx_hash !== 'string' || !SIG.test(tx_hash)) {
+    return res.status(400).json({ error: 'Invalid transaction hash.' });
   }
 
-  // WITHDRAW
-  if (action === 'withdraw') {
-    if (!lid) return res.status(400).json({ error: 'Missing lid' });
-    const { data: listing, error: fetchErr } = await supabase
-      .from('listings').select('*').eq('id', lid).single();
-    if (fetchErr || !listing) return res.status(404).json({ error: 'Listing not found' });
-    if (listing.seller !== username) return res.status(403).json({ error: 'Not your listing' });
-    if (listing.status !== 'active') return res.status(400).json({ error: 'Listing not active' });
+  // Verify session + ban status
+  const { data: player, error: fetchErr } = await supabase
+    .from('players')
+    .select('session_token, tokens, runs, banned')
+    .eq('username', username)
+    .single();
 
-    const { error: updateErr } = await supabase
-      .from('listings')
-      .update({ status: 'withdrawn' })
-      .eq('id', lid);
+  if (fetchErr || !player) return res.status(403).json({ error: 'Player not found.' });
+  if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session.' });
+  if (player.banned) return res.status(403).json({ error: 'Account suspended.' });
 
-    if (updateErr) {
-      console.error('Withdraw update error:', updateErr);
-      return res.status(500).json({ error: 'Failed to withdraw listing: ' + updateErr.message });
-    }
-
-    return res.status(200).json({ ok: true, item: listing.item_data });
+  // Reject a tx_hash that was already submitted (replay protection).
+  const { data: existing } = await supabase
+    .from('deposits')
+    .select('id')
+    .eq('tx_hash', tx_hash)
+    .maybeSingle();
+  if (existing) {
+    return res.status(400).json({ error: 'This transaction has already been submitted.' });
   }
 
-  // BUY — now handled by /api/market-usdc-buy
-  if (action === 'buy') {
-    return res.status(400).json({ error: 'EXT purchases disabled — use USDC via Phantom wallet' });
+  // Light DB-based rate limit (one pending deposit per 30s per account).
+  const since = new Date(Date.now() - 30000).toISOString();
+  const { data: recent } = await supabase
+    .from('deposits')
+    .select('id')
+    .eq('username', username)
+    .gte('requested_at', since)
+    .limit(1);
+  if (recent && recent.length) {
+    return res.status(429).json({ error: 'Please wait before submitting another deposit.' });
   }
 
-  return res.status(400).json({ error: 'Unknown action' });
+  // ⚠️ SECURITY: `amount` here is CLIENT-SUPPLIED and NOT trustworthy. Whatever
+  // process credits tokens for a 'pending' deposit MUST look up tx_hash on the
+  // Solana chain, confirm it is finalized, sent to YOUR deposit wallet, in USDC,
+  // and credit the REAL on-chain amount — never this client-claimed value.
+  const { error: insertErr } = await supabase
+    .from('deposits')
+    .insert({
+      username,
+      amount: safeAmount,          // claimed; verify on-chain before crediting
+      tx_hash,
+      tokens_balance: player.tokens || 0,
+      runs: player.runs || 0,
+      status: 'pending',
+      requested_at: new Date().toISOString()
+    });
+
+  if (insertErr) {
+    console.error('Deposit insert error:', insertErr);
+    return res.status(500).json({ error: 'Failed to submit. Try again.' });
+  }
+
+  return res.status(200).json({ ok: true });
 }
