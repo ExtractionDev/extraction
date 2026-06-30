@@ -5551,6 +5551,19 @@ function _setSignedInUI(username){
       .then(function(r){return r.ok?r.json():null;})
       .then(function(d){
         if(d&&!d.error&&d.updated_at){
+          // Keep the client's lifetimeExt high-water mark at least the server's
+          // credited total. If it falls behind (cleared storage, new browser,
+          // cross-session drift) save.js computes a <=0 earnings delta and token
+          // credits freeze at exactly the old value. Realign unconditionally.
+          try{
+            var _sbLife=parseFloat(d.lifetime_ext)||0;
+            if(_sbLife>(parseFloat(lifetimeExt)||0)) lifetimeExt=_sbLife;
+            var _curL=JSON.parse(localStorage.getItem(_localKey)||'null');
+            if(_curL&&_sbLife>(parseFloat(_curL.lifetimeExt)||0)){
+              _curL.lifetimeExt=_sbLife;
+              localStorage.setItem(_localKey,JSON.stringify(_curL));
+            }
+          }catch(e){}
           var _sbTokens=d.tokens||0;
           var _sbGold=d.gold||0;
           var _localTokens=_localData.tokens||0;
@@ -5584,7 +5597,7 @@ function _setSignedInUI(username){
         if(d&&!d.error&&(d.updated_at||typeof d.gold==='number')){
           var mapped={gold:d.gold,tokens:d.tokens,totalRocks:d.total_rocks,runs:d.runs,chests:d.chests,
             ups:d.ups,oreStash:d.ore_stash,inventory:d.inventory,eqSlots:d.equipped_slots,
-            gameStats:d.game_stats,_achiev:d.achievements,
+            gameStats:d.game_stats,_achiev:d.achievements,lifetimeExt:d.lifetime_ext,
             mRockNum:d.mRockNum,mRockHP:d.mRockHP,mRockMax:d.mRockMax,mRockType:d.mRockType};
           localStorage.setItem(_localKey,JSON.stringify(mapped));
         }
