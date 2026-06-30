@@ -52,6 +52,12 @@ export default async function handler(req, res) {
     if (!item || !safePrice || safePrice < 0.01) {
       return res.status(400).json({ error: 'Invalid listing — price must be at least $0.01 USDC' });
     }
+    // Cap item_data so a client can't store arbitrarily large blobs.
+    let itemStr;
+    try { itemStr = JSON.stringify(item); } catch (e) { itemStr = ''; }
+    if (!itemStr || itemStr.length > 4096) {
+      return res.status(400).json({ error: 'Invalid item data.' });
+    }
     if (!seller_wallet) {
       return res.status(400).json({ error: 'Phantom wallet not connected' });
     }
