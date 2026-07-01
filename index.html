@@ -5644,26 +5644,26 @@ function _setSignedInUI(username){
               localStorage.setItem(_localKey,JSON.stringify(_curL));
             }
           }catch(e){}
-          var _sbTokens=d.tokens||0;
-          var _sbGold=d.gold||0;
-          var _localTokens=_localData.tokens||0;
-          var _localGold=_localData.gold||0;
-          if(_sbTokens>_localTokens||(_sbGold>_localGold&&_sbTokens>=_localTokens)){
-            // Only update tokens/gold/stats — keep local inventory and equipment untouched
-            var _cur=null;
-            try{_cur=JSON.parse(localStorage.getItem(_localKey)||'null');}catch(e){}
-            if(_cur){
-              _cur.tokens=_sbTokens;
-              _cur.gold=_sbGold;
-              _cur.totalRocks=d.total_rocks||_cur.totalRocks;
-              _cur.runs=d.runs||_cur.runs;
-              _cur.chests=d.chests||_cur.chests;
-              _cur.ups=d.ups||_cur.ups;
-              _cur.gameStats=d.game_stats||_cur.gameStats;
-              _cur._achiev=d.achievements||_cur._achiev;
-              localStorage.setItem(_localKey,JSON.stringify(_cur));
-              loadGame();uiAll();
-            }
+          var _sbTokens=(typeof d.tokens==='number')?d.tokens:0;
+          var _sbGold=(typeof d.gold==='number')?d.gold:0;
+          // SERVER IS THE SOURCE OF TRUTH. Always adopt the server's tokens/gold,
+          // whether higher OR lower than local. This prevents the display from
+          // showing an inflated local balance the server never actually credited
+          // (e.g. after a withdrawal, or optimistic client-side adds). Inventory
+          // and equipment are kept local and untouched.
+          var _cur=null;
+          try{_cur=JSON.parse(localStorage.getItem(_localKey)||'null');}catch(e){}
+          if(_cur){
+            _cur.tokens=_sbTokens;
+            _cur.gold=_sbGold;
+            _cur.totalRocks=d.total_rocks!=null?d.total_rocks:_cur.totalRocks;
+            _cur.runs=d.runs!=null?d.runs:_cur.runs;
+            _cur.chests=d.chests!=null?d.chests:_cur.chests;
+            _cur.ups=d.ups!=null?d.ups:_cur.ups;
+            _cur.gameStats=d.game_stats||_cur.gameStats;
+            _cur._achiev=d.achievements||_cur._achiev;
+            localStorage.setItem(_localKey,JSON.stringify(_cur));
+            loadGame();uiAll();
           }
         }
       }).catch(function(){});
