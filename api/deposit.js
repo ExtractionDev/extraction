@@ -141,7 +141,7 @@ export default async function handler(req, res) {
     ...((tx.transaction.message.instructions) || []),
     ...(innerIx.flatMap(ii => ii.instructions) || [])
   ];
-  const receivedUnits = allIx
+  const allTransfers = allIx
     .filter(ix => ix.program === 'spl-token' && ix.parsed &&
                   (ix.parsed.type === 'transfer' || ix.parsed.type === 'transferChecked'))
     .map(ix => {
@@ -149,13 +149,26 @@ export default async function handler(req, res) {
       let amt = info.amount;
       if (amt == null && info.tokenAmount) amt = info.tokenAmount.amount;
       return { to: info.destination, amount: parseInt(amt || '0', 10) };
-    })
+    });
+
+  // DIAGNOSTIC: show what we're matching against vs what the tx actually contained.
+  console.log('DEPOSIT DEBUG', JSON.stringify({
+    username,
+    tx_hash,
+    depositWallet: DEPOSIT_WALLET,
+    depositATA,
+    transfersFound: allTransfers,
+    matched: allTransfers.filter(t => t.to === depositATA)
+  }));
+
+  const receivedUnits = allTransfers
     .filter(t => t.to === depositATA)
     .reduce((s, t) => s + t.amount, 0);
 
   // USDC has 6 decimals. Convert base units → USDC → $EXT.
   const usdcReceived = receivedUnits / 1e6;
   if (!(usdcReceived > 0)) {
+    console.error('DEPOSIT REJECT: no USDC matched deposit ATA', depositATA, '— transfers were:', JSON.stringify(allTransfers));
     return res.status(400).json({ error: 'No USDC to your deposit wallet found in this transaction.' });
   }
   const extToCredit = Math.floor(usdcReceived * EXT_PER_USDC);
