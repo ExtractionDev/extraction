@@ -334,9 +334,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 .bp-tab.on{display:flex!important;flex-direction:column;overflow:hidden}
 /* bp-tab.on is identical to .tab.on — kept for clarity but goTab must preserve bp-tab class to take effect */
 .bp-inner{padding:10px;display:flex;flex-direction:column;flex:1;overflow-y:auto}
-.bp-layout{display:flex;flex-direction:row;gap:14px;flex:1}
-.bp-left{flex:1;width:50%;display:flex;flex-direction:column;min-width:0;overflow:visible}
-.bp-right{flex:1;width:50%;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.bp-layout{display:flex;flex-direction:row;gap:10px;flex:1;align-items:flex-start}
+.bp-left{flex:0 0 auto;display:flex;flex-direction:column;overflow:visible}
+.bp-right{flex:0 0 auto;display:flex;flex-direction:column;overflow:visible}
 .bp-section-hdr{display:flex;align-items:center;gap:6px;padding-bottom:6px;border-bottom:1px solid var(--border2);margin-bottom:10px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:700}
 .bp-mannequin{position:relative;width:760px;height:650px;margin:0;display:block;overflow:visible}
 .bp-mrow{display:none}
@@ -1023,17 +1023,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 
     <!-- LEFT: 20-slot backpack inventory grid -->
     <div class="bp-left">
-      <div class="bp-section-hdr">
-        <i class="ti ti-backpack" style="color:var(--purple);font-size:14px"></i>
-        <span>Backpack</span>
-        <span id="bpCount" style="color:var(--gold);margin-left:2px;font-weight:400">0/20</span>
-      </div>
       <div class="bp-inv-grid" id="bpGrid"></div>
       <div id="bpBonuses" class="bp-bonuses" style="display:none;margin-top:14px;align-self:flex-start"></div>
     </div>
 
     <!-- MIDDLE: Sanchez companion stats (only shows when equipped) -->
-    <div class="bp-pet-stats" id="bpPetStats" style="display:none;flex-direction:column;align-self:flex-start;min-width:150px;max-width:180px;background:var(--bg3);border:1.5px solid #ff9ec4;border-radius:12px;padding:14px;margin:0 4px"></div>
+    <div class="bp-pet-stats" id="bpPetStats" style="display:none;flex-direction:column;align-self:flex-start;min-width:150px;max-width:180px;background:var(--bg3);border:1.5px solid #ff9ec4;border-radius:12px;padding:14px;margin:0"></div>
 
     <!-- RIGHT: Equipment mannequin (scale 5.5, 338px canvas, 80px slots) -->
     <div class="bp-right">
@@ -2226,7 +2221,7 @@ function scaleBpLayout(){
   var t4=document.getElementById('t4');
   var inner=t4?t4.querySelector('.bp-inner'):null;
   if(!inner)return;
-  var designW=1550; // grid(650) + bonuses(~120) + gap(14) + mannequin(676) + padding(90)
+  var designW=1630; // grid(650) + pet(180) + mannequin(760) + gaps/padding
   var availW=t4.clientWidth||window.innerWidth;
   inner.style.zoom=availW>=designW?1:availW/designW;
 }
