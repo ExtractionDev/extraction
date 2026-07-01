@@ -283,8 +283,12 @@ export default async function handler(req, res) {
       jackpot_eligible_at: new Date().toISOString()  // grants ONE jackpot pull for this paid run
     }).eq('username', username);
 
-    const poolAdd = fee * 0.80;
-    const removedAdd = fee * 0.20;
+    // Entry split: 40% burn / 10% dev / 50% jackpot pool.
+    // (Was 10/10/80 — the 80% pool recirculated to a winner with no burn, so the
+    // house only permanently removed 10%. Halving the pool feed and burning the
+    // difference plugs that leak: 50% of every entry is now destroyed on entry.)
+    const poolAdd = fee * 0.50;    // recirculates via jackpot
+    const removedAdd = fee * 0.50; // 40% burn + 10% dev — removed from player circulation
 
     const { error: poolErr } = await supabase.rpc('add_to_pool', { amount: poolAdd });
     if (poolErr) console.error('add_to_pool failed:', poolErr.message);
