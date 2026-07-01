@@ -102,6 +102,21 @@ export default async function handler(req, res) {
     if (!seller_wallet) {
       return res.status(400).json({ error: 'Phantom wallet not connected' });
     }
+    // Enforced cap: a seller may have at most MAX_LISTINGS active listings.
+    // This is the authoritative check — the client cap can be bypassed, this can't.
+    const MAX_LISTINGS = 6;
+    const { count: activeCount, error: countErr } = await supabase
+      .from('listings')
+      .select('id', { count: 'exact', head: true })
+      .eq('seller', username)
+      .eq('status', 'active');
+    if (countErr) {
+      console.error('Listing count error:', countErr);
+      return res.status(500).json({ error: 'Could not verify your listings. Try again.' });
+    }
+    if ((activeCount || 0) >= MAX_LISTINGS) {
+      return res.status(400).json({ error: 'You already have ' + MAX_LISTINGS + ' active listings. Sell or withdraw one before listing another.' });
+    }
     const { data, error } = await supabase.from('listings').insert({
       seller:        username,
       item_data:     item,
