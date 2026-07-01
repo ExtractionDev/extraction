@@ -26,8 +26,40 @@ export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  // GET — fetch all active listings
+  // GET — fetch all active listings, OR (?sold=1) this seller's sold history.
   if (req.method === 'GET') {
+    // Sold-items history: /api/listings?sold=1&username=..&token=..
+    if (req.query && (req.query.sold === '1' || req.query.sold === 'true')) {
+      const { username, token } = req.query;
+      if (!username || !token) return res.status(400).json({ error: 'Missing credentials' });
+      const auth = await verifyToken(username, token);
+      if (!auth) return res.status(403).json({ error: 'Invalid session' });
+
+      const { data: rows, error: sErr } = await supabase
+        .from('sales')
+        .select('buyer, price_usdc, item_data, sold_at')
+        .eq('seller', username)
+        .order('sold_at', { ascending: false })
+        .limit(100);
+      if (sErr) return res.status(500).json({ error: sErr.message });
+
+      const sales = (rows || []).map(s => {
+        const it = s.item_data || {};
+        const isOre = it && typeof it.ore_name === 'string';
+        return {
+          kind: isOre ? 'ore' : 'item',
+          label: isOre
+            ? `${it.ore_name} x${it.qty || 1}`
+            : (it.type || it.mat || 'Item') + (it.rarN ? ` (${it.rarN})` : ''),
+          price_usdc: s.price_usdc,
+          buyer: s.buyer,
+          sold_at: s.sold_at
+        };
+      });
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ sales });
+    }
+
     const { data, error } = await supabase
       .from('listings')
       .select('*')
