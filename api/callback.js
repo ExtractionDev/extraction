@@ -112,21 +112,51 @@ export default async function handler(req, res) {
       console.error('Existing player fetch error:', e);
     }
 
-    // 5. Streak calc
+    // 5. Streak calc — 7-day cycle that resets to 1 after completing day 7.
+    // Reward table (EXT) for days 1-7:
+    const STREAK_REWARDS = { 1: 500, 2: 750, 3: 1000, 4: 1500, 5: 2000, 6: 3000, 7: 5000 };
     const today = new Date().toISOString().split('T')[0];
     let streak = 1;
-    let streakBonus = 0;
+    let streakBonus = 0;      // EXT to credit for today's login
+    let alreadyClaimedToday = false;
     if (player) {
       const lastDate = player.last_streak_date || '';
       const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
       if (lastDate === today) {
+        // Already logged in today — no new reward, keep current streak.
         streak = player.login_streak || 1;
+        alreadyClaimedToday = true;
       } else if (lastDate === yesterday) {
-        streak = (player.login_streak || 0) + 1;
+        // Consecutive day — advance, but wrap 7 → 1.
+        const prev = player.login_streak || 0;
+        streak = prev >= 7 ? 1 : prev + 1;
       } else {
+        // Missed a day (or first ever) — restart at day 1.
         streak = 1;
       }
-      streakBonus = Math.min(streak, 30) * 0.5;
+      if (!alreadyClaimedToday) streakBonus = STREAK_REWARDS[streak] || 0;
+    } else {
+      // Brand new player's first login = day 1.
+      streak = 1;
+      streakBonus = STREAK_REWARDS[1];
+    }
+
+    // Credit today's streak reward to the REAL server balance (once per day).
+    if (streakBonus > 0) {
+      try {
+        await fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/credit_tokens`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+            Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+          },
+          body: JSON.stringify({ p_username: username, p_amount: streakBonus })
+        });
+      } catch (e) {
+        console.error('Streak credit failed for', username, e);
+        // Non-fatal: login still proceeds; they just miss this credit.
+      }
     }
 
     // 6. Upsert player
