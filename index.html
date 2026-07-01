@@ -528,9 +528,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 @keyframes swing{0%{transform:rotate(0deg)}16%{transform:rotate(7deg)}46%{transform:rotate(-28deg)}58%{transform:rotate(-20deg)}72%{transform:rotate(-25deg)}100%{transform:rotate(0deg)}}
 @media (prefers-reduced-motion:reduce){#smithy.strike #hammer,#smithy.strike #anvil{animation-duration:.01ms}}
 /* ---- compact pickaxe selection cards in the smith grid ---- */
-#smithPickGrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:start}
-#smithPickGrid .mk-card{padding:8px;border-width:1px;border-radius:9px}
-#smithPickGrid .mk-card img{width:26px!important;height:26px!important}
+.smith-wrap{max-width:560px;margin:0 auto}
+#smithPickGrid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;align-items:start;justify-content:center}
+#smithPickGrid .mk-card{padding:10px;border-width:1px;border-radius:10px}
+#smithPickGrid .mk-card img{width:28px!important;height:28px!important}
 .smith-reroll-btn{width:100%;padding:11px;border-radius:8px;font-size:13px;font-weight:700;font-family:'Space Mono',monospace;cursor:pointer;border:1.5px solid var(--gold);background:var(--gold3);color:var(--gold);margin-top:14px;transition:all .15s}
 .smith-reroll-btn:hover:not(:disabled){background:var(--gold);color:#000}
 .smith-reroll-btn:disabled{opacity:.4;cursor:not-allowed}
@@ -1252,6 +1253,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
   </div>
 </div>
 <div class="tab" id="t6" style="padding:16px;overflow-y:auto;background:var(--bg);min-height:100%">
+  <div class="smith-wrap">
   <!-- Header -->
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border2)">
     <i class="ti ti-hammer" style="font-size:22px;color:var(--gold)"></i>
@@ -1293,6 +1295,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     </div>
     <button class="smith-reroll-btn" id="smithRerollBtn" onclick="smithReroll()">🔨 Re-roll Stats</button>
   </div>
+  </div><!-- /smith-wrap -->
 </div><!-- /t6 smith tab -->
 
 <!-- LIST MODAL -->
