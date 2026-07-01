@@ -569,6 +569,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     <div class="home-streak" id="homeStreakWidget" style="display:none">
       <div class="home-streak-title">🔥 Daily Login Streak</div>
       <div class="home-streak-days" id="homeStreakDays"></div>
+      <button id="streakClaimBtn" onclick="claimStreak()" style="display:block;margin:16px auto 0;padding:12px 34px;border-radius:10px;border:1.5px solid #1dbc8f;background:#051a14;color:#1dbc8f;font-family:'Space Mono',monospace;font-size:14px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Claim Reward</button>
+      <div id="streakClaimMsg" style="text-align:center;margin-top:8px;font-size:11px;color:var(--text3);min-height:14px"></div>
     </div>
 
     <!-- Player stats -->
@@ -5613,6 +5615,59 @@ function _renderStreak(streakDay){
     html+='</div>';
   });
   container.innerHTML=html;
+  if(typeof _updStreakClaimUI==='function')_updStreakClaimUI();
+}
+// Tick the streak cooldown countdown every 30s.
+setInterval(function(){if(typeof _updStreakClaimUI==='function')_updStreakClaimUI();},30000);
+var _streakNextKey='extraction_streak_next';
+function _updStreakClaimUI(){
+  var btn=document.getElementById('streakClaimBtn');
+  var msg=document.getElementById('streakClaimMsg');
+  if(!btn||!msg)return;
+  var next=parseInt(localStorage.getItem(_streakNextKey)||'0');
+  var now=Date.now();
+  if(next&&now<next){
+    var ms=next-now;
+    var h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000);
+    btn.disabled=true;btn.style.opacity='0.5';btn.style.cursor='default';
+    btn.textContent='Claimed';
+    msg.textContent='Next reward in '+h+'h '+m+'m';
+  } else {
+    btn.disabled=false;btn.style.opacity='';btn.style.cursor='pointer';
+    btn.textContent='Claim Reward';
+    msg.textContent='Your reward is ready!';
+  }
+}
+function claimStreak(){
+  var _xd=_getAuth&&_getAuth();
+  if(!_xd||!_xd.username){if(typeof openXAuth==='function')openXAuth();return;}
+  var btn=document.getElementById('streakClaimBtn');
+  var msg=document.getElementById('streakClaimMsg');
+  if(btn){btn.disabled=true;btn.style.opacity='0.6';}
+  if(msg){msg.style.color='var(--text3)';msg.textContent='Claiming...';}
+  fetch('/api/load',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username:_xd.username,token:_xd.token||'',action:'claim_streak'})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d&&d.ok){
+      if(typeof d.newBalance==='number'){tokens=d.newBalance;uiAll();}
+      var amt=d.reward||0;var fa=amt>=1000?(amt/1000)+'K':amt;
+      localStorage.setItem(_streakNextKey,String(Date.now()+(d.nextMs||86400000)));
+      _renderStreak(d.streak||1);
+      if(msg){msg.style.color='#1dbc8f';}
+      if(typeof showAchieve==='function')showAchieve('📅','Day '+(d.streak||1)+' Claimed','+'+fa+' $EXT added to your balance!');
+      _updStreakClaimUI();
+    } else if(d&&d.cooldown){
+      // Server says not yet — sync the local timer to the server's remaining time.
+      localStorage.setItem(_streakNextKey,String(Date.now()+(d.msLeft||0)));
+      _updStreakClaimUI();
+    } else {
+      if(msg){msg.style.color='var(--red)';msg.textContent=(d&&d.error)||'Claim failed. Try again.';}
+      if(btn){btn.disabled=false;btn.style.opacity='';}
+    }
+  }).catch(function(){
+    if(msg){msg.style.color='var(--red)';msg.textContent='Network error. Try again.';}
+    if(btn){btn.disabled=false;btn.style.opacity='';}
+  });
 }
 
 function _setSignedInUI(username){
