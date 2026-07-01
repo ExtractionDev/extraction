@@ -103,7 +103,28 @@ export default async function handler(req, res) {
     // Lightweight gate for free-run entry: if we reach here the session is valid
     // and NOT banned (the check above already 403's banned users). No side effects.
     if (action === 'checkban') {
-      return res.status(200).json({ ok: true });
+      // Server-authoritative free-run limit. localStorage on the client is not
+      // trusted — the daily count lives here and cannot be reset by the browser.
+      const FREE_MAX_DAILY = 10; // keep in sync with index.html
+      const { data: usedAfter, error: frErr } = await supabase
+        .rpc('consume_free_run', { p_username: username, p_max: FREE_MAX_DAILY });
+      if (frErr) {
+        console.error('consume_free_run failed:', frErr.message);
+        return res.status(500).json({ error: 'Try again shortly.' });
+      }
+      if (usedAfter === -1) {
+        return res.status(200).json({ ok: false, error: 'No free runs left today! Come back tomorrow or spend $EXT to enter.' });
+      }
+      // Optional flag-for-review backstop (does NOT ban, does NOT block play).
+      // Skips anyone with a real deposited balance so paying users are never flagged.
+      if (usedAfter >= FREE_MAX_DAILY && (player.tokens || 0) <= 0) {
+        try {
+          await supabase.from('players')
+            .update({ review_flag: 'maxed free runs ' + new Date().toISOString().slice(0,10) })
+            .eq('username', username);
+        } catch (e) { /* non-fatal */ }
+      }
+      return res.status(200).json({ ok: true, freeRunsLeft: FREE_MAX_DAILY - usedAfter });
     }
 
     // ---------- DAILY STREAK CLAIM (24h rolling cooldown) ----------
