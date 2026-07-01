@@ -4,6 +4,14 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// ===== CLIENT VERSION / FORCED UPDATE =====
+// One number to bump per forced-update deploy. Must match CLIENT_BUILD in
+// index.html. Served to clients via GET /api/load?version=1, and enforced on
+// the paid-entry path below (stale clients get 426 and reload).
+const CURRENT_BUILD = 20260701;   // <-- bump this each forced-update deploy
+const CLIENT_VERSION = '0.3.1';   // display only
+
+
 // ---------------------------------------------------------------------------
 // FIX C-3 (CORS): no more wildcard. Only echo the Origin header back if it is
 // on an explicit allowlist. Set ALLOWED_ORIGINS in your Vercel env vars, e.g.
@@ -245,10 +253,8 @@ export default async function handler(req, res) {
 
     // ---------- DUNGEON ENTRY FEE ----------
     // Forced-update gate: a stale client must not start a paid run. Reject with
-    // 426 so the client reloads onto the current build. Keep MIN_BUILD in sync
-    // with BUILD in /api/version and CLIENT_BUILD in index.html.
-    const MIN_BUILD = 20260701;
-    if (!build || build < MIN_BUILD) {
+    // 426 so the client reloads onto the current build.
+    if (!build || build < CURRENT_BUILD) {
       return res.status(426).json({ error: 'stale_client', reload: true });
     }
     if (!entryFee) return res.status(400).json({ error: 'Missing entry fee' });
@@ -290,8 +296,16 @@ export default async function handler(req, res) {
   }
 
   // =====================================================================
-  // GET — handles: blockhash proxy, pool amount, player load
+  // GET — handles: version check, blockhash proxy, pool amount, player load
   // =====================================================================
+
+  // ---------- VERSION / FORCED-UPDATE CHECK (public, no auth) ----------
+  // Client polls /api/load?version=1 to learn the current build. Bump
+  // CURRENT_BUILD (top of file) on any deploy you want to force clients onto.
+  if (req.query.version) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json({ build: CURRENT_BUILD, version: CLIENT_VERSION });
+  }
 
   // ---------- BLOCKHASH PROXY (public on-chain data, no auth needed) ----------
   if (req.query.blockhash) {
