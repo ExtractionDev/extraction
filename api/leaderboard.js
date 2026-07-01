@@ -32,8 +32,12 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: error.message });
   }
 
+  // Accounts hidden from the public leaderboard (dev/owner/test), case-insensitive.
+  const HIDDEN = ['kaynkingdom'];
+
   const rows = (data || [])
     .filter(p => !p.banned)              // unified ban flag
+    .filter(p => !HIDDEN.includes((p.username || '').toLowerCase()))
     .slice(0, 50)
     .map((p, i) => ({
       rank: i + 1,
