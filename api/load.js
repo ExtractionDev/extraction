@@ -106,6 +106,62 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+    // ---------- DAILY STREAK CLAIM (24h rolling cooldown) ----------
+    if (action === 'claim_streak') {
+      const STREAK_REWARDS = { 1: 500, 2: 750, 3: 1000, 4: 1500, 5: 2000, 6: 3000, 7: 5000 };
+      const now = Date.now();
+      // Re-fetch claim fields (player above may not include them).
+      let claimRow = null;
+      try {
+        const cr = await supabase
+          .from('players')
+          .select('login_streak, last_streak_claim')
+          .eq('username', username)
+          .single();
+        claimRow = cr.data;
+      } catch (e) { claimRow = null; }
+
+      const lastClaimMs = claimRow && claimRow.last_streak_claim ? new Date(claimRow.last_streak_claim).getTime() : 0;
+      const prevStreak = (claimRow && claimRow.login_streak) || 0;
+      const elapsed = now - lastClaimMs;
+      const DAY = 24 * 3600 * 1000;
+
+      if (lastClaimMs && elapsed < DAY) {
+        const msLeft = DAY - elapsed;
+        return res.status(200).json({ ok: false, cooldown: true, msLeft,
+          error: 'Already claimed. Come back later.' });
+      }
+
+      // Determine new streak day: within 48h of last claim = continue, else reset.
+      let newStreak;
+      if (lastClaimMs && elapsed <= 2 * DAY) {
+        newStreak = prevStreak >= 7 ? 1 : prevStreak + 1;
+      } else {
+        newStreak = 1; // missed the window (or first ever) → restart
+      }
+      const reward = STREAK_REWARDS[newStreak] || 0;
+
+      // Persist claim state first (so a failed credit can't be double-claimed).
+      const { error: updErr } = await supabase.from('players').update({
+        login_streak: newStreak,
+        last_streak_claim: new Date(now).toISOString()
+      }).eq('username', username);
+      if (updErr) {
+        console.error('claim_streak update failed:', updErr.message);
+        return res.status(500).json({ ok: false, error: 'Could not record claim. Try again.' });
+      }
+
+      // Credit the reward.
+      const { data: newBalRaw, error: creditErr } = await supabase
+        .rpc('credit_tokens', { p_username: username, p_amount: reward });
+      if (creditErr) {
+        console.error('claim_streak credit failed:', creditErr.message);
+        return res.status(500).json({ ok: false, error: 'Claim recorded but credit failed — contact support.' });
+      }
+      const newBalance = parseFloat(newBalRaw) || 0;
+      return res.status(200).json({ ok: true, streak: newStreak, reward, newBalance, nextMs: DAY });
+    }
+
     // ---------- JACKPOT PULL ----------
     if (action === 'jackpot') {
       // Anti-drain gate: a pull requires a paid entry that hasn't been used yet.
