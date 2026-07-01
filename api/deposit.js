@@ -229,6 +229,7 @@ export default async function handler(req, res) {
     amount: usdcReceived,
     tx_hash,
     tokens_balance: player.tokens || 0,
+    runs: 0,
     status: 'credited',
     requested_at: new Date().toISOString()
   };
@@ -242,14 +243,14 @@ export default async function handler(req, res) {
       console.error('DEPOSIT 400: duplicate tx_hash on insert', tx_hash);
       return res.status(400).json({ error: 'This transaction has already been submitted.' });
     }
-    // Not a duplicate — likely a missing column. Retry with only the essentials.
-    console.error('Deposit full insert failed, retrying minimal:', insertErr.message);
-    const min = await supabase.from('deposits').insert({ username, tx_hash, status: 'credited' });
+    // Not a duplicate — a schema/constraint issue. Log the REAL error and retry minimal.
+    console.error('DEPOSIT INSERT FAILED — real reason:', insertErr.message, '| code:', insertErr.code, '| details:', insertErr.details);
+    const min = await supabase.from('deposits').insert({ username, tx_hash, amount: usdcReceived, tokens_balance: player.tokens || 0, runs: 0, status: 'credited' });
     if (min.error) {
-      // Even the minimal insert failed. Record couldn't be written, but the
-      // payment is real and this tx wasn't credited before, so credit anyway.
-      console.error('Deposit minimal insert also failed — crediting without a row:', min.error.message,
-                    'user', username, 'tx', tx_hash, 'EXT', extToCredit);
+      console.error('DEPOSIT MINIMAL INSERT ALSO FAILED:', min.error.message, '| code:', min.error.code,
+                    '| user', username, 'tx', tx_hash, 'EXT', extToCredit);
+    } else {
+      console.log('DEPOSIT: minimal row inserted OK for', username, tx_hash);
     }
   }
 
