@@ -57,21 +57,24 @@ async function getParsedTx(signature) {
     'https://solana-mainnet.rpc.extrnode.com',
     'https://solana.public-rpc.com'
   ];
+  // 'confirmed' is reached in ~1-2s (finalized takes ~13s). The client calls us
+  // right after confirmation, so 'finalized' would usually return null. Confirmed
+  // is safe for crediting — it has supermajority votes and won't be rolled back.
   const body = JSON.stringify({
     jsonrpc: '2.0', id: 1,
     method: 'getTransaction',
-    params: [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'finalized' }]
+    params: [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' }]
   });
   for (const rpc of rpcs) {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 4; attempt++) {
       try {
         const r = await fetch(rpc, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
-        if (!r.ok) break;
+        if (!r.ok) { await new Promise(res => setTimeout(res, 1200)); continue; }
         const d = await r.json();
-        if (d.error) break;
-        if (d.result) return d.result;
-        await new Promise(res => setTimeout(res, 1500));
-      } catch (e) { break; }
+        if (d.error) { break; }               // hard RPC error → try next endpoint
+        if (d.result) return d.result;          // got it
+        await new Promise(res => setTimeout(res, 2000)); // result null → not indexed yet, wait & retry
+      } catch (e) { await new Promise(res => setTimeout(res, 1200)); }
     }
   }
   return null;
