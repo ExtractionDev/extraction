@@ -500,10 +500,22 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 .smith-box{flex:1;background:var(--bg3);border:1.5px solid var(--border2);border-radius:12px;padding:14px;min-width:0}
 .smith-box-title{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;display:flex;align-items:center;gap:5px}
 .smith-stat-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px}
-.smith-mid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:0 4px}
-.smith-hammer{transition:transform .15s;cursor:default}
-.smith-hammer.swing{animation:smithSwing .25s ease-in-out 3}
-@keyframes smithSwing{0%{transform:rotate(0deg) translateY(0)}50%{transform:rotate(-30deg) translateY(-6px)}100%{transform:rotate(0deg) translateY(0)}}
+.smith-mid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:0 2px;flex:0 0 auto}
+/* ---- animated blacksmith (transparent, pixel-crisp) ---- */
+#smithy{position:relative;width:150px;height:130px;margin:0 auto;image-rendering:pixelated;-webkit-user-select:none;user-select:none;background:transparent}
+#smithy svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;background:transparent}
+#smithy image{image-rendering:pixelated}
+#anvil{transform-box:view-box;transform-origin:186px 230px}
+#smithy.strike #anvil{animation:anvilShake .32s ease-out .20s}
+@keyframes anvilShake{0%{transform:translate(0,0)}14%{transform:translate(0,4px)}38%{transform:translate(-1px,1px)}62%{transform:translate(1px,0)}100%{transform:translate(0,0)}}
+#hammer{transform-box:view-box;transform-origin:299px 143px}
+#smithy.strike #hammer{animation:swing .50s cubic-bezier(.35,.85,.35,1)}
+@keyframes swing{0%{transform:rotate(0deg)}16%{transform:rotate(7deg)}46%{transform:rotate(-28deg)}58%{transform:rotate(-20deg)}72%{transform:rotate(-25deg)}100%{transform:rotate(0deg)}}
+@media (prefers-reduced-motion:reduce){#smithy.strike #hammer,#smithy.strike #anvil{animation-duration:.01ms}}
+/* ---- compact pickaxe selection cards in the smith grid ---- */
+#smithPickGrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+#smithPickGrid .mk-card{padding:8px;border-width:1px;border-radius:9px}
+#smithPickGrid .mk-card img{width:26px!important;height:26px!important}
 .smith-reroll-btn{width:100%;padding:11px;border-radius:8px;font-size:13px;font-weight:700;font-family:'Space Mono',monospace;cursor:pointer;border:1.5px solid var(--gold);background:var(--gold3);color:var(--gold);margin-top:14px;transition:all .15s}
 .smith-reroll-btn:hover:not(:disabled){background:var(--gold);color:#000}
 .smith-reroll-btn:disabled{opacity:.4;cursor:not-allowed}
@@ -1239,20 +1251,17 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
         <div class="smith-box-title">⬛ Before</div>
         <div id="smithBeforeStats"></div>
       </div>
-      <!-- Anvil -->
+      <!-- Animated blacksmith (hammer strikes anvil top-center on re-roll) -->
       <div class="smith-mid">
-        <svg class="smith-hammer" id="smithHammer" width="44" height="54" viewBox="0 0 44 54">
-          <rect x="8" y="28" width="28" height="16" rx="3" fill="#5a5060"/>
-          <rect x="12" y="32" width="20" height="8" rx="2" fill="#4a4050"/>
-          <rect x="16" y="28" width="6" height="4" rx="1" fill="#6a6070"/>
-          <rect x="20" y="2" width="4" height="28" rx="2" fill="#7a7080"/>
-        </svg>
-        <svg width="50" height="32" viewBox="0 0 50 32">
-          <rect x="8" y="20" width="34" height="8" rx="2" fill="#4a4050"/>
-          <rect x="14" y="24" width="22" height="5" rx="1" fill="#3a3040"/>
-          <path d="M6 20 Q2 15 4 9 Q6 3 16 3 L34 3 Q42 3 44 9 L46 20 Z" fill="#5a5060"/>
-          <path d="M10 20 Q6 15 8 9 Q10 5 18 5 L32 5 Q40 5 40 10 L42 20 Z" fill="#6a6070"/>
-        </svg>
+        <div id="smithy">
+          <svg viewBox="0 0 359 311">
+            <image id="anvil" x="0" y="0" width="359" height="311" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAWcAAAE3CAYAAAB2NoB6AAADKklEQVR4nO3dIU4DURRA0YF0KRgWUdltVLMkNAtAYpBNcGgMKyAERAMWFAYIgin8Cz3HT/LMv/PMn5kmAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4CsHowcAvme9PnkZPcObs7NTLdmxw9EDAPCRt90OlTYZ+E3393eznr+4ONeid2zOAEGL0QP8J3O3B4A3NmeAIJszMNt2ux09wr9jcwYIEmeAIHEGCBJngCBxBggSZ4AgcQYIEmeAIJdQgNk2m0sfLtoxmzNAkLddzHK58tnRPWPr5DM2Z4AgcQYIEmeAIHEGCBJngCBxBggSZ4AgcQYIEmeAIDeTmKbpezcTn5+ffmKUX3V9feUMkGRzBggSZ4AgcQYIEmeAIHEGCBJngCBxBggSZ4AgcQYIEmeAIHEGCBJngCBxBggSZ4AgcQYIEmeAIHEGCBJngCBxBggSZ4AgcQYIEmeAIHEGCBJngCBxBggSZ4AgcQYIEmeAIHEGCBJngCBxBggSZ4AgcQYIEmeAIHEGCDoYPcC+Wi5XL6NnoGezuXQmmabJ5gyQJM4AQeIMELQYPcC+enx8GD0CEGZzBggSZ4AgcQYIEmeAIHEGCBJngCBxBggSZ4AgcQYIEmeAIHEGCBJngCBxBggSZ4AgcQYI8r+yP+bo6Ni/B/+A29sbZ4tZbM4AQeIMECTOAEHiDBAkzgBB4gwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA8NNeAeTcKWBKZn/nAAAAAElFTkSuQmCC"/>
+            <g id="hammer">
+              <image x="0" y="0" width="359" height="311" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAWcAAAE3CAYAAAB2NoB6AAAFT0lEQVR4nO3dL28sVRzH4QPBEaAKQSpqQFWhCx6DuPIKXsANCkNyBYKQSjBwX0DxWFAIKAaBqrumgiAQpEDQoLZM2tnOn52Z892d51GbbdPdTZo5n/3tmdlSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKjmhdpPAIZ48uSjf+/e9+zZ5/6POTgv1n4CANynOIjXVst9KGr2mXIGCKQsiDe2nNuoafaFcgYIpCKINGUtb6OiSaacAQIpByL1KeeTk5NSSinX19eTPa6aJoVyBgjk4AwQyFs4ogz5IHAz1mgy4uBQKGeAQMqA6nat5T4UNftGOQMEUgBU11XOY2u56d3XvymllHLx89s7/602apqpKWeAQFZ7qlhizryp5W1++P3R7e0xM2m1zJyUM0Cgl2o/AdalbzFPMWceYvN4x8fHt/ddXl4u+hygSTkDBFLOHJQhc+amZjFvnJ2d3d5uVrRZM0tQzgCBlDOzm3tnRlctl7K9mPtSyyxNOQMEUs5Ut/TOjI22OTOkUM4AgZQzs1jiC1rH7MwYUsuPHz8yZ6Ya5QwQSDkzmbTrZcA+U84AgZQzi0rfmWHOTArlDBBIObOzuXdmTHm9jG3++PqLQc8J5qacAQIpZ0ZZYmdGDV++987t6/rw2x/Nn6lGOQMEcnAGCGSsQaSxlwEd8iHg1Vef3d5+49WX7/28OeJoMu5gCcoZIJACoLd9OD27q5ybtdylraabFDRzUs4AgcycmUz6qdlD/fbXP7e3zaRZmnIGCGSFp9PTp58+OGu+ubkppSw/Zx5SzN+df/zgz49fe6X339romkk3qWmGUs4AgazmtOqq5TZHR0e9f3eKi+aP+cqpD07f7P26xtR0KXZ5MA3lDBDIbg0ms5k93zWkqLvs+gWtF1fPW6u1rah//fPv/x93QEVvdnlsK+i2XR5qmruUM0AgqzWdxsyfu7z/1vet9+96vYxdv2bKTJoUyhkgkBWaUaas6WZF1y7nbbqKeq6KblLU66KcAQJZiZnMlDV9enra+3fnquVt+s6l1TS7UM4Agay6zGKJil66mB9ilwdTU84Agay0LGrKoj4//yT6/7dPTbsaHtsoZ4BAVlWqGFvQ6bW8jZk0QylngEAOzgCBvM0hSte4Y1/HGtvMcVq4DwwPg3IGCGTVhAAJHxg2Ker6lDNAIKsjBJu7qG2/y6WcAQJZFWHPuPD/OihngEBWP9hjtWfSpajouShngEBWPDgwLlV6GJQzQCCrGxwwZx7uL+UMEMgqBivUt6hd+L8e5QwQyOoFlFKceZhGOQMEskoB99Q+81BBK2eASKtfnYB+zKSXpZwBAq1mFQKmU2smrZwBqGo1qxAwryWu43H+0y+rOWYpZ4BADs4AgVbzFgGoY9cteGsaZTQpZ4BAq1yRgDr6fmh4cfV89ccm5QwQaPWrE1BXW00rZ+UMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABDsP1NqKG/Kl4hSAAAAAElFTkSuQmCC"/>
+            </g>
+            <g id="sparks"></g>
+          </svg>
+        </div>
         <div id="smithCostBadge" style="font-size:10px;color:var(--gold);text-align:center;white-space:nowrap"></div>
       </div>
       <!-- After -->
@@ -4058,7 +4067,7 @@ function renderSmith(){
     var c=SMITH_COSTS[it.rar.n];
     var h='<div class="mk-card" onclick="smithSelectIdx('+idx+')" style="border-color:'+(sel?it.rar.c:'var(--border)')+';background:'+(sel?it.rar.bg:'var(--bg3)')+'">'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
-        itemIcon(it.rar,32)+
+        itemIcon(it.rar,26)+
         '<div>'+
           '<div style="font-size:13px;font-weight:700;color:'+it.rar.c+'">'+it.mat+'</div>'+
           '<div style="font-size:10px;color:var(--text3)">'+it.rar.n+' · '+obj.label+'</div>'+
@@ -4101,6 +4110,36 @@ function smithSelectItem(it){
   renderSmith();
 }
 
+var SPARK_COLORS=['#ffe066','#ffb000','#ff8800','#fff2a8'];
+function strikeAnvil(){
+  var stage=document.getElementById('smithy');
+  if(!stage)return;
+  stage.classList.remove('strike');void stage.offsetWidth;stage.classList.add('strike');
+  setTimeout(spawnSparks,235);
+}
+function spawnSparks(){
+  var g=document.getElementById('sparks');
+  if(!g)return;
+  var NS='http://www.w3.org/2000/svg';
+  var impactX=150,impactY=190,count=11;
+  for(var i=0;i<count;i++){
+    var s=document.createElementNS(NS,'rect');
+    var sz=2+Math.floor(Math.random()*3);
+    s.setAttribute('x',impactX);s.setAttribute('y',impactY);
+    s.setAttribute('width',sz);s.setAttribute('height',sz);
+    s.setAttribute('fill',SPARK_COLORS[i%SPARK_COLORS.length]);
+    s.setAttribute('shape-rendering','crispEdges');
+    g.appendChild(s);
+    var dx=(Math.random()*2-1)*70, rise=34+Math.random()*46, dur=380+Math.random()*280;
+    s.animate([
+      {transform:'translate(0,0)',opacity:1},
+      {transform:'translate('+(dx*0.6)+'px,'+(-rise)+'px)',opacity:1,offset:0.45},
+      {transform:'translate('+dx+'px,'+(rise*0.5)+'px)',opacity:0}
+    ],{duration:dur,easing:'cubic-bezier(.3,.7,.5,1)',fill:'forwards'});
+    (function(el,d){setTimeout(function(){el.remove();},d+40);})(s,dur);
+  }
+}
+
 function smithReroll(){
   if(!_smithItem)return;
   var cost=SMITH_COSTS[_smithItem.rar.n];
@@ -4115,9 +4154,8 @@ function smithReroll(){
   document.getElementById('smithAfterStats').innerHTML=_smithStatRows(newAffixes,'smith-stat-new');
   // Also refresh before box with new (applied) stats
   document.getElementById('smithBeforeStats').innerHTML=_smithStatRows(newAffixes,'');
-  // Swing hammer
-  var h=document.getElementById('smithHammer');
-  if(h){h.classList.remove('swing');void h.offsetWidth;h.classList.add('swing');}
+  // Swing hammer + sparks
+  strikeAnvil();
   // Sound
   [0,100,200,320].forEach(function(d,i){setTimeout(function(){_snd({f:[220,330,440,660][i],wave:'square',vol:0.10,dur:0.12});},d);});
   // Reset after box after 3s (ready for next roll)
