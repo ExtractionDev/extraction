@@ -1925,7 +1925,16 @@ var _apiSaveTmr=null;
 function _doApiSave(data){
   try{var _xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');if(_xd&&_xd.username){
     fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:_xd.username,token:_xd.token||'',build:CLIENT_BUILD,data:data})})
-      .then(function(r){if(!r.ok)console.error('Save failed:',r.status);})
+      .then(function(r){if(!r.ok){console.error('Save failed:',r.status);return null;}return r.json();})
+      .then(function(d){
+        if(d&&d.reset){
+          // Admin wiped this account server-side. Clear the local save so the old
+          // data isn't re-uploaded, then reload into the fresh account.
+          try{localStorage.removeItem(_getSaveKey());}catch(e){}
+          try{localStorage.removeItem(_saveKey);}catch(e){}
+          _forceReload();
+        }
+      })
       .catch(function(e){console.error('Save error:',e);});
   }}catch(e){}
 }
