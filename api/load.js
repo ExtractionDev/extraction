@@ -100,6 +100,12 @@ export default async function handler(req, res) {
     if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session' });
     if (player.banned) return res.status(403).json({ error: 'Account suspended.' });
 
+    // Lightweight gate for free-run entry: if we reach here the session is valid
+    // and NOT banned (the check above already 403's banned users). No side effects.
+    if (action === 'checkban') {
+      return res.status(200).json({ ok: true });
+    }
+
     // ---------- JACKPOT PULL ----------
     if (action === 'jackpot') {
       // Anti-drain gate: a pull requires a paid entry that hasn't been used yet.
