@@ -1000,7 +1000,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     </div>
     <div style="margin-bottom:14px">
       <div style="font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Amount <span id="withdrawMaxLabel" style="color:var(--sol)"></span></div>
-      <input id="withdrawAmt" type="number" min="50000" placeholder="Min 50,000 $EXT..." style="width:100%;box-sizing:border-box;background:var(--bg4);border:1px solid var(--border3);border-radius:8px;color:var(--text);padding:8px 10px;font-family:'Space Mono',monospace;font-size:11px">
+      <input id="withdrawAmt" type="number" min="50000" placeholder="Min 50,000 $EXT..." oninput="_updWithdrawNet()" style="width:100%;box-sizing:border-box;background:var(--bg4);border:1px solid var(--border3);border-radius:8px;color:var(--text);padding:8px 10px;font-family:'Space Mono',monospace;font-size:11px">
+      <div id="withdrawNet" style="font-size:10px;color:var(--text3);margin-top:6px;letter-spacing:.03em">A <b style="color:var(--red)">10% withdraw burn</b> applies. You'll receive <b style="color:#90c848"><span id="withdrawNetAmt">0</span> $EXT</b>.</div>
     </div>
     <div id="withdrawMsg" style="font-size:11px;min-height:16px;margin-bottom:10px;color:var(--red)"></div>
     <button onclick="submitWithdraw()" style="width:100%;padding:12px;border-radius:8px;border:1.5px solid var(--sol);background:#0c0520;color:var(--sol);font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.1em;cursor:pointer;text-transform:uppercase">Submit Request</button>
@@ -2051,6 +2052,12 @@ setInterval(_fetchGlobalPool,15000); // 15 sec
 var _soundOn=true;
 function openSettings(){document.getElementById('settingsModal').classList.add('open');}
 function closeSettings(){document.getElementById('settingsModal').classList.remove('open');}
+var WITHDRAW_BURN_PCT=0.10; // must match WITHDRAW_BURN_PCT in withdraw.js
+function _updWithdrawNet(){
+  var amt=parseFloat(document.getElementById('withdrawAmt').value);
+  var net=(!amt||amt<=0)?0:Math.floor(amt*(1-WITHDRAW_BURN_PCT));
+  document.getElementById('withdrawNetAmt').textContent=net.toLocaleString();
+}
 function openWithdraw(){
   closeSettings();
   var _xd=null;try{_xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');}catch(e){}
@@ -2059,6 +2066,7 @@ function openWithdraw(){
   document.getElementById('withdrawAmt').value='';
   document.getElementById('withdrawWallet').value='';
   document.getElementById('withdrawMsg').textContent='';
+  _updWithdrawNet();
   document.getElementById('withdrawModal').classList.add('open');
 }
 function closeWithdraw(){document.getElementById('withdrawModal').classList.remove('open');}
@@ -2179,7 +2187,8 @@ function submitWithdraw(){
       // Server already debited — reflect the real returned balance, don't keep the stale local one.
       if(typeof d.newBalance==='number'){ tokens=d.newBalance; uiAll(); }
       msg.style.color='var(--green)';
-      msg.textContent='✓ Request submitted! You will receive your $EXT within 24 hours.';
+      var _net=(typeof d.payout==='number')?d.payout:Math.floor(amt*(1-WITHDRAW_BURN_PCT));
+      msg.textContent='✓ Request submitted! You will receive '+_net.toLocaleString()+' $EXT (after 10% burn) within 24 hours.';
       setTimeout(closeWithdraw,3000);
     } else {
       msg.style.color='var(--red)';
