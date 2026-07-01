@@ -133,39 +133,84 @@ export default async function handler(req, res) {
   // ── On-chain verification ────────────────────────────────────────────────
   const tx = await getParsedTx(tx_hash);
   if (!tx) {
+    console.error('DEPOSIT 400: getParsedTx returned null for', tx_hash);
     return res.status(400).json({ error: 'Transaction not found / not finalized yet. Try again in a moment.' });
   }
   if (tx.meta && tx.meta.err) {
+    console.error('DEPOSIT 400: tx failed on chain', JSON.stringify(tx.meta.err));
     return res.status(400).json({ error: 'Transaction failed on chain.' });
   }
 
-  // AUTHORITATIVE CHECK: use the transaction's own pre/post token balances.
-  // Solana records, per tx, every token account's owner + mint + balance before
-  // and after. We find the USDC account OWNED BY the deposit wallet and confirm
-  // its balance increased. This avoids fragile ATA-address string matching and
-  // works for both `transfer` and `transferChecked`.
+  // Log the RAW balance arrays first thing, so nothing below can hide them.
   const pre = (tx.meta && tx.meta.preTokenBalances) ? tx.meta.preTokenBalances : [];
   const post = (tx.meta && tx.meta.postTokenBalances) ? tx.meta.postTokenBalances : [];
-
-  function usdcAmtFor(list) {
-    // sum uiAmount (in whole USDC) across entries owned by DEPOSIT_WALLET for the USDC mint
-    return (list || [])
-      .filter(b => b.owner === DEPOSIT_WALLET && b.mint === USDC_MINT)
-      .reduce((s, b) => s + (parseFloat(b.uiTokenAmount && b.uiTokenAmount.uiAmountString) || 0), 0);
-  }
-
-  const before = usdcAmtFor(pre);
-  const after = usdcAmtFor(post);
-  const usdcReceived = Math.max(0, after - before);
-
-  console.log('DEPOSIT DEBUG', JSON.stringify({
-    username, tx_hash, depositWallet: DEPOSIT_WALLET,
-    usdcBefore: before, usdcAfter: after, usdcReceived,
-    postOwners: post.map(b => ({ owner: b.owner, mint: b.mint, amt: b.uiTokenAmount && b.uiTokenAmount.uiAmountString }))
+  console.log('DEPOSIT RAW', JSON.stringify({
+    depositWallet: DEPOSIT_WALLET,
+    usdcMint: USDC_MINT,
+    pre: pre.map(b => ({ owner: b.owner, mint: b.mint, amt: b.uiTokenAmount && b.uiTokenAmount.uiAmountString })),
+    post: post.map(b => ({ owner: b.owner, mint: b.mint, amt: b.uiTokenAmount && b.uiTokenAmount.uiAmountString }))
   }));
 
+  let usdcReceived = 0;
+  try {
+    // Method 1: pre/post token balances. Match the deposit wallet's USDC either
+    // by OWNER == DEPOSIT_WALLET, or by the token-account address (accountKeys[accountIndex])
+    // == the deposit wallet's ATA. We pair pre/post by accountIndex so we get the delta.
+    const accountKeys = ((tx.transaction && tx.transaction.message && tx.transaction.message.accountKeys) || [])
+      .map(k => (typeof k === 'string' ? k : (k && k.pubkey) || ''));
+
+    function usdcEntries(list) {
+      // Return {index -> uiAmount} for USDC entries owned by the deposit wallet.
+      const out = {};
+      (list || []).forEach(b => {
+        if (!b || b.mint !== USDC_MINT) return;
+        const ownerMatch = b.owner === DEPOSIT_WALLET;
+        if (!ownerMatch) return;
+        const a = b.uiTokenAmount ? parseFloat(b.uiTokenAmount.uiAmountString || b.uiTokenAmount.uiAmount || 0) : 0;
+        out[b.accountIndex] = isFinite(a) ? a : 0;
+      });
+      return out;
+    }
+    const preMap = usdcEntries(pre);
+    const postMap = usdcEntries(post);
+    // Sum deltas across every deposit-wallet USDC account that appears.
+    const idxs = new Set([...Object.keys(preMap), ...Object.keys(postMap)]);
+    idxs.forEach(i => {
+      const d = (postMap[i] || 0) - (preMap[i] || 0);
+      if (d > 0) usdcReceived += d;
+    });
+
+    // Method 2 fallback: if balances showed nothing, scan parsed spl-token transfers
+    // for any that credit an account owned by the deposit wallet (via post balances owner map).
+    if (!(usdcReceived > 0)) {
+      const ownerByAcct = {};
+      post.forEach(b => { if (b && accountKeys[b.accountIndex]) ownerByAcct[accountKeys[b.accountIndex]] = b.owner; });
+      const innerIx = (tx.meta && tx.meta.innerInstructions) ? tx.meta.innerInstructions : [];
+      const allIx = [
+        ...((tx.transaction.message.instructions) || []),
+        ...(innerIx.flatMap(ii => ii.instructions) || [])
+      ];
+      allIx.forEach(ix => {
+        if (!ix || ix.program !== 'spl-token' || !ix.parsed) return;
+        if (ix.parsed.type !== 'transfer' && ix.parsed.type !== 'transferChecked') return;
+        const info = ix.parsed.info || {};
+        const dest = info.destination;
+        if (ownerByAcct[dest] === DEPOSIT_WALLET) {
+          let amt = info.amount;
+          if (amt == null && info.tokenAmount) amt = info.tokenAmount.amount;
+          usdcReceived += (parseInt(amt || '0', 10) / 1e6);
+        }
+      });
+    }
+
+    console.log('DEPOSIT DEBUG', JSON.stringify({ username, usdcReceived, method: usdcReceived > 0 ? 'ok' : 'none' }));
+  } catch (e) {
+    console.error('DEPOSIT parse error:', e && e.message);
+    return res.status(400).json({ error: 'Could not read the transaction. Contact support with your TX.' });
+  }
+
   if (!(usdcReceived > 0)) {
-    console.error('DEPOSIT REJECT: deposit wallet USDC balance did not increase in this tx.');
+    console.error('DEPOSIT REJECT: no USDC to deposit wallet found. RAW post was logged above.');
     return res.status(400).json({ error: 'No USDC to your deposit wallet found in this transaction.' });
   }
   const extToCredit = Math.floor(usdcReceived * EXT_PER_USDC);
