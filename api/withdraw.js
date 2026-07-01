@@ -17,7 +17,7 @@ function applyCors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-const MIN_WITHDRAW = 25000;
+const MIN_WITHDRAW = 50000;
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/; // Solana address charset + length
 
 export default async function handler(req, res) {
