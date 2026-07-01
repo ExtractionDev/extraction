@@ -1569,6 +1569,8 @@ function genItem(){
   var price=Math.floor((rar===RARS[0]?100:rar===RARS[1]?320:rar===RARS[2]?850:rar===RARS[3]?2500:rar===RARS[4]?9500:99999)*(0.85+Math.random()*0.3));
   return{mat:mat,type:'Pickaxe',slot:'pickaxe',slotIcon:'ti-pickaxe',rar:rar,affixes:affixes,price:price,id:Math.random().toString(36).substr(2,8)};
 }
+// Returns Sanchez's pig image for his pet item, else the normal rarity icon. Used in market listings.
+function sIcon(it,size){return (it&&it.isSanchez)?('<img src="'+SANCHEZ.src+'" style="width:'+size+'px;height:'+size+'px;image-rendering:pixelated;object-fit:contain" alt="Sanchez"/>'):itemIcon(it.rar,size);}
 function itemIcon(rar,size){
   var s=size||36;
   var src=PICK_IMGS[rar.n];
@@ -2355,7 +2357,7 @@ function openListModal(itemId){
   var it=inventory.find(function(x){return x.id===itemId});if(!it)return;
   if(!walletConnected||!walletAddress){alert('Connect your Phantom wallet first to list items for USDC.');return;}
   listingItemId=itemId;
-  document.getElementById('listModalItem').innerHTML=itemIcon(it.rar,60)+'<div><div style="font-size:12px;color:'+it.rar.c+';font-weight:700">'+it.mat+' '+it.type+'</div><div style="font-size:12px;color:var(--text3)">'+it.rar.n+' · '+it.affixes.map(function(a){return'+'+a.v+'% '+a.t.n}).join(', ')+'</div></div>';
+  document.getElementById('listModalItem').innerHTML=sIcon(it,60)+'<div><div style="font-size:12px;color:'+it.rar.c+';font-weight:700">'+it.mat+' '+it.type+'</div><div style="font-size:12px;color:var(--text3)">'+it.rar.n+' · '+it.affixes.map(function(a){return'+'+a.v+'% '+a.t.n}).join(', ')+'</div></div>';
   document.getElementById('listPrice').value='';
   document.getElementById('listModal').style.display='flex';
 }
@@ -2566,7 +2568,7 @@ function renderMarket(filter){
   var _xd=_getAuth();var myUser=_xd?_xd.username:'';
   var ir=document.getElementById('mkInvRow');
   ir.innerHTML=!inventory.length?'<div class="mk-inv-empty">No items — run the dungeon first!</div>':
-    inventory.map(function(it){return'<div class="bp-inv-slot" style="border-color:'+it.rar.c+'" onclick="openListModal(\''+it.id+'\')" title="'+it.mat+' '+it.type+' · '+it.rar.n+' — tap to list for sale">'+itemIcon(it.rar,70)+'<span style="font-size:7px;color:'+it.rar.c+';line-height:1;overflow:hidden;white-space:nowrap;max-width:100%;text-overflow:ellipsis">'+it.rar.n+'</span><i class="ti ti-tag" style="position:absolute;top:7px;right:9px;font-size:12px;color:var(--text4)"></i></div>';}).join('');
+    inventory.map(function(it){return'<div class="bp-inv-slot" style="border-color:'+it.rar.c+'" onclick="openListModal(\''+it.id+'\')" title="'+it.mat+' '+it.type+' · '+it.rar.n+' — tap to list for sale">'+sIcon(it,70)+'<span style="font-size:7px;color:'+it.rar.c+';line-height:1;overflow:hidden;white-space:nowrap;max-width:100%;text-overflow:ellipsis">'+it.rar.n+'</span><i class="ti ti-tag" style="position:absolute;top:7px;right:9px;font-size:12px;color:var(--text4)"></i></div>';}).join('');
   var grid=document.getElementById('mkGrid');
   var mw=document.getElementById('mkMyListingsWrap'),mg=document.getElementById('mkMyListingsGrid');
   grid.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:11px">Loading...</div>';
@@ -2584,7 +2586,7 @@ function renderMarket(filter){
         var afxH=it.affixes.map(function(a){return'<div class="mk-afx"><i class="ti '+a.t.i+'"></i> +'+a.v+'% '+a.t.n+'</div>';}).join('');
         return'<div style="background:var(--bg4);border:1.5px solid '+it.rar.c+';border-radius:10px;padding:10px 14px;min-width:180px;max-width:240px">'
           +'<div style="font-size:10px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>'
-          +'<div style="display:flex;align-items:center;gap:8px">'+itemIcon(it.rar,40)+'<div><div style="color:'+it.rar.c+';font-size:13px;font-weight:700;line-height:1.2">'+it.mat+' '+it.type+'</div><div style="color:'+it.rar.c+';font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.85">'+it.rar.n+'</div></div></div>'
+          +'<div style="display:flex;align-items:center;gap:8px">'+sIcon(it,40)+'<div><div style="color:'+it.rar.c+';font-size:13px;font-weight:700;line-height:1.2">'+it.mat+' '+it.type+'</div><div style="color:'+it.rar.c+';font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.85">'+it.rar.n+'</div></div></div>'
           +'<div class="mk-affixes">'+afxH+'</div>'
           +'<div style="color:#26c281;font-size:11px;font-weight:700">$'+(parseFloat(l.price)||0).toFixed(2)+' USDC</div>'
           +'<div onclick="withdrawListing(\''+l.id+'\')" style="margin-top:6px;font-size:9px;color:var(--text4);cursor:pointer;text-decoration:underline">Withdraw</div>'
@@ -2606,7 +2608,7 @@ function renderMarket(filter){
           ?'<button style="margin-top:6px;width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--text4);padding:4px;font-size:9px;font-family:\'Space Mono\',monospace;cursor:default">Listed</button>'
           :'<button id="ubtn_'+l.id+'" onclick="buyWithUSDC(\''+l.id+'\',\''+( l.seller_wallet||'')+'\','+(parseFloat(l.price)||0)+')" style="margin-top:6px;width:100%;background:#0a2018;border:1px solid #26c281;border-radius:5px;color:#26c281;padding:4px;cursor:pointer;font-size:9px;font-family:\'Space Mono\',monospace">Buy with USDC</button>';
         return'<div style="background:var(--bg4);border:1.5px solid '+it.rar.c+';border-radius:10px;padding:10px 14px;min-width:180px;max-width:240px">'+badge
-          +'<div style="display:flex;align-items:center;gap:8px">'+itemIcon(it.rar,40)+'<div><div style="color:'+it.rar.c+';font-size:13px;font-weight:700;line-height:1.2">'+it.mat+' '+it.type+'</div><div style="color:'+it.rar.c+';font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.85">'+it.rar.n+'</div></div></div>'
+          +'<div style="display:flex;align-items:center;gap:8px">'+sIcon(it,40)+'<div><div style="color:'+it.rar.c+';font-size:13px;font-weight:700;line-height:1.2">'+it.mat+' '+it.type+'</div><div style="color:'+it.rar.c+';font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.85">'+it.rar.n+'</div></div></div>'
           +'<div class="mk-affixes">'+afxH+'</div>'
           +'<div style="color:#26c281;font-size:11px;font-weight:700">$'+(parseFloat(l.price)||0).toFixed(2)+' USDC</div>'+btn+'</div>';
       }).join('');
@@ -2677,7 +2679,7 @@ function renderSoldItems(){
           visual='<div style="width:36px;height:36px;border-radius:6px;background:'+oc+';display:flex;align-items:center;justify-content:center"><i class="ti ti-diamond" style="font-size:20px;color:rgba(255,255,255,.85)"></i></div>';
         }else{
           var it=null; try{it=_relinkItem(s.item_data);}catch(e){}
-          if(it){visual=itemIcon(it.rar,36);accent=it.rar.c;}
+          if(it){visual=sIcon(it,36);accent=it.rar.c;}
           else{visual='<i class="ti ti-pickaxe" style="font-size:20px;color:#90c848"></i>';}
         }
         return '<div style="display:flex;align-items:center;gap:12px;background:var(--bg3);border:1px solid '+accent+';border-radius:10px;padding:10px 14px">'
@@ -3133,12 +3135,12 @@ function drawMiner(){
   var mx=215,ty=MGY-mDstH;
   // ── Sanchez the pig companion (drawn before miner so miner overlaps for depth) ──
   if(sanchezEquipped()&&SANCHEZ&&SANCHEZ.complete&&SANCHEZ.naturalWidth>0){
-    var _sw=76,_sh=76;                 // a touch smaller than the 96px miner
+    var _sw=38,_sh=38;                 // little piggy — about half the miner's height
     var _sbob=Math.sin(mTk*0.06)*2;    // gentle idle bob
-    var _sx=118, _sy=MGY-_sh+12+_sbob;  // left of miner (mx=215), same ground line
+    var _sx=165, _sy=MGY-_sh+6+_sbob;  // left of miner (mx=215), same ground line
     // soft ground shadow
     MC.save();MC.globalAlpha=0.25;MC.fillStyle='#000';
-    MC.beginPath();MC.ellipse(_sx+_sw/2,MGY+1,26,5,0,0,6.28);MC.fill();MC.restore();
+    MC.beginPath();MC.ellipse(_sx+_sw/2,MGY+1,15,4,0,0,6.28);MC.fill();MC.restore();
     MC.imageSmoothingEnabled=false;
     MC.drawImage(SANCHEZ,_sx,_sy,_sw,_sh); // natural orientation (snout left)
   }
