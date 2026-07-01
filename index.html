@@ -358,9 +358,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 .bp-ore-chip:hover{border-color:var(--gold)}
 .bp-inv-empty{opacity:0.28;cursor:default}
 .bp-inv-empty:hover{border-color:var(--border2)!important}
-.bp-bonuses{background:var(--bg3);border:2px solid var(--border3);border-radius:18px;padding:14px 16px;font-size:14px;color:var(--gold);display:flex;flex-direction:column;flex-wrap:wrap;gap:10px;align-items:flex-start;flex-shrink:0;max-width:200px}
+.bp-bonuses{background:var(--bg3);border:2px solid var(--border3);border-radius:18px;padding:14px 16px;font-size:14px;color:var(--gold);display:flex;flex-direction:column;gap:10px;align-items:flex-start;flex-shrink:0;width:fit-content}
 .bp-bonuses>span:first-child{flex-basis:100%}
-.bp-bonus-chip{background:var(--bg4);border:1.5px solid var(--gold);border-radius:10px;padding:8px 16px;font-size:14px;color:var(--gold);font-weight:700;letter-spacing:.04em}
+.bp-bonus-chip{background:var(--bg4);border:1.5px solid var(--gold);border-radius:10px;padding:8px 14px;font-size:14px;color:var(--gold);font-weight:700;letter-spacing:.04em;display:inline-flex;align-items:center;white-space:nowrap;width:fit-content}
 /* EXCALIBUR POOL */
 /* DESCEND PREVIEW OVERLAY */
 .desc-preview{position:absolute;inset:0;background:rgba(4,3,8,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:80;gap:16px;padding:28px;overflow-y:auto}
@@ -1027,13 +1027,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     </div>
 
     <!-- MIDDLE: Active Bonuses on top, Sanchez companion stats stacked under it -->
-    <div class="bp-mid" style="display:flex;flex-direction:column;gap:12px;align-self:flex-start;min-width:150px;max-width:200px">
+    <div class="bp-mid" style="display:flex;flex-direction:column;gap:12px;align-self:flex-start;width:fit-content;min-width:170px">
       <div id="bpBonuses" class="bp-bonuses" style="display:none"></div>
-      <div class="bp-pet-stats" id="bpPetStats" style="display:none;flex-direction:column;min-width:150px;max-width:200px;background:var(--bg3);border:1.5px solid #ff9ec4;border-radius:12px;padding:14px;margin:0"></div>
+      <div class="bp-pet-stats" id="bpPetStats" style="display:none;flex-direction:column;min-width:190px;background:var(--bg3);border:1.5px solid #ff9ec4;border-radius:12px;padding:14px;margin:0"></div>
     </div>
 
     <!-- RIGHT: Equipment mannequin (scale 5.5, 338px canvas, 80px slots) -->
-    <div class="bp-right" style="margin-left:60px">
+    <div class="bp-right" style="margin-left:110px">
       <div class="bp-section-hdr">
         <i class="ti ti-shield" style="color:var(--gold);font-size:14px"></i>
         <span>Equipment</span>
@@ -2223,7 +2223,7 @@ function scaleBpLayout(){
   var t4=document.getElementById('t4');
   var inner=t4?t4.querySelector('.bp-inner'):null;
   if(!inner)return;
-  var designW=1700; // grid(650) + mid(200) + mannequin(760) + 60px shift + gaps/padding
+  var designW=1780; // grid(650) + mid(~240) + mannequin(760) + 110px shift + gaps
   var availW=t4.clientWidth||window.innerWidth;
   inner.style.zoom=availW>=designW?1:availW/designW;
 }
