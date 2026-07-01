@@ -2498,12 +2498,23 @@ function renderSoldItems(){
       el.innerHTML=d.sales.map(function(s){
         var when=new Date(s.sold_at);
         var dateStr=isNaN(when.getTime())?'':when.toLocaleDateString()+' '+when.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-        var icon=s.kind==='ore'?'ti-diamond':'ti-pickaxe';
         var price=(typeof s.price_usdc==='number'?s.price_usdc:parseFloat(s.price_usdc)||0).toFixed(2);
-        return '<div style="display:flex;align-items:center;gap:12px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px 14px">'
-          +'<i class="ti '+icon+'" style="font-size:18px;color:#90c848"></i>'
+        // Build the visual: real pixel image for equipment, colored gem for ore.
+        var visual='', accent='#90c848';
+        if(s.kind==='ore'){
+          var oreCols={Coal:'#3a3a3a',Copper:'#c87040',Iron:'#8080a0',Silver:'#a8b0c8',Gold:'#c8a020',Mystrile:'#7858e0'};
+          var oc=(s.item_data&&oreCols[s.item_data.ore_name])||'#c8a040';
+          accent=oc;
+          visual='<div style="width:36px;height:36px;border-radius:6px;background:'+oc+';display:flex;align-items:center;justify-content:center"><i class="ti ti-diamond" style="font-size:20px;color:rgba(255,255,255,.85)"></i></div>';
+        }else{
+          var it=null; try{it=_relinkItem(s.item_data);}catch(e){}
+          if(it){visual=itemIcon(it.rar,36);accent=it.rar.c;}
+          else{visual='<i class="ti ti-pickaxe" style="font-size:20px;color:#90c848"></i>';}
+        }
+        return '<div style="display:flex;align-items:center;gap:12px;background:var(--bg3);border:1px solid '+accent+';border-radius:10px;padding:10px 14px">'
+          +'<div style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+visual+'</div>'
           +'<div style="flex:1;min-width:0">'
-            +'<div style="font-family:\'Space Mono\',monospace;font-size:13px;color:var(--text)">'+_esc(s.label)+'</div>'
+            +'<div style="font-family:\'Space Mono\',monospace;font-size:13px;color:'+accent+'">'+_esc(s.label)+'</div>'
             +'<div style="font-size:10px;color:var(--text3);letter-spacing:.05em">sold to @'+_esc(s.buyer)+' · '+dateStr+'</div>'
           +'</div>'
           +'<div style="font-family:\'Space Mono\',monospace;font-size:13px;color:#90c848;white-space:nowrap">$'+price+' USDC</div>'
