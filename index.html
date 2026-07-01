@@ -1494,19 +1494,6 @@ var extBurned=0,devCut=0; // running totals: $EXT burned & dev cut (simulated)
 var FREE_MAX_DAILY=10;
 function getFreeUsesKey(){return 'freeUses_'+new Date().toDateString();}
 function getFreeUsesLeft(){var s=localStorage.getItem(getFreeUsesKey());return s?Math.max(0,FREE_MAX_DAILY-parseInt(s)):FREE_MAX_DAILY;}
-// Server-authoritative free runs remaining. null = unknown (fall back to local).
-var _serverFreeLeft=null;
-// Ask the server how many free runs are left today WITHOUT consuming one.
-// Uses the same /api/load POST but action 'freecount' (read-only on the server).
-function refreshFreeCount(){
-  var _xd=_getAuth&&_getAuth();
-  if(!_xd||!_xd.username){return;}
-  fetch('/api/load',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({username:_xd.username,token:_xd.token||'',action:'freecount'})
-  }).then(function(r){return r.json();}).then(function(d){
-    if(d&&typeof d.freeRunsLeft==='number'){_serverFreeLeft=d.freeRunsLeft;updFreeLabel();}
-  }).catch(function(){});
-}
 function useFreeRun(){var k=getFreeUsesKey();var used=parseInt(localStorage.getItem(k)||'0');localStorage.setItem(k,used+1);}
 
 var EQUIP_SLOTS=[
@@ -1521,6 +1508,7 @@ var EQUIP_SLOTS=[
 var extFee=1000,mode='safe';
 var walletConnected=false,walletAddress=null;
 var listedItems=[],listingItemId=null;
+var MAX_LISTINGS=6; // max active marketplace listings per player (also enforced server-side)
 
 var PICK_IMGS={
   'Common':'data:image/png;base64,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',
@@ -1679,7 +1667,6 @@ function pickMode(m){
     if(excWidget)excWidget.style.display='none';
     var left=getFreeUsesLeft();
     if(goBtn){goBtn.style.borderColor=left>0?'#4088c0':'#e84b4b';goBtn.style.color=left>0?'#70b8ff':'#e84b4b';}
-    refreshFreeCount();
   } else {
     if(solWrap)solWrap.style.display='';
     if(excWidget)excWidget.style.display='';
@@ -1690,9 +1677,7 @@ function pickMode(m){
 }
 function updFreeLabel(){
   var el=document.getElementById('freeUsesLabel');
-  if(!el)return;
-  var left=(_serverFreeLeft!==null)?_serverFreeLeft:getFreeUsesLeft();
-  el.textContent=left+' / '+FREE_MAX_DAILY+' runs today';
+  if(el)el.textContent=getFreeUsesLeft()+' / '+FREE_MAX_DAILY+' runs today';
 }
 function updExt(){
   var _v=parseInt(document.getElementById('solS').value);
@@ -2353,6 +2338,12 @@ function closeListModal(){document.getElementById('listModal').style.display='no
 function _getAuth(){try{return JSON.parse(localStorage.getItem(_xAuthKey)||'null');}catch(e){return null;}}
 function confirmList(){
   var it=inventory.find(function(x){return x.id===listingItemId});if(!it)return;
+  // Client-side cap (also enforced on the server so it can't be bypassed).
+  var _xdC=_getAuth();
+  if(_xdC&&_xdC.username){
+    var _mine=(listedItems||[]).filter(function(l){return l.seller===_xdC.username;}).length;
+    if(_mine>=MAX_LISTINGS){alert('You can have at most '+MAX_LISTINGS+' active listings. Sell or withdraw one first.');return;}
+  }
   var price=parseFloat(document.getElementById('listPrice').value);
   if(!price||price<0.01){alert('Enter a valid USDC price (min $0.01).');return;}
   if(!walletConnected||!walletAddress){alert('Connect your Phantom wallet to list items.');return;}
@@ -3885,13 +3876,9 @@ function startDungeon(){
     }).then(function(r){return r.json();}).then(function(d){
       if(_goBtnF){_goBtnF.disabled=false;_goBtnF.style.opacity='';}
       if(d&&d.ok){
-        // Server already consumed the run; trust its remaining count.
-        if(typeof d.freeRunsLeft==='number')_serverFreeLeft=d.freeRunsLeft;
         useFreeRun();updFreeLabel();
         _beginDungeonRun();
       } else {
-        // Server denied (e.g. daily cap hit). Sync the label to the truth.
-        refreshFreeCount();
         alert('Entry failed: '+((d&&d.error)||'Account not eligible.'));
       }
     }).catch(function(){
