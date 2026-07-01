@@ -211,7 +211,13 @@ export default async function handler(req, res) {
       elapsedSec = Math.max(MIN_CREDIT_WINDOW_SEC, Math.min(dt, 8 * 3600));
     }
   }
-  const timeCeiling = maxEarnPerSec(safeUps) * elapsedSec;
+  // Hard ceiling: mining can never credit more than MAX_MINE_PER_HOUR, regardless
+  // of upgrades or window length. This bounds the pure-mining path only; the
+  // dungeon refineBurst and the jackpot (award_jackpot in load.js) are separate
+  // and intentionally not limited by this.
+  const MAX_MINE_PER_HOUR = 5000;
+  const mineCap = MAX_MINE_PER_HOUR * (elapsedSec / 3600);
+  const timeCeiling = Math.min(maxEarnPerSec(safeUps) * elapsedSec, mineCap);
 
   let refineBurst = 0;
   const lastFee = parseFloat(player.last_entry_fee) || 0;
