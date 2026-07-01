@@ -1236,6 +1236,51 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     <div class="docs-callout" style="margin-top:8px"><strong style="color:var(--gold)">Save System:</strong> All progress (GC, $EXT, ore, upgrades, inventory) saves automatically — cloud-synced to your X (Twitter) account when signed in, so it follows you across devices. Settings → Reset wipes your local save.</div>
   </div>
 
+  <!-- MARKETPLACE -->
+  <div class="docs-section">
+    <div class="docs-h2"><i class="ti ti-building-store" style="color:#90c848"></i> Player Marketplace</div>
+    <div class="docs-p">Trade items and ore directly with other players. Buyers pay in <b>USDC</b> straight to the seller's Phantom wallet on-chain — there's no escrow, the transaction itself is the settlement. List your best pickaxes and loot, or dump surplus ore for real value.</div>
+    <table class="docs-table">
+      <thead><tr><th>Detail</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Settlement</td><td>USDC on Solana, seller wallet direct (no escrow)</td></tr>
+        <tr><td>Marketplace fee</td><td>5% — taken out of the seller's cut</td></tr>
+        <tr><td>Buyer pays</td><td>Exactly the sticker price</td></tr>
+        <tr><td>Seller nets</td><td>95% of the listing price</td></tr>
+        <tr><td>Max active item listings</td><td>6 per seller</td></tr>
+        <tr><td>Minimum price</td><td>$0.01 USDC</td></tr>
+        <tr><td>Tradable ore</td><td>Coal · Copper · Iron · Silver · Gold · Mystrile</td></tr>
+      </tbody>
+    </table>
+    <div class="docs-callout green"><strong style="color:#90c848">On a sale</strong> the payment is verified three ways on-chain — seller's cut, the 5% fee, and the total — so neither side can be shorted. Each payment signature can only ever claim one item.</div>
+    <div class="docs-callout" style="border-left-color:var(--red);margin-top:6px"><strong style="color:#ff6666">Double-buy protection:</strong> Listings are claimed atomically — if two people buy at the exact same moment, one wins and the other's payment is flagged for a manual refund. If that's you, keep your <b>TX signature</b> and contact support.</div>
+  </div>
+
+  <!-- DAILY STREAK -->
+  <div class="docs-section">
+    <div class="docs-h2"><i class="ti ti-flame" style="color:var(--gold)"></i> Daily Login Streak</div>
+    <div class="docs-p">Hit the <b>Claim</b> button once every 24 hours for a growing $EXT reward. Miss more than 48 hours and the streak resets to Day 1. The cycle runs 7 days, then loops back around.</div>
+    <table class="docs-table">
+      <thead><tr><th>Day</th><th>Reward</th><th>Day</th><th>Reward</th></tr></thead>
+      <tbody>
+        <tr><td>Day 1</td><td>500 $EXT</td><td>Day 5</td><td>2,000 $EXT</td></tr>
+        <tr><td>Day 2</td><td>750 $EXT</td><td>Day 6</td><td>3,000 $EXT</td></tr>
+        <tr><td>Day 3</td><td>1,000 $EXT</td><td style="color:var(--gold)">Day 7</td><td style="color:var(--gold)">5,000 $EXT</td></tr>
+        <tr><td>Day 4</td><td>1,500 $EXT</td><td>—</td><td>then loops</td></tr>
+      </tbody>
+    </table>
+    <div class="docs-callout"><strong style="color:var(--gold)">Note:</strong> The claim cooldown is a rolling 24 hours enforced server-side. The login screen shows your current streak, but the reward only lands when you actually tap Claim.</div>
+  </div>
+
+  <!-- FAIR PLAY -->
+  <div class="docs-section">
+    <div class="docs-h2"><i class="ti ti-shield-check" style="color:#40c8f0"></i> Fair Play &amp; Anti-Cheat</div>
+    <div class="docs-p">Automated checks protect the leaderboard and the economy so real players aren't drowned out by exploiters.</div>
+    <div class="docs-callout" style="border-left-color:#40c8f0"><strong style="color:#40c8f0">God-mode detection:</strong> Runs that look impossible — deep floors cleared repeatedly with zero damage taken — raise a flag. Enough flags and the account is auto-suspended.</div>
+    <div class="docs-callout" style="border-left-color:var(--red);margin-top:6px"><strong style="color:#ff6666">Suspended accounts</strong> are hidden from the leaderboard and blocked from deposits, withdrawals, and the marketplace.</div>
+    <div class="docs-callout green" style="margin-top:6px"><strong style="color:#90c848">Rate limits &amp; caps</strong> are in place throughout to prevent GC inflation and abuse. The leaderboard ranks the top 50 by lifetime GC extracted.</div>
+  </div>
+
  </div>
 </div>
 
