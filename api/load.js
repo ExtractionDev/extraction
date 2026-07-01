@@ -102,6 +102,28 @@ export default async function handler(req, res) {
 
     // Lightweight gate for free-run entry: if we reach here the session is valid
     // and NOT banned (the check above already 403's banned users). No side effects.
+    // Read-only free-run count for the UI label. Does NOT consume a run.
+    if (action === 'freecount') {
+      const FREE_MAX_DAILY = 10; // keep in sync with index.html
+      const today = new Date(new Date().toISOString().slice(0,10)); // UTC date
+      let used = 0;
+      try {
+        const { data: fr } = await supabase
+          .from('players')
+          .select('free_runs_used, free_runs_date')
+          .eq('username', username)
+          .single();
+        if (fr && fr.free_runs_date) {
+          const stored = new Date(fr.free_runs_date);
+          // Same UTC day → count is current; otherwise it resets to 0.
+          if (stored.toISOString().slice(0,10) === today.toISOString().slice(0,10)) {
+            used = fr.free_runs_used || 0;
+          }
+        }
+      } catch (e) { /* default used=0 */ }
+      return res.status(200).json({ ok: true, freeRunsLeft: Math.max(0, FREE_MAX_DAILY - used) });
+    }
+
     if (action === 'checkban') {
       // Server-authoritative free-run limit. localStorage on the client is not
       // trusted — the daily count lives here and cannot be reset by the browser.
