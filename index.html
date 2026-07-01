@@ -790,10 +790,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 <div class="tab market-tab" id="t3">
   <div class="mk-header"><div class="mk-title">Marketplace</div><div class="mk-count" id="mkCount">8 items listed</div></div>
   <!-- Market sub-tabs -->
-  <div style="display:flex;gap:0;border-bottom:1px solid var(--border2);margin-bottom:12px">
-    <div id="mkTabPickaxe" class="mk-subtab on" onclick="switchMkTab('pickaxe')" style="padding:8px 18px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;border-bottom:2px solid var(--gold);color:var(--gold);font-family:'Space Mono',monospace"><i class="ti ti-pickaxe" style="margin-right:4px"></i>Equipment</div>
-    <div id="mkTabOres" class="mk-subtab" onclick="switchMkTab('ores')" style="padding:8px 18px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;border-bottom:2px solid transparent;color:var(--text3);font-family:'Space Mono',monospace"><i class="ti ti-diamond" style="margin-right:4px;color:#c8a040"></i>Ores</div>
-    <div id="mkTabSold" class="mk-subtab" onclick="switchMkTab('sold')" style="padding:8px 18px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;border-bottom:2px solid transparent;color:var(--text3);font-family:'Space Mono',monospace"><i class="ti ti-receipt" style="margin-right:4px;color:#90c848"></i>Sold</div>
+  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+    <div id="mkTabPickaxe" class="mk-subtab on" onclick="switchMkTab('pickaxe')" style="padding:12px 26px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;border:1.5px solid var(--gold);border-radius:9px;color:var(--gold);background:rgba(200,160,64,.12);font-family:'Space Mono',monospace;transition:all .12s"><i class="ti ti-pickaxe" style="margin-right:6px"></i>Equipment</div>
+    <div id="mkTabOres" class="mk-subtab" onclick="switchMkTab('ores')" style="padding:12px 26px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;border:1.5px solid var(--border3);border-radius:9px;color:var(--text3);background:var(--bg3);font-family:'Space Mono',monospace;transition:all .12s"><i class="ti ti-diamond" style="margin-right:6px;color:#c8a040"></i>Ores</div>
+    <div id="mkTabSold" class="mk-subtab" onclick="switchMkTab('sold')" style="padding:12px 26px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;border:1.5px solid var(--border3);border-radius:9px;color:var(--text3);background:var(--bg3);font-family:'Space Mono',monospace;transition:all .12s"><i class="ti ti-receipt" style="margin-right:6px;color:#90c848"></i>Sold</div>
   </div>
 
   <!-- PICKAXES PANEL -->
@@ -2465,20 +2465,21 @@ function switchMkTab(tab){
   mkActiveTab=tab;
   var pp=document.getElementById('mkPanelPickaxe'),op=document.getElementById('mkPanelOres'),sp=document.getElementById('mkPanelSold');
   var tp=document.getElementById('mkTabPickaxe'),to2=document.getElementById('mkTabOres'),ts=document.getElementById('mkTabSold');
-  // reset all tabs to inactive
-  [tp,to2,ts].forEach(function(t){if(t){t.style.borderBottomColor='transparent';t.style.color='var(--text3)';}});
+  // reset all tabs to inactive (bordered button look)
+  [tp,to2,ts].forEach(function(t){if(t){t.style.borderColor='var(--border3)';t.style.color='var(--text3)';t.style.background='var(--bg3)';}});
   if(pp)pp.style.display='none';if(op)op.style.display='none';if(sp)sp.style.display='none';
+  function _activate(t){if(t){t.style.borderColor='var(--gold)';t.style.color='var(--gold)';t.style.background='rgba(200,160,64,.12)';}}
   if(tab==='pickaxe'){
     if(pp)pp.style.display='';
-    if(tp){tp.style.borderBottomColor='var(--gold)';tp.style.color='var(--gold)';}
+    _activate(tp);
     renderMarket(mkFilter);
   }else if(tab==='ores'){
     if(op)op.style.display='';
-    if(to2){to2.style.borderBottomColor='var(--gold)';to2.style.color='var(--gold)';}
+    _activate(to2);
     renderOreMarket();
   }else{
     if(sp)sp.style.display='';
-    if(ts){ts.style.borderBottomColor='var(--gold)';ts.style.color='var(--gold)';}
+    _activate(ts);
     renderSoldItems();
   }
 }
