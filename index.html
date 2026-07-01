@@ -1494,6 +1494,19 @@ var extBurned=0,devCut=0; // running totals: $EXT burned & dev cut (simulated)
 var FREE_MAX_DAILY=10;
 function getFreeUsesKey(){return 'freeUses_'+new Date().toDateString();}
 function getFreeUsesLeft(){var s=localStorage.getItem(getFreeUsesKey());return s?Math.max(0,FREE_MAX_DAILY-parseInt(s)):FREE_MAX_DAILY;}
+// Server-authoritative free runs remaining. null = unknown (fall back to local).
+var _serverFreeLeft=null;
+// Ask the server how many free runs are left today WITHOUT consuming one.
+// Uses the same /api/load POST but action 'freecount' (read-only on the server).
+function refreshFreeCount(){
+  var _xd=_getAuth&&_getAuth();
+  if(!_xd||!_xd.username){return;}
+  fetch('/api/load',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username:_xd.username,token:_xd.token||'',action:'freecount'})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d&&typeof d.freeRunsLeft==='number'){_serverFreeLeft=d.freeRunsLeft;updFreeLabel();}
+  }).catch(function(){});
+}
 function useFreeRun(){var k=getFreeUsesKey();var used=parseInt(localStorage.getItem(k)||'0');localStorage.setItem(k,used+1);}
 
 var EQUIP_SLOTS=[
@@ -1666,6 +1679,7 @@ function pickMode(m){
     if(excWidget)excWidget.style.display='none';
     var left=getFreeUsesLeft();
     if(goBtn){goBtn.style.borderColor=left>0?'#4088c0':'#e84b4b';goBtn.style.color=left>0?'#70b8ff':'#e84b4b';}
+    refreshFreeCount();
   } else {
     if(solWrap)solWrap.style.display='';
     if(excWidget)excWidget.style.display='';
@@ -1676,7 +1690,9 @@ function pickMode(m){
 }
 function updFreeLabel(){
   var el=document.getElementById('freeUsesLabel');
-  if(el)el.textContent=getFreeUsesLeft()+' / '+FREE_MAX_DAILY+' runs today';
+  if(!el)return;
+  var left=(_serverFreeLeft!==null)?_serverFreeLeft:getFreeUsesLeft();
+  el.textContent=left+' / '+FREE_MAX_DAILY+' runs today';
 }
 function updExt(){
   var _v=parseInt(document.getElementById('solS').value);
@@ -3869,9 +3885,13 @@ function startDungeon(){
     }).then(function(r){return r.json();}).then(function(d){
       if(_goBtnF){_goBtnF.disabled=false;_goBtnF.style.opacity='';}
       if(d&&d.ok){
+        // Server already consumed the run; trust its remaining count.
+        if(typeof d.freeRunsLeft==='number')_serverFreeLeft=d.freeRunsLeft;
         useFreeRun();updFreeLabel();
         _beginDungeonRun();
       } else {
+        // Server denied (e.g. daily cap hit). Sync the label to the truth.
+        refreshFreeCount();
         alert('Entry failed: '+((d&&d.error)||'Account not eligible.'));
       }
     }).catch(function(){
