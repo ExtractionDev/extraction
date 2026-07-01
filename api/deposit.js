@@ -121,12 +121,6 @@ export default async function handler(req, res) {
   }
 
   // ── On-chain verification ────────────────────────────────────────────────
-  const depositATA = await getRealUsdcAccount(DEPOSIT_WALLET);
-  if (!depositATA) {
-    console.error('Deposit wallet has no USDC account on chain.');
-    return res.status(500).json({ error: 'Deposits temporarily unavailable.' });
-  }
-
   const tx = await getParsedTx(tx_hash);
   if (!tx) {
     return res.status(400).json({ error: 'Transaction not found / not finalized yet. Try again in a moment.' });
@@ -135,40 +129,33 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Transaction failed on chain.' });
   }
 
-  // Sum every USDC transfer whose destination is OUR deposit USDC account.
-  const innerIx = (tx.meta && tx.meta.innerInstructions) ? tx.meta.innerInstructions : [];
-  const allIx = [
-    ...((tx.transaction.message.instructions) || []),
-    ...(innerIx.flatMap(ii => ii.instructions) || [])
-  ];
-  const allTransfers = allIx
-    .filter(ix => ix.program === 'spl-token' && ix.parsed &&
-                  (ix.parsed.type === 'transfer' || ix.parsed.type === 'transferChecked'))
-    .map(ix => {
-      const info = ix.parsed.info;
-      let amt = info.amount;
-      if (amt == null && info.tokenAmount) amt = info.tokenAmount.amount;
-      return { to: info.destination, amount: parseInt(amt || '0', 10) };
-    });
+  // AUTHORITATIVE CHECK: use the transaction's own pre/post token balances.
+  // Solana records, per tx, every token account's owner + mint + balance before
+  // and after. We find the USDC account OWNED BY the deposit wallet and confirm
+  // its balance increased. This avoids fragile ATA-address string matching and
+  // works for both `transfer` and `transferChecked`.
+  const pre = (tx.meta && tx.meta.preTokenBalances) ? tx.meta.preTokenBalances : [];
+  const post = (tx.meta && tx.meta.postTokenBalances) ? tx.meta.postTokenBalances : [];
 
-  // DIAGNOSTIC: show what we're matching against vs what the tx actually contained.
+  function usdcAmtFor(list) {
+    // sum uiAmount (in whole USDC) across entries owned by DEPOSIT_WALLET for the USDC mint
+    return (list || [])
+      .filter(b => b.owner === DEPOSIT_WALLET && b.mint === USDC_MINT)
+      .reduce((s, b) => s + (parseFloat(b.uiTokenAmount && b.uiTokenAmount.uiAmountString) || 0), 0);
+  }
+
+  const before = usdcAmtFor(pre);
+  const after = usdcAmtFor(post);
+  const usdcReceived = Math.max(0, after - before);
+
   console.log('DEPOSIT DEBUG', JSON.stringify({
-    username,
-    tx_hash,
-    depositWallet: DEPOSIT_WALLET,
-    depositATA,
-    transfersFound: allTransfers,
-    matched: allTransfers.filter(t => t.to === depositATA)
+    username, tx_hash, depositWallet: DEPOSIT_WALLET,
+    usdcBefore: before, usdcAfter: after, usdcReceived,
+    postOwners: post.map(b => ({ owner: b.owner, mint: b.mint, amt: b.uiTokenAmount && b.uiTokenAmount.uiAmountString }))
   }));
 
-  const receivedUnits = allTransfers
-    .filter(t => t.to === depositATA)
-    .reduce((s, t) => s + t.amount, 0);
-
-  // USDC has 6 decimals. Convert base units → USDC → $EXT.
-  const usdcReceived = receivedUnits / 1e6;
   if (!(usdcReceived > 0)) {
-    console.error('DEPOSIT REJECT: no USDC matched deposit ATA', depositATA, '— transfers were:', JSON.stringify(allTransfers));
+    console.error('DEPOSIT REJECT: deposit wallet USDC balance did not increase in this tx.');
     return res.status(400).json({ error: 'No USDC to your deposit wallet found in this transaction.' });
   }
   const extToCredit = Math.floor(usdcReceived * EXT_PER_USDC);
