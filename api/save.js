@@ -196,10 +196,20 @@ export default async function handler(req, res) {
   let rawDelta = claimLifetime - prevLifetime;
   if (!(rawDelta > 0)) rawDelta = 0;
 
-  let elapsedSec = 300;
+  // Seconds since the last save. Frequent client autosaves make this tiny (a few
+  // seconds), which used to crush timeCeiling — and thus the credit — to ~0 on
+  // every save, so mined EXT never landed server-side. Enforce the earn-rate cap
+  // over a MINIMUM window so a save that arrives 3s after the last one is still
+  // allowed to credit the earnings accrued during that period. The rate cap
+  // itself (maxEarnPerSec) still prevents crediting faster than upgrades allow.
+  const MIN_CREDIT_WINDOW_SEC = 300; // rolling window floor (5 min)
+  let elapsedSec = MIN_CREDIT_WINDOW_SEC;
   if (player.updated_at) {
     const dt = (Date.now() - Date.parse(player.updated_at)) / 1000;
-    if (isFinite(dt)) elapsedSec = Math.max(0, Math.min(dt, 8 * 3600));
+    if (isFinite(dt)) {
+      // Floor at the window so rapid saves still credit; cap at 8h against idle abuse.
+      elapsedSec = Math.max(MIN_CREDIT_WINDOW_SEC, Math.min(dt, 8 * 3600));
+    }
   }
   const timeCeiling = maxEarnPerSec(safeUps) * elapsedSec;
 
