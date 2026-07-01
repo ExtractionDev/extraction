@@ -31,6 +31,11 @@ const MAX_INVENTORY  = 50;
 const MAX_RUNS_GAIN   = 50;
 const MAX_CHESTS_GAIN = 50;
 const MAX_ROCKS_GAIN  = 200000;
+// Auto-ban if a single upload claims MORE than this many new rocks.
+// Legit max is ~320/upload at 20s autosave with fully-maxed upgrades (~640 if a
+// save is delayed/merged). 10,000 is ~15x that ceiling: no real player reaches
+// it, but scripted/edited clients claiming 100k+ get caught. Lower to tighten.
+const ROCKS_CHEAT_LIMIT = 10000;
 const MAX_ORE_GAIN    = 500;
 
 const MAX_GOLD_PER_RUN = 50000;
@@ -252,6 +257,14 @@ export default async function handler(req, res) {
   const tokenClaim = Math.floor(parseFloat(tokens) || 0);
   if (tokenClaim > prevTokens + allowedDelta + TOKEN_CHEAT_MARGIN) {
     cheatReasons.push(`tokens ${tokenClaim} exceeds creditable ${Math.floor(prevTokens + allowedDelta)} by >${TOKEN_CHEAT_MARGIN}`);
+  }
+
+  // Rocks-per-upload cap: a single save claiming more new rocks than a human
+  // could mine indicates a memory editor / scripted client.
+  const rocksClaimed = Math.floor(totalRocks || 0);
+  const rocksDelta = rocksClaimed - prevRocks;
+  if (rocksDelta > ROCKS_CHEAT_LIMIT) {
+    cheatReasons.push(`rocks +${rocksDelta} in one upload exceeds limit ${ROCKS_CHEAT_LIMIT}`);
   }
 
   if (Array.isArray(inventory)) {
