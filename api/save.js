@@ -129,13 +129,49 @@ export default async function handler(req, res) {
   // ── Verify session ──────────────────────────────────────────────────────
   const { data: player, error: fetchErr } = await supabase
     .from('players')
-    .select('session_token, gold, tokens, total_rocks, runs, chests, ups, ore_stash, lifetime_ext, game_stats, updated_at, last_entry_fee, last_entry_at, banned')
+    .select('session_token, gold, tokens, total_rocks, runs, chests, ups, ore_stash, lifetime_ext, game_stats, updated_at, last_entry_fee, last_entry_at, banned, reset_flag')
     .eq('username', username)
     .single();
 
   if (fetchErr || !player) return res.status(403).json({ error: 'Player not found' });
   if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session token' });
   if (player.banned) return res.status(403).json({ error: 'Account suspended.' });
+
+  // ── ADMIN RESET ─────────────────────────────────────────────────────────
+  // If an admin set reset_flag = true (e.g. via SQL), wipe this account to a
+  // fresh state server-side and tell the client to clear its local save. We do
+  // this BEFORE processing the incoming save so the client's old data cannot be
+  // written back. The client, on seeing reset:true, clears localStorage and
+  // reloads — after which it loads this fresh row. Fully server-driven: setting
+  // the flag in the DB is all that's needed to wipe a player.
+  if (player.reset_flag === true) {
+    const baseRow = {
+      username,
+      gold: 50,
+      tokens: 0,
+      total_rocks: 0,
+      runs: 0,
+      chests: 0,
+      ups: {},
+      ore_stash: {},
+      inventory: [],
+      equipped_slots: {},
+      game_stats: {},
+      achievements: {},
+      lifetime_ext: 0,
+      last_entry_fee: 0,
+      reset_flag: false,           // clear the flag so it only fires once
+      updated_at: new Date().toISOString()
+    };
+    const { error: resetErr } = await supabase
+      .from('players')
+      .upsert(baseRow, { onConflict: 'username' });
+    if (resetErr) {
+      console.error('Admin reset failed:', resetErr);
+      return res.status(500).json({ error: 'Reset failed — try again.' });
+    }
+    return res.status(200).json({ ok: true, reset: true });
+  }
 
   const {
     gold, totalRocks, runs, chests, ups, oreStash,
