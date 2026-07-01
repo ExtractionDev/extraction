@@ -3343,9 +3343,9 @@ var ORE_ROLL_MIN=1, ORE_ROLL_MAX=6;   // each regular rock drops this many of it
 var ORE_DEATH_PENALTY=0.30;           // fraction of THIS RUN's ore lost on a penalised death
 function rollOre(maxQ){var mx=maxQ||ORE_ROLL_MAX;return ORE_ROLL_MIN+Math.floor(Math.random()*(mx-ORE_ROLL_MIN+1));}
 // ===== TUNABLE: ore -> $EXT refinery (run-summary) =====
-var REFINE_DIVISOR=364;   // ore-value that refines for 1x your entry fee. Payout = entry × (value/364), clamped between floor and cap. (-10% divisor = +10% payout)
-var REFINE_CAP=1.65;      // ceiling as a multiple of entry fee — only a big haul (~600 value) reaches it (+10%)
-var REFINE_FLOOR=0.22;    // minimum: any run with ≥1 mined rock refines for at least 22% of entry (+10%)
+var REFINE_DIVISOR=728;   // ore-value that refines for 1x entry. Payout = entry × (value/728). (HALVED GC: divisor doubled from 364)
+var REFINE_CAP=1.65;      // ceiling as a multiple of entry fee — only a big haul reaches it
+var REFINE_FLOOR=0.22;    // minimum: any run with ≥1 mined rock refines for at least 22% of entry
 var _runRefined=false;    // guard: one refine per summary
 function oreHaulValue(bag){var v=0;for(var k in bag){for(var i=0;i<DORES.length;i++){if(DORES[i].n===k){v+=bag[k]*(DORES[i].rv||DORES[i].v);break;}}}return v;}
 function refinePayout(bag){var val=oreHaulValue(bag);var ratio=Math.max(REFINE_FLOOR,Math.min(REFINE_CAP,val/REFINE_DIVISOR));var ext=Math.round((extFee>0?extFee:0)*ratio);return{ext:ext,val:val,mult:ratio};}
