@@ -670,7 +670,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
         <div style="text-align:right"><div class="exc-pool-amount" id="excPoolAmt">0.000</div><div class="exc-pool-sol">$EXT</div></div>
       </div>
       <div class="exc-pool-odds" id="excPoolOdds">⚔ Excalibur odds: 1% this run</div>
-      <div class="exc-burn"><i class="ti ti-flame"></i> <span id="excBurnTxt">10% burn · 10% dev · 80% feeds the prize pool</span></div>
+      <div class="exc-burn"><i class="ti ti-flame"></i> <span id="excBurnTxt">40% burn · 10% dev · 50% feeds the prize pool</span></div>
     </div>
     <!-- $EXT entry-fee slider — hidden in free mode -->
     <div class="sol-wrap" id="solWrap">
@@ -1086,7 +1086,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
   <div class="docs-section">
     <div class="docs-h2"><i class="ti ti-refresh"></i> The Loop</div>
     <div class="docs-loop">
-      <div class="docs-loop-step"><div class="docs-loop-num">1</div><div><div class="docs-loop-title">Deposit & Enter the Dungeon</div><div class="docs-loop-desc">Top up your in-game $EXT from your Phantom wallet (USDC for now — <b>$10 = 100,000 $EXT</b>). Choose Free (no cost, limited runs) or a paid entry (1K–100K $EXT). Every paid entry splits <b>10% burn · 10% dev · 80% into the jackpot prize pool</b>. Navigate <b>10 procedural floors</b>, mine ore, fight enemies with <b>E</b>.</div></div></div>
+      <div class="docs-loop-step"><div class="docs-loop-num">1</div><div><div class="docs-loop-title">Deposit & Enter the Dungeon</div><div class="docs-loop-desc">Top up your in-game $EXT from your Phantom wallet (USDC for now — <b>$10 = 100,000 $EXT</b>). Choose Free (no cost, limited runs) or a paid entry (1K–100K $EXT). Every paid entry splits <b>40% burn · 10% dev · 50% into the jackpot prize pool</b>. Navigate <b>10 procedural floors</b>, mine ore, fight enemies with <b>E</b>.</div></div></div>
       <div class="docs-loop-step"><div class="docs-loop-num">2</div><div><div class="docs-loop-title">Explore Special Floors</div><div class="docs-loop-desc"><b>Vein Floors</b> glow with a "✦ VEIN FLOOR ✦" banner — every ore node gives <b>2× GC</b>. <b>Healing Shrines</b> restore +60 HP when you press <b>E</b> nearby. Chests drop pickaxes.</div></div></div>
       <div class="docs-loop-step"><div class="docs-loop-num">3</div><div><div class="docs-loop-title">Defeat Guardian Bosses</div><div class="docs-loop-desc">Floor 5 spawns the <b>Guardian</b> (600 HP) and Floor 10 the <b>Inferno Guardian</b> (1200 HP). Both fire <b>3-shot fireball volleys</b> toward you with a ±fan spread. Stay mobile.</div></div></div>
       <div class="docs-loop-step"><div class="docs-loop-num">4</div><div><div class="docs-loop-title">2× Loot on Floors 6–10</div><div class="docs-loop-desc">All GC mined on floors 6–10 is automatically doubled. Vein Floors stack on top of this for up to 4× GC.</div></div></div>
@@ -1246,7 +1246,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
   <!-- ECONOMY -->
   <div class="docs-section">
     <div class="docs-h2"><i class="ti ti-coin" style="color:var(--sol)"></i> $EXT &amp; Economy</div>
-    <div class="docs-callout sol"><strong style="color:var(--sol)">Entry Fee Slider:</strong> Set your $EXT entry (1K–100K) on a log scale. Higher entry = better loot multiplier (up to 20×) + higher Excalibur Stone spawn odds. Every paid entry splits <b>10% burned · 10% to dev · 80% into the prize pool</b>.</div>
+    <div class="docs-callout sol"><strong style="color:var(--sol)">Entry Fee Slider:</strong> Set your $EXT entry (1K–100K) on a log scale. Higher entry = better loot multiplier (up to 20×) + higher Excalibur Stone spawn odds. Every paid entry splits <b>40% burned · 10% to dev · 50% into the prize pool</b>.</div>
     <div class="docs-callout green" style="margin-top:8px"><strong style="color:#90c848">Loot Tiers:</strong> LOW (1K–3K $EXT) · MEDIUM (3K–10K) · HIGH (10K–50K) · MAX (50K–100K). The label shows on the dungeon entry screen.</div>
     <div class="docs-callout" style="margin-top:8px"><strong style="color:var(--gold)">Prize Pool:</strong> Displayed live on the Home screen (and in the jackpot jar on the Idle Miner). Grows with every paid dungeon entry — 80% of each fee. One winner takes the <b>entire pool</b> via the Excalibur Stone jackpot pull (1% chance). The pool resets to zero after each win and starts building again.</div>
     <div class="docs-callout" style="margin-top:8px"><strong style="color:var(--gold)">Save System:</strong> All progress (GC, $EXT, ore, upgrades, inventory) saves automatically — cloud-synced to your X (Twitter) account when signed in, so it follows you across devices. Settings → Reset wipes your local save.</div>
@@ -1796,7 +1796,7 @@ function updExcPool(){
   if(poolEl)poolEl.textContent=displayPool.toFixed(3);
   var jackOdds=1.0; // jackpot pull odds always 1% once found
   if(oddsEl)oddsEl.textContent='⚔ Stone appears: '+odds.toFixed(1)+'% this run  ·  Jackpot pull: 1% if found  ·  Pool: '+displayPool.toFixed(3)+' $EXT';
-  var bl=document.getElementById('excBurnTxt');if(bl)bl.textContent='🔥 10% burn  ·  10% dev  ·  80% feeds the prize pool';
+  var bl=document.getElementById('excBurnTxt');if(bl)bl.textContent='🔥 40% burn  ·  10% dev  ·  50% feeds the prize pool';
 }
 function getItemBonus(k){var t=0;['pickaxe','head','ring','amulet'].forEach(function(s){if(equippedSlots[s])equippedSlots[s].affixes.forEach(function(a){if(a.t.k===k)t+=a.v;});});return t;}
 function getSpd(){return(0.5+ups.speed*0.015)*(1+getItemBonus('speed')/100);}
