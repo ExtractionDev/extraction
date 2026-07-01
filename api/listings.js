@@ -16,9 +16,10 @@ function applyCors(req, res) {
 
 async function verifyToken(username, token) {
   const { data, error } = await supabase
-    .from('players').select('session_token, tokens').eq('username', username).single();
+    .from('players').select('session_token, tokens, banned').eq('username', username).single();
   if (error || !data) return null;
   if (data.session_token !== token) return null;
+  if (data.banned) return null;   // banned users are treated as unauthenticated
   return data;
 }
 
@@ -75,6 +76,13 @@ export default async function handler(req, res) {
 
   const { action, username, token, item, price, lid, seller_wallet } = req.body || {};
   if (!username || !token) return res.status(400).json({ error: 'Missing credentials' });
+
+  // Explicit ban check for a clear message (verifyToken also blocks banned users).
+  const { data: banRow } = await supabase
+    .from('players').select('banned').eq('username', username).single();
+  if (banRow && banRow.banned) {
+    return res.status(403).json({ error: 'Your account is suspended and cannot use the marketplace.' });
+  }
 
   const player = await verifyToken(username, token);
   if (!player) return res.status(403).json({ error: 'Invalid session' });
