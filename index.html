@@ -390,7 +390,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 .exc-pool-odds{font-size:8px;color:var(--gold2);margin-top:4px;text-align:center}
 .exc-burn{display:flex;align-items:center;gap:5px;font-size:11px;color:#ff6b35;margin-top:5px;padding-top:5px;border-top:1px solid var(--border2)}
 /* EXCALIBUR CHAMPIONS PODIUM (left of dungeon entry) */
-.exc-podium{background:rgba(6,5,10,.97);border:1.5px solid var(--border3);border-radius:14px;padding:16px 18px;z-index:60;min-width:240px;backdrop-filter:blur(10px);box-shadow:0 8px 32px rgba(0,0,0,.8)}
+.exc-podium{background:rgba(6,5,10,.97);border:1.5px solid var(--border3);border-radius:14px;padding:16px 18px;z-index:60;min-width:240px;backdrop-filter:blur(10px);box-shadow:0 8px 32px rgba(0,0,0,.8);display:flex;flex-direction:column;justify-content:center}
 .exc-podium-title{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);font-weight:700;display:flex;align-items:center;gap:7px;margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--border2);justify-content:center}
 .exc-podium-stage{display:flex;align-items:flex-end;justify-content:center;gap:7px}
 .exc-pod-col{display:flex;flex-direction:column;align-items:center;width:62px}
@@ -663,7 +663,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
   </div>
 
   <!-- floating controls box — absolutely positioned in the right open space -->
-  <div id="entryControls" class="ctrl-helper" style="position:absolute;top:18%;right:30px;left:auto;bottom:auto;zoom:1.5">
+  <div id="entryControls" class="ctrl-helper" style="position:absolute;top:18%;right:30px;left:auto;bottom:auto;zoom:1.5;width:306px;height:308px;box-sizing:border-box">
     <div class="ctrl-helper-title"><i class="ti ti-device-gamepad-2" style="font-size:13px"></i> Controls</div>
     <div style="display:flex;flex-direction:column">
       <div class="ctrl-row"><div class="ctrl-keys"><span class="ctrl-key" style="color:var(--text2)">A</span><span class="ctrl-key" style="color:var(--text2)">←</span></div><span class="ctrl-desc">Move left</span></div>
@@ -676,7 +676,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     </div>
   </div>
   <!-- Excalibur champions podium (previous jackpot winners) -->
-  <div id="excPodium" class="exc-podium" style="position:absolute;top:15%;left:30px;right:auto;bottom:auto;zoom:1.5">
+  <div id="excPodium" class="exc-podium" style="position:absolute;top:18%;left:30px;right:auto;bottom:auto;zoom:1.5;width:306px;height:308px;box-sizing:border-box">
     <div class="exc-podium-title"><i class="ti ti-trophy"></i> Excalibur Champions</div>
     <div class="exc-podium-stage" id="excPodiumStage"></div>
     <div class="exc-podium-note">⚔ Previous jackpot winners</div>
