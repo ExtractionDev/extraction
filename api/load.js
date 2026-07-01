@@ -83,7 +83,7 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     let body = req.body;
     if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = {}; } }
-    const { username, token, entryFee, action } = body || {};
+    const { username, token, entryFee, action, build } = body || {};
 
     if (!username || !token) {
       return res.status(400).json({ error: 'Missing username or token' });
@@ -244,6 +244,13 @@ export default async function handler(req, res) {
     }
 
     // ---------- DUNGEON ENTRY FEE ----------
+    // Forced-update gate: a stale client must not start a paid run. Reject with
+    // 426 so the client reloads onto the current build. Keep MIN_BUILD in sync
+    // with BUILD in /api/version and CLIENT_BUILD in index.html.
+    const MIN_BUILD = 20260701;
+    if (!build || build < MIN_BUILD) {
+      return res.status(426).json({ error: 'stale_client', reload: true });
+    }
     if (!entryFee) return res.status(400).json({ error: 'Missing entry fee' });
     const fee = parseFloat(entryFee);
     if (isNaN(fee) || fee <= 0) return res.status(400).json({ error: 'Invalid entry fee' });
