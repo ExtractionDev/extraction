@@ -793,6 +793,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
   <div style="display:flex;gap:0;border-bottom:1px solid var(--border2);margin-bottom:12px">
     <div id="mkTabPickaxe" class="mk-subtab on" onclick="switchMkTab('pickaxe')" style="padding:8px 18px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;border-bottom:2px solid var(--gold);color:var(--gold);font-family:'Space Mono',monospace"><i class="ti ti-pickaxe" style="margin-right:4px"></i>Equipment</div>
     <div id="mkTabOres" class="mk-subtab" onclick="switchMkTab('ores')" style="padding:8px 18px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;border-bottom:2px solid transparent;color:var(--text3);font-family:'Space Mono',monospace"><i class="ti ti-diamond" style="margin-right:4px;color:#c8a040"></i>Ores</div>
+    <div id="mkTabSold" class="mk-subtab" onclick="switchMkTab('sold')" style="padding:8px 18px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;border-bottom:2px solid transparent;color:var(--text3);font-family:'Space Mono',monospace"><i class="ti ti-receipt" style="margin-right:4px;color:#90c848"></i>Sold</div>
   </div>
 
   <!-- PICKAXES PANEL -->
@@ -853,6 +854,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
         </div>
       </div>
     </div>
+  </div>
+
+  <div id="mkPanelSold" style="display:none">
+    <div class="mk-section-title"><i class="ti ti-receipt" style="color:#90c848"></i> Your sold items</div>
+    <div id="mkSoldList" style="display:flex;flex-direction:column;gap:8px;margin-top:8px"></div>
   </div>
 </div>
 
@@ -2457,20 +2463,56 @@ function _genOreMarket(){ oreMarketListings=[]; }
 _genOreMarket();
 function switchMkTab(tab){
   mkActiveTab=tab;
-  var pp=document.getElementById('mkPanelPickaxe'),op=document.getElementById('mkPanelOres');
-  var tp=document.getElementById('mkTabPickaxe'),to2=document.getElementById('mkTabOres');
+  var pp=document.getElementById('mkPanelPickaxe'),op=document.getElementById('mkPanelOres'),sp=document.getElementById('mkPanelSold');
+  var tp=document.getElementById('mkTabPickaxe'),to2=document.getElementById('mkTabOres'),ts=document.getElementById('mkTabSold');
+  // reset all tabs to inactive
+  [tp,to2,ts].forEach(function(t){if(t){t.style.borderBottomColor='transparent';t.style.color='var(--text3)';}});
+  if(pp)pp.style.display='none';if(op)op.style.display='none';if(sp)sp.style.display='none';
   if(tab==='pickaxe'){
-    if(pp)pp.style.display='';if(op)op.style.display='none';
+    if(pp)pp.style.display='';
     if(tp){tp.style.borderBottomColor='var(--gold)';tp.style.color='var(--gold)';}
-    if(to2){to2.style.borderBottomColor='transparent';to2.style.color='var(--text3)';}
     renderMarket(mkFilter);
-  }else{
-    if(pp)pp.style.display='none';if(op)op.style.display='';
-    if(tp){tp.style.borderBottomColor='transparent';tp.style.color='var(--text3)';}
+  }else if(tab==='ores'){
+    if(op)op.style.display='';
     if(to2){to2.style.borderBottomColor='var(--gold)';to2.style.color='var(--gold)';}
     renderOreMarket();
+  }else{
+    if(sp)sp.style.display='';
+    if(ts){ts.style.borderBottomColor='var(--gold)';ts.style.color='var(--gold)';}
+    renderSoldItems();
   }
 }
+
+function renderSoldItems(){
+  var el=document.getElementById('mkSoldList');
+  if(!el)return;
+  var _xd=null;try{_xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');}catch(e){}
+  if(!_xd||!_xd.username){el.innerHTML='<div class="mk-inv-empty">Sign in to see your sold items.</div>';return;}
+  el.innerHTML='<div class="mk-inv-empty">Loading…</div>';
+  fetch('/api/listings?sold=1&username='+encodeURIComponent(_xd.username)+'&token='+encodeURIComponent(_xd.token||''))
+    .then(function(r){return r.ok?r.json():null;})
+    .then(function(d){
+      if(!d||!Array.isArray(d.sales)){el.innerHTML='<div class="mk-inv-empty">Could not load sales.</div>';return;}
+      if(!d.sales.length){el.innerHTML='<div class="mk-inv-empty">No sales yet — when someone buys your listing it shows here.</div>';return;}
+      el.innerHTML=d.sales.map(function(s){
+        var when=new Date(s.sold_at);
+        var dateStr=isNaN(when.getTime())?'':when.toLocaleDateString()+' '+when.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+        var icon=s.kind==='ore'?'ti-diamond':'ti-pickaxe';
+        var price=(typeof s.price_usdc==='number'?s.price_usdc:parseFloat(s.price_usdc)||0).toFixed(2);
+        return '<div style="display:flex;align-items:center;gap:12px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px 14px">'
+          +'<i class="ti '+icon+'" style="font-size:18px;color:#90c848"></i>'
+          +'<div style="flex:1;min-width:0">'
+            +'<div style="font-family:\'Space Mono\',monospace;font-size:13px;color:var(--text)">'+_esc(s.label)+'</div>'
+            +'<div style="font-size:10px;color:var(--text3);letter-spacing:.05em">sold to @'+_esc(s.buyer)+' · '+dateStr+'</div>'
+          +'</div>'
+          +'<div style="font-family:\'Space Mono\',monospace;font-size:13px;color:#90c848;white-space:nowrap">$'+price+' USDC</div>'
+        +'</div>';
+      }).join('');
+    })
+    .catch(function(){el.innerHTML='<div class="mk-inv-empty">Could not load sales.</div>';});
+}
+
+function _esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function renderOreMarket(){
   // Helper: in-game ore sprite at a given pixel size (matches backpack inventory look)
   function oreSprite(ore,size){
