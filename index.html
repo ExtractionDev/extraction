@@ -5579,27 +5579,23 @@ function xAuthLogout(){
   closeXAuth();
 }
 function _renderStreak(streakDay){
-  // Reward schedule
-  var rewards={1:0.5,2:1,3:2,4:3,5:5,6:7,7:10,14:25,30:100};
-  function getReward(day){return rewards[day]||+(day*0.5).toFixed(1);}
+  // 7-day reward schedule (EXT), resets to day 1 after day 7.
+  var rewards={1:500,2:750,3:1000,4:1500,5:2000,6:3000,7:5000};
+  function fmt(n){return n>=1000?(n/1000)+'K':n;}
+  function getReward(day){return rewards[day]||0;}
   // Show widget
   var widget=document.getElementById('homeStreakWidget');
   var container=document.getElementById('homeStreakDays');
   if(!widget||!container)return;
   widget.style.display='';
-  // Build 7-day view centered on today
+  // Always a clean 7-day view (cycle resets at 7).
+  var cur=((streakDay-1)%7)+1;
   var days=[];
   for(var i=1;i<=7;i++)days.push(i);
-  // If streak > 7, shift window to show current day
-  if(streakDay>7){
-    days=[];
-    for(var i=streakDay-3;i<=streakDay+3;i++)days.push(i>0?i:1);
-  }
   var html='';
   days.forEach(function(d){
-    var isDone=d<streakDay;
-    var isToday=d===streakDay;
-    var isFuture=d>streakDay;
+    var isDone=d<cur;
+    var isToday=d===cur;
     var circleClass=isDone?'done':isToday?'today':'future';
     var labelClass=isToday?'today':'';
     var icon=isDone?'✓':isToday?'★':d;
@@ -5607,7 +5603,7 @@ function _renderStreak(streakDay){
     html+='<div class="home-streak-day">';
     html+='<div class="home-streak-circle '+circleClass+'">'+icon+'</div>';
     html+='<div class="home-streak-label '+labelClass+'">Day '+d+'</div>';
-    html+='<div class="home-streak-reward">+'+reward+' $EXT</div>';
+    html+='<div class="home-streak-reward">+'+fmt(reward)+' $EXT</div>';
     html+='</div>';
   });
   container.innerHTML=html;
@@ -5733,12 +5729,16 @@ function _unlockNav(){
     try{var gs=JSON.parse(localStorage.getItem('extraction_v1')||'{}');gs.xUsername=_u;localStorage.setItem('extraction_v1',JSON.stringify(gs));}catch(e){}
     _setSignedInUI(_u);
     _renderStreak(_streak||1);
-    // Show streak bonus notification
+    // Streak reward is credited SERVER-SIDE in callback.js. Show the notification
+    // only — do NOT add it locally (that would double it). The balance will sync
+    // from the server on load.
     if(_streak>0){
       setTimeout(function(){
-        var _msg=_streak>1?'🔥 '+_streak+' day streak! +'+_bonus.toFixed(2)+' $EXT bonus':'Welcome back!';
+        var _rewards={1:500,2:750,3:1000,4:1500,5:2000,6:3000,7:5000};
+        var _amt=_rewards[((_streak-1)%7)+1]||0;
+        var _fmt=_amt>=1000?(_amt/1000)+'K':_amt;
+        var _msg=(_bonus>0)?('🔥 Day '+_streak+' — +'+_fmt+' $EXT claimed!'):'Welcome back!';
         showAchieve('📅','Daily Login',_msg);
-        if(_bonus>0){tokens+=_bonus;saveGame();uiAll();}
       },1500);
     }
     // Clean the URL
