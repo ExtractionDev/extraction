@@ -389,6 +389,21 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 .exc-pool-stats{display:flex;justify-content:space-between;font-size:11px;color:var(--text3)}
 .exc-pool-odds{font-size:8px;color:var(--gold2);margin-top:4px;text-align:center}
 .exc-burn{display:flex;align-items:center;gap:5px;font-size:11px;color:#ff6b35;margin-top:5px;padding-top:5px;border-top:1px solid var(--border2)}
+/* EXCALIBUR CHAMPIONS PODIUM (left of dungeon entry) */
+.exc-podium{background:rgba(6,5,10,.97);border:1.5px solid var(--border3);border-radius:14px;padding:14px 14px 12px;z-index:60;min-width:210px;backdrop-filter:blur(10px);box-shadow:0 8px 32px rgba(0,0,0,.8)}
+.exc-podium-title{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);font-weight:700;display:flex;align-items:center;gap:7px;margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--border2);justify-content:center}
+.exc-podium-stage{display:flex;align-items:flex-end;justify-content:center;gap:7px}
+.exc-pod-col{display:flex;flex-direction:column;align-items:center;width:62px}
+.exc-pod-crown{font-size:16px;line-height:1;margin-bottom:3px;filter:drop-shadow(0 0 6px rgba(255,215,0,.4))}
+.exc-pod-name{font-size:10px;font-weight:700;color:var(--text);max-width:62px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+.exc-pod-amt{font-size:9px;color:var(--gold);font-weight:700;margin-bottom:4px;white-space:nowrap}
+.exc-pod-pillar{width:100%;border-radius:6px 6px 0 0;display:flex;align-items:flex-start;justify-content:center;padding-top:5px;font-family:'DM Serif Display',serif;font-size:18px;font-weight:700;color:#0a0806;box-shadow:inset 0 2px 0 rgba(255,255,255,.25),inset 0 -6px 12px rgba(0,0,0,.35)}
+.exc-pod-col.r1 .exc-pod-pillar{height:60px;background:linear-gradient(180deg,#ffe082,#c8a040)}
+.exc-pod-col.r2 .exc-pod-pillar{height:44px;background:linear-gradient(180deg,#e8e8ee,#9aa0ac)}
+.exc-pod-col.r3 .exc-pod-pillar{height:32px;background:linear-gradient(180deg,#e0a878,#a0662f)}
+.exc-pod-col.empty .exc-pod-pillar{background:linear-gradient(180deg,#242430,#181820);color:var(--text4);box-shadow:inset 0 -6px 12px rgba(0,0,0,.35)}
+.exc-pod-col.empty .exc-pod-name{color:var(--text4)}
+.exc-podium-note{font-size:8px;letter-spacing:.08em;color:var(--text3);text-align:center;margin-top:9px}
 /* FREE MODE card */
 .dung-card.free.sel{border-color:#4088c0;background:#080c18}
 .dung-card.free .dc-icon{color:var(--blue)}
@@ -659,6 +674,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
       <div class="ctrl-row"><div class="ctrl-keys"><span class="ctrl-key" style="color:var(--gold);border-color:#3a3020;border-bottom-color:#2a2010;font-size:9px;white-space:nowrap">🖱 LMB</span></div><span class="ctrl-desc">Mine ore block / Attack</span></div>
       <div class="ctrl-row" style="margin-top:8px;padding-top:10px;border-top:1px solid var(--border2)"><span style="font-size:9px;color:var(--text4);letter-spacing:.08em;line-height:1.7">Touch buttons available<br>in the bar below the screen</span></div>
     </div>
+  </div>
+  <!-- Excalibur champions podium (previous jackpot winners) -->
+  <div id="excPodium" class="exc-podium" style="position:absolute;top:15%;left:30px;right:auto;bottom:auto;zoom:1.35">
+    <div class="exc-podium-title"><i class="ti ti-trophy"></i> Excalibur Champions</div>
+    <div class="exc-podium-stage" id="excPodiumStage"></div>
+    <div class="exc-podium-note">⚔ Previous jackpot winners</div>
   </div>
   <div id="dungGame" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden">
     <div id="veinBanner" class="vein-banner"><div class="vein-banner-title">✦ VEIN FLOOR ✦</div><div class="vein-banner-sub">Rock value doubled</div></div>
@@ -1388,6 +1409,70 @@ var equippedSlots={pickaxe:null,head:null,ring:null,amulet:null};
 // Excalibur prize pool (in $EXT)
 var excPool=0;var EXC_POOL_MAX=10; // prize pool (in $EXT), fills visually at 10
 var globalPool=0;       // shared server-side prize pool (all players' 10% contributions)
+// ── Excalibur Champions (previous jackpot winners) ──
+var EXC_WINNERS=[];     // newest first: [{name, amount, ts}]
+function _loadExcWinners(){
+  try{var raw=localStorage.getItem('exc_winners');if(raw){var a=JSON.parse(raw);if(Array.isArray(a))EXC_WINNERS=a;}}catch(e){}
+}
+function _saveExcWinners(){
+  try{localStorage.setItem('exc_winners',JSON.stringify(EXC_WINNERS.slice(0,20)));}catch(e){}
+}
+function recordExcaliburWin(name,amount){
+  if(!name)name='Anonymous';
+  EXC_WINNERS.unshift({name:String(name).slice(0,18),amount:Number(amount)||0,ts:Date.now()});
+  EXC_WINNERS=EXC_WINNERS.slice(0,20);
+  _saveExcWinners();
+  renderExcPodium();
+}
+function _fmtExtShort(n){
+  n=Number(n)||0;
+  if(n>=1e6)return (n/1e6).toFixed(n>=1e7?0:1)+'M';
+  if(n>=1e3)return (n/1e3).toFixed(n>=1e4?0:1)+'K';
+  return n.toFixed(n<10?2:0);
+}
+function renderExcPodium(){
+  var stage=document.getElementById('excPodiumStage');
+  if(!stage)return;
+  // podium order on screen: 2nd (left), 1st (center/tallest), 3rd (right)
+  var order=[{i:1,cls:'r2',crown:'🥈'},{i:0,cls:'r1',crown:'👑'},{i:2,cls:'r3',crown:'🥉'}];
+  stage.innerHTML=order.map(function(o){
+    var w=EXC_WINNERS[o.i];
+    var rankNum=o.i+1;
+    if(w){
+      return '<div class="exc-pod-col '+o.cls+'">'+
+        '<div class="exc-pod-crown">'+o.crown+'</div>'+
+        '<div class="exc-pod-name" title="'+w.name+'">'+(/^@/.test(w.name)?w.name:'@'+w.name)+'</div>'+
+        '<div class="exc-pod-amt">'+_fmtExtShort(w.amount)+' $EXT</div>'+
+        '<div class="exc-pod-pillar">'+rankNum+'</div>'+
+      '</div>';
+    }
+    return '<div class="exc-pod-col '+o.cls+' empty">'+
+      '<div class="exc-pod-crown" style="opacity:.35">'+o.crown+'</div>'+
+      '<div class="exc-pod-name">—</div>'+
+      '<div class="exc-pod-amt" style="color:var(--text4)">no champion</div>'+
+      '<div class="exc-pod-pillar">'+rankNum+'</div>'+
+    '</div>';
+  }).join('');
+  var note=document.querySelector('#excPodium .exc-podium-note');
+  if(note)note.textContent=EXC_WINNERS.length?'⚔ Previous jackpot winners':'⚔ No champions yet — be the first!';
+}
+// Try to pull a shared winners list if the backend exposes one; fall back to local
+function _fetchExcWinners(){
+  fetch('/api/excalibur-winners?v='+Date.now())
+    .then(function(r){return r.ok?r.json():null;})
+    .then(function(data){
+      var rows=Array.isArray(data)?data:(data&&data.rows);
+      if(rows&&rows.length){
+        EXC_WINNERS=rows.map(function(w){return {name:w.name||w.username||'Anonymous',amount:w.amount||w.won||0,ts:w.ts||0};}).slice(0,20);
+        _saveExcWinners();renderExcPodium();
+      }
+    }).catch(function(){});
+}
+function _myUsername(){
+  try{var _xd=JSON.parse(localStorage.getItem('extraction_xauth')||'null');if(_xd&&_xd.username)return _xd.username;}catch(e){}
+  return 'You';
+}
+_loadExcWinners();
 var lifetimeExt=0;      // monotonic: total $EXT ever mined, never decreases (drives pool contribution)
 var extBurned=0,devCut=0; // running totals: $EXT burned & dev cut (simulated)
 // Free mode daily tracking
@@ -1524,6 +1609,8 @@ function goTab(n){
     if(de)de.style.display='flex';
     if(dg)dg.style.display='none';
     var ec=document.getElementById('entryControls');if(ec)ec.style.display='block';
+    var ep=document.getElementById('excPodium');if(ep)ep.style.display='block';
+    renderExcPodium();_fetchExcWinners();
   }
   uiAll();if(n===3){if(mkActiveTab==='ores')renderOreMarket();else renderMarket(mkFilter);}if(n===4){scaleBpLayout();renderBackpack();}if(n===6)renderSmith();if(n===7)_lbFullFetch();
 }
@@ -3427,6 +3514,7 @@ function dMine(){
               chests++;
               saveGame(true);renderBackpack();updExt();uiAll();_fetchGlobalPool();
               excMsg='⚔ JACKPOT! You won '+wonPool.toFixed(3)+' $EXT + MYTHIC Prismatic Pickaxe! ✨';
+              recordExcaliburWin(_myUsername(),wonPool);
               dtoasts.push({x:r.x,y:r.y-50,t:'💰 JACKPOT! +'+wonPool.toFixed(1)+' $EXT',c:'#FFD700',life:120});
               dtoasts.push({x:r.x,y:r.y-80,t:'💎 MYTHIC PRISMATIC PICKAXE!',c:'#40c8f0',life:180});
               dtoasts.push({x:r.x,y:r.y-110,t:'✨ ULTRA RARE DROP!',c:'#40c8f0',life:180});
@@ -3434,6 +3522,7 @@ function dMine(){
             // No pickaxe — jackpot pays out the prize pool only
             saveGame(true);updExt();uiAll();_fetchGlobalPool();
             excMsg='⚔ JACKPOT! You won '+wonPool.toFixed(3)+' $EXT!';
+            recordExcaliburWin(_myUsername(),wonPool);
             dtoasts.push({x:r.x,y:r.y-50,t:'💰 JACKPOT! +'+wonPool.toFixed(1)+' $EXT',c:'#FFD700',life:120});
             }
             dFlash=30;dShake=15;
@@ -3815,6 +3904,7 @@ function _beginDungeonRun(){
   if(!mmcv){mmcv=document.getElementById('mmcv');if(mmcv)MMC=mmcv.getContext('2d');}
   document.getElementById('dungEntry').style.display='none';
   var ec=document.getElementById('entryControls');if(ec)ec.style.display='none';
+  var ep=document.getElementById('excPodium');if(ep)ep.style.display='none';
   document.getElementById('dungGame').style.display='flex';
   window.addEventListener('keydown',dKD);window.addEventListener('keyup',dKU);
   playAmbient(dfl);_seedAmbient(0);
@@ -4560,7 +4650,7 @@ function drawMinimap(){
   MMC.strokeStyle='#fff8';MMC.lineWidth=1;
   MMC.beginPath();MMC.arc(plx,ply,4,0,6.28);MMC.stroke();
 }
-function closeSummaryPlay(){document.getElementById('runSummary').classList.remove('show');document.getElementById('dungEntry').style.display='flex';var ec=document.getElementById('entryControls');if(ec)ec.style.display='block';pickMode(mode);}
+function closeSummaryPlay(){document.getElementById('runSummary').classList.remove('show');document.getElementById('dungEntry').style.display='flex';var ec=document.getElementById('entryControls');if(ec)ec.style.display='block';var ep=document.getElementById('excPodium');if(ep)ep.style.display='block';renderExcPodium();pickMode(mode);}
 function closeSummaryHome(){document.getElementById('runSummary').classList.remove('show');goTab(0);}
 function showRunSummary(died,final,runLootItems,excMsg){
   var el=document.getElementById('runSummary');
