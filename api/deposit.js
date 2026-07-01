@@ -227,7 +227,6 @@ export default async function handler(req, res) {
   const fullRow = {
     username,
     amount: usdcReceived,
-    ext_credited: extToCredit,
     tx_hash,
     tokens_balance: player.tokens || 0,
     status: 'credited',
