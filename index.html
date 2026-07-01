@@ -1906,8 +1906,25 @@ async function depositTokens(){
     btn.textContent='Confirming...';
     await _pollConfirm(signed.signature);   // throws if the transfer failed — no credit on failure
     var credited=amt*_DEPOSIT_RATE;
-    tokens=(tokens||0)+credited;saveGame();uiAll();
-    msg.style.color='var(--green)';msg.textContent='\u2713 '+credited.toLocaleString()+' $EXT arrived in your account!';
+    btn.textContent='Crediting...';
+    var _depResp=null;
+    try{
+      var _r=await fetch('/api/deposit',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({username:_xd.username,token:_xd.token||'',amount:amt,tx_hash:signed.signature})});
+      _depResp=await _r.json();
+      if(!_r.ok||!_depResp||_depResp.error){throw new Error((_depResp&&_depResp.error)||'Server could not credit the deposit.');}
+    }catch(_e){
+      msg.style.color='var(--red)';
+      msg.textContent='Payment sent but crediting failed. Contact support with TX: '+signed.signature.substr(0,12)+'\u2026';
+      btn.disabled=false;btn.textContent='Confirm & Send';
+      console.error('Deposit credit failed:',_e,'sig',signed.signature);
+      return;
+    }
+    if(_depResp && typeof _depResp.newBalance==='number'){ tokens=_depResp.newBalance; }
+    else if(_depResp && typeof _depResp.credited==='number'){ tokens=(tokens||0)+_depResp.credited; }
+    uiAll();
+    var _shown=(_depResp&&_depResp.credited)||credited;
+    msg.style.color='var(--green)';msg.textContent='\u2713 '+_shown.toLocaleString()+' $EXT credited to your account!';
     setTimeout(closeDeposit,2400);
   }catch(e){
     console.error('Deposit error:',e);
