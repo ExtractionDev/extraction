@@ -4146,18 +4146,29 @@ var smithMode='reforge';      // 'reforge' | 'combine'
 var COMBINE_COUNT=5;          // Iron pickaxes required
 var COMBINE_COST=2500;        // $EXT required
 var _combineResult=null;      // holds the just-forged Adamant during the reveal
+var _combineSel=[];           // ids of Iron pickaxes chosen to combine (max COMBINE_COUNT)
 function switchSmithMode(m){
-  smithMode=m;_combineResult=null;
+  smithMode=m;_combineResult=null;_combineSel=[];
   var ab=document.getElementById('smithAfterBox');if(ab)ab.classList.remove('revealed');
   renderSmith();
 }
 function smithAction(){ if(smithMode==='combine')smithCombine(); else smithReroll(); }
+function combineToggle(id){
+  var i=_combineSel.indexOf(id);
+  if(i>=0){_combineSel.splice(i,1);}
+  else if(_combineSel.length<COMBINE_COUNT){_combineSel.push(id);}
+  try{_snd({f:520,wave:'square',vol:0.05,dur:0.05});}catch(e){}
+  renderSmith();
+}
 function smithCombine(){
-  var ironList=inventory.filter(function(x){return x.slot==='pickaxe'&&x.mat==='Iron';});
-  if(ironList.length<COMBINE_COUNT||tokens<COMBINE_COST)return;
+  // only combine the explicitly selected Iron pickaxes
+  var byId={};inventory.forEach(function(x){byId[x.id]=x;});
+  var chosen=_combineSel.filter(function(id){var x=byId[id];return x&&x.slot==='pickaxe'&&x.mat==='Iron';});
+  if(chosen.length<COMBINE_COUNT||tokens<COMBINE_COST)return;
   tokens-=COMBINE_COST;
-  var consume=ironList.slice(0,COMBINE_COUNT).map(function(x){return x.id;});
+  var consume=chosen.slice(0,COMBINE_COUNT);
   inventory=inventory.filter(function(x){return consume.indexOf(x.id)===-1;});
+  _combineSel=[];
   var unc=RARS.find(function(r){return r.n==='Uncommon';});
   var price=Math.floor(320*(0.85+Math.random()*0.3));
   var adam={mat:'Adamant',type:'Pickaxe',slot:'pickaxe',slotIcon:'ti-pickaxe',rar:unc,affixes:_buildAffixes(unc),price:price,id:Math.random().toString(36).substr(2,8)};
@@ -4177,30 +4188,49 @@ function smithCombine(){
 }
 function renderCombine(grid,emp,forge){
   emp.style.display='none';
-  grid.style.display='none';
   forge.style.display='block';
   var ironList=inventory.filter(function(x){return x.slot==='pickaxe'&&x.mat==='Iron';});
-  var have=ironList.length;
+  // keep selection valid
+  var ids={};ironList.forEach(function(x){ids[x.id]=1;});
+  _combineSel=_combineSel.filter(function(id){return ids[id];});
   var unc=RARS.find(function(r){return r.n==='Uncommon';});
+  // ---- selectable Iron grid ----
+  grid.style.display='';
+  if(!ironList.length){
+    grid.style.display='none';emp.textContent='No Iron pickaxes in your backpack to combine';emp.style.display='block';
+  }
+  grid.innerHTML=ironList.map(function(it){
+    var sel=_combineSel.indexOf(it.id)>=0;
+    return '<div class="mk-card'+(sel?' combine-sel':'')+'" onclick="combineToggle(\''+it.id+'\')" style="border-color:'+(sel?'var(--gold)':'var(--border)')+';background:'+(sel?'var(--gold3)':'var(--bg3)')+';position:relative">'+
+      (sel?'<div style="position:absolute;top:6px;right:8px;color:var(--gold);font-size:13px;font-weight:700">✓</div>':'')+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+itemIcon(it.rar,26)+
+        '<div><div style="font-size:13px;font-weight:700;color:'+it.rar.c+'">'+it.mat+'</div>'+
+        '<div style="font-size:10px;color:var(--text3)">Common · Backpack</div></div></div>'+
+      it.affixes.map(function(a){return '<div style="font-size:11px;color:var(--green);line-height:1.8">+'+a.v+'% '+a.t.n+'</div>';}).join('')+
+    '</div>';
+  }).join('');
+  // ---- ingredients (neutral slots, no green) ----
   document.getElementById('smithForgeTitle').textContent='Combine · 5× Iron → Adamant';
   var slots='';
   for(var i=0;i<COMBINE_COUNT;i++){
-    var filled=i<have;
-    slots+='<div style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:1px solid '+(filled?'#4a8a28':'var(--border2)')+';background:'+(filled?'#0c1a08':'var(--bg4)')+';opacity:'+(filled?1:.45)+'">'+(filled?itemIcon(RARS[0],22):'<span style="color:var(--text4);font-size:13px">+</span>')+'</div>';
+    var filled=i<_combineSel.length;
+    slots+='<div style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:1px '+(filled?'solid var(--border3)':'dashed var(--border2)')+';background:'+(filled?'var(--bg4)':'transparent')+';opacity:'+(filled?1:.5)+'">'+(filled?itemIcon(RARS[0],22):'<span style="color:var(--text4);font-size:13px">+</span>')+'</div>';
   }
+  var full=_combineSel.length>=COMBINE_COUNT;
   document.getElementById('smithBeforeStats').innerHTML=
-    '<div style="font-size:11px;color:var(--text3);margin-bottom:9px">Iron Pickaxes owned: <b style="color:'+(have>=COMBINE_COUNT?'var(--green)':'var(--red)')+'">'+have+' / '+COMBINE_COUNT+'</b></div>'+
-    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+slots+'</div>';
+    '<div style="font-size:11px;color:var(--text3);margin-bottom:9px">Selected: <b style="color:'+(full?'var(--gold)':'var(--text)')+'">'+_combineSel.length+' / '+COMBINE_COUNT+'</b></div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+slots+'</div>'+
+    '<div style="font-size:10px;color:var(--text4);font-style:italic">Tap Iron pickaxes above to add them</div>';
   if(!_combineResult){
     document.getElementById('smithAfterStats').innerHTML='<div class="smith-stat-placeholder">Combine to forge an Adamant Pickaxe</div>';
     var ab=document.getElementById('smithAfterBox');if(ab)ab.classList.remove('revealed');
   }
   var btn=document.getElementById('smithRerollBtn');
-  var ok=have>=COMBINE_COUNT&&tokens>=COMBINE_COST;
+  var ok=full&&tokens>=COMBINE_COST;
   btn.disabled=!ok;
   btn.textContent='✦ Combine 5× Iron — '+COMBINE_COST.toLocaleString()+' $EXT';
   var badge=document.getElementById('smithCostBadge');
-  badge.textContent = have<COMBINE_COUNT ? ('Need '+(COMBINE_COUNT-have)+' more Iron') : (tokens<COMBINE_COST?'Not enough $EXT':'');
+  badge.textContent = !full ? ('Select '+(COMBINE_COUNT-_combineSel.length)+' more') : (tokens<COMBINE_COST?'Not enough $EXT':'');
   badge.style.color = ok?'var(--gold)':'var(--red)';
 }
 var SMITH_COSTS={Common:1000,Uncommon:5000,Rare:10000,Epic:25000,Legendary:50000,Mythic:200000};
