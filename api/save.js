@@ -309,6 +309,17 @@ export default async function handler(req, res) {
   }
 
   // ── Apply earnings atomically ───────────────────────────────────────────
+  // DIAGNOSTIC: print the exact numbers so we can see why credit is/ isn't happening.
+  console.log('SAVE CREDIT', JSON.stringify({
+    username,
+    clientLifetimeExt: parseFloat(lifetimeExt) || 0,
+    serverLifetimeExt: prevLifetime,
+    rawDelta,
+    timeCeiling,
+    refineBurst,
+    allowedDelta,
+    prevTokens
+  }));
   let newTokens = prevTokens;
   if (allowedDelta > 0) {
     const { data: rpcData, error: incErr } = await supabase
@@ -321,6 +332,8 @@ export default async function handler(req, res) {
     const { error: poolErr } = await supabase
       .rpc('add_to_pool', { amount: allowedDelta * 0.10 });
     if (poolErr) console.error('Pool contribution error:', poolErr);
+  } else {
+    console.log('SAVE CREDIT: allowedDelta is 0 — nothing credited. lifetimeExt client<=server?', (parseFloat(lifetimeExt)||0) <= prevLifetime);
   }
 
   return res.status(200).json({ ok: true, newTokens });
