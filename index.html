@@ -1032,6 +1032,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
       <div id="bpBonuses" class="bp-bonuses" style="display:none;margin-top:14px;align-self:flex-start"></div>
     </div>
 
+    <!-- MIDDLE: Sanchez companion stats (only shows when equipped) -->
+    <div class="bp-pet-stats" id="bpPetStats" style="display:none;flex-direction:column;align-self:flex-start;min-width:150px;max-width:180px;background:var(--bg3);border:1.5px solid #ff9ec4;border-radius:12px;padding:14px;margin:0 4px"></div>
+
     <!-- RIGHT: Equipment mannequin (scale 5.5, 338px canvas, 80px slots) -->
     <div class="bp-right">
       <div class="bp-section-hdr">
@@ -1405,6 +1408,9 @@ var SANCHEZ_TESTERS=['kaynkingdom']; // who auto-receives a Sanchez for testing 
 function makeSanchezItem(){return{id:SANCHEZ_ID,slot:'pet',slotIcon:'ti-paw',mat:'Sanchez',type:'Pet',
   rar:{n:'Companion',c:'#ff9ec4',bg:'rgba(255,158,196,.12)'},affixes:[],price:0,isSanchez:true};}
 function sanchezEquipped(){return !!(equippedSlots&&equippedSlots.pet&&equippedSlots.pet.isSanchez);}
+// Single source of truth for Sanchez's boosts — used by the backpack panel AND the idle-miner panel so they always match.
+var SANCHEZ_STATS=[{icon:'ti-pick',label:'Miner Output',val:'+10%'},{icon:'ti-diamond',label:'Dungeon Ore',val:'+10%'}];
+function sanchezStatRowsHtml(){return SANCHEZ_STATS.map(function(s){return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05)">'+'<span style="color:#ff9ec4;font-size:12px"><i class="ti '+s.icon+'" style="margin-right:6px;font-size:13px;vertical-align:middle"></i>'+s.label+'</span>'+'<span style="color:var(--gold);font-size:12px;font-weight:700">'+s.val+'</span>'+'</div>';}).join('');}
 function iImg(k,cx,cy,w,h,dx,dy,dw,dh,ctx,smooth){
   var im=IMGS[k];if(!im||!im.complete||im.naturalWidth===0)return false;
   ctx.imageSmoothingEnabled=!!smooth;
@@ -2311,6 +2317,18 @@ function renderBackpack(){
       bonEl.innerHTML='<span style="font-size:12px;color:var(--gold);font-weight:700;letter-spacing:.12em;text-transform:uppercase;opacity:.7">Active Bonuses</span>'+allChips.join('');
     }else bonEl.style.display='none';
   }
+  // Sanchez companion stats panel (between grid and equipment) — only when he's equipped
+  var petEl=document.getElementById('bpPetStats');
+  if(petEl){
+    if(sanchezEquipped()){
+      petEl.style.display='flex';
+      petEl.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+        +'<img src="'+SANCHEZ.src+'" style="width:34px;height:34px;image-rendering:pixelated" alt="Sanchez"/>'
+        +'<div><div style="font-size:13px;color:#ff9ec4;font-weight:700">Sanchez</div>'
+        +'<div style="font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase">Companion</div></div></div>'
+        +sanchezStatRowsHtml();
+    }else petEl.style.display='none';
+  }
   var grid=document.getElementById('bpGrid');if(!grid)return;
   // Build list of owned ore types (qty>0) to show in the inventory grid
   var oreCells=[];
@@ -2931,6 +2949,15 @@ function uiAll(){
       +'</div></div>'+_rows;
   }
   else{eqEl.className='eq-empty';eqEl.textContent='None — find one in the dungeon';}
+  // Append Sanchez companion stats to the idle-miner panel (same boosts as the backpack panel — kept in sync)
+  if(sanchezEquipped()){
+    if(eqEl.className==='eq-empty'){eqEl.className='';eqEl.innerHTML='';}
+    eqEl.innerHTML+='<div style="display:flex;align-items:center;gap:8px;margin:10px 0 8px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08)">'
+      +'<img src="'+SANCHEZ.src+'" style="width:32px;height:32px;image-rendering:pixelated" alt="Sanchez"/>'
+      +'<div><div style="font-size:13px;color:#ff9ec4;font-weight:700">Sanchez</div>'
+      +'<div style="font-size:12px;color:var(--text3)">Companion · '+SANCHEZ_STATS.length+' stats</div></div></div>'
+      +sanchezStatRowsHtml();
+  }
   if(activeTab===3&&(Date.now()-(_mkLastFetch||0))>15000){_mkLastFetch=Date.now();renderMarket(mkFilter);}
   if(activeTab===4)renderBackpack();
   // Update home stats count
