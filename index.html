@@ -1578,6 +1578,23 @@ var EQUIP_SLOTS=[
   {slot:'pet',    type:'Pet',    icon:'ti-paw',     mats:{Common:'Slime',Uncommon:'Bat',Rare:'Fox',Epic:'Drake',Legendary:'Phoenix'}}
 ];
 var extFee=1000,mode='safe';
+// ===== CLIENT VERSION / FORCED UPDATE =====
+// Must match BUILD in /api/version and MIN_BUILD in load.js.
+var CLIENT_BUILD=20260701;      // bump each forced-update deploy
+var CLIENT_VERSION='0.3.1';     // display only
+var _pendingReload=false;       // set true when a newer build is seen mid-run
+function _forceReload(){try{location.reload();}catch(e){location.href=location.pathname+'?v='+Date.now();}}
+function _checkVersion(){
+  fetch('/api/version',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+    if(d&&typeof d.build==='number'&&d.build>CLIENT_BUILD){
+      // Never yank a player out mid-run — that would wipe the current dungeon.
+      if(typeof dRunning!=='undefined'&&dRunning){_pendingReload=true;}
+      else{_forceReload();}
+    }
+  }).catch(function(){});
+}
+setInterval(_checkVersion,60000);   // re-check every 60s; also runs after a run ends
+setTimeout(_checkVersion,3000);     // and once shortly after load
 var walletConnected=false,walletAddress=null;
 var listedItems=[],listingItemId=null;
 
@@ -1906,7 +1923,7 @@ function _getSaveKey(){
 var _apiSaveTmr=null;
 function _doApiSave(data){
   try{var _xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');if(_xd&&_xd.username){
-    fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:_xd.username,token:_xd.token||'',data:data})})
+    fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:_xd.username,token:_xd.token||'',build:CLIENT_BUILD,data:data})})
       .then(function(r){if(!r.ok)console.error('Save failed:',r.status);})
       .catch(function(e){console.error('Save error:',e);});
   }}catch(e){}
@@ -4014,8 +4031,11 @@ function startDungeon(){
     // confirm the fee was actually debited — otherwise a rejected entry could
     // still let the player into the dungeon.
     fetch('/api/load',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({username:_xd2.username,token:_xd2.token||'',entryFee:extFee})
-    }).then(function(r){return r.json();}).then(function(d){
+      body:JSON.stringify({username:_xd2.username,token:_xd2.token||'',build:CLIENT_BUILD,entryFee:extFee})
+    }).then(function(r){
+      if(r.status===426){alert('A new version of Extraction is available. The page will reload to update.');_forceReload();throw new Error('stale_client');}
+      return r.json();
+    }).then(function(d){
       if(_goBtn){_goBtn.disabled=false;_goBtn.style.opacity='';}
       if(d&&d.ok){
         if(typeof d.newTokens==='number')tokens=d.newTokens; // server truth
@@ -4903,7 +4923,7 @@ function drawMinimap(){
   MMC.strokeStyle='#fff8';MMC.lineWidth=1;
   MMC.beginPath();MMC.arc(plx,ply,4,0,6.28);MMC.stroke();
 }
-function closeSummaryPlay(){document.getElementById('runSummary').classList.remove('show');var _dl=document.getElementById('dungEntryLayout');if(_dl)_dl.style.display='flex';document.getElementById('dungEntry').style.display='flex';var ec=document.getElementById('entryControls');if(ec)ec.style.display='block';var ep=document.getElementById('excPodium');if(ep)ep.style.display='block';renderExcPodium();pickMode(mode);}
+function closeSummaryPlay(){if(_pendingReload){_forceReload();return;}document.getElementById('runSummary').classList.remove('show');var _dl=document.getElementById('dungEntryLayout');if(_dl)_dl.style.display='flex';document.getElementById('dungEntry').style.display='flex';var ec=document.getElementById('entryControls');if(ec)ec.style.display='block';var ep=document.getElementById('excPodium');if(ep)ep.style.display='block';renderExcPodium();pickMode(mode);}
 function closeSummaryHome(){document.getElementById('runSummary').classList.remove('show');goTab(0);}
 function showRunSummary(died,final,runLootItems,excMsg){
   var el=document.getElementById('runSummary');
