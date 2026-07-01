@@ -4145,6 +4145,9 @@ var _smithItem=null;
 var smithMode='reforge';      // 'reforge' | 'combine'
 var COMBINE_COUNT=5;          // Iron pickaxes required
 var COMBINE_COST=2500;        // $EXT required
+var COMBINE_ORES=[{n:'Coal',img:'stone_1',need:25},{n:'Iron',img:'stone_2',need:25},{n:'Copper',img:'copper_ore',need:30}];
+function _oreImgTag(img,sz){sz=sz||20;return '<img src="'+((typeof _B64!=='undefined'&&_B64[img])||'')+'" width="'+sz+'" height="'+sz+'" style="image-rendering:pixelated;display:block">';}
+function _combineOresOk(){return COMBINE_ORES.every(function(o){return (oreStash[o.n]||0)>=o.need;});}
 var _combineResult=null;      // holds the just-forged Adamant during the reveal
 var _combineSel=[];           // ids of Iron pickaxes chosen to combine (max COMBINE_COUNT)
 function switchSmithMode(m){
@@ -4164,8 +4167,9 @@ function smithCombine(){
   // only combine the explicitly selected Iron pickaxes
   var byId={};inventory.forEach(function(x){byId[x.id]=x;});
   var chosen=_combineSel.filter(function(id){var x=byId[id];return x&&x.slot==='pickaxe'&&x.mat==='Iron';});
-  if(chosen.length<COMBINE_COUNT||tokens<COMBINE_COST)return;
+  if(chosen.length<COMBINE_COUNT||tokens<COMBINE_COST||!_combineOresOk())return;
   tokens-=COMBINE_COST;
+  COMBINE_ORES.forEach(function(o){oreStash[o.n]=(oreStash[o.n]||0)-o.need;if(oreStash[o.n]<=0)delete oreStash[o.n];});
   var consume=chosen.slice(0,COMBINE_COUNT);
   inventory=inventory.filter(function(x){return consume.indexOf(x.id)===-1;});
   _combineSel=[];
@@ -4217,20 +4221,32 @@ function renderCombine(grid,emp,forge){
     slots+='<div style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:1px '+(filled?'solid var(--border3)':'dashed var(--border2)')+';background:'+(filled?'var(--bg4)':'transparent')+';opacity:'+(filled?1:.5)+'">'+(filled?itemIcon(RARS[0],22):'<span style="color:var(--text4);font-size:13px">+</span>')+'</div>';
   }
   var full=_combineSel.length>=COMBINE_COUNT;
+  var oreRows=COMBINE_ORES.map(function(o){
+    var have=oreStash[o.n]||0,okk=have>=o.need;
+    return '<div style="display:flex;align-items:center;gap:7px;padding:3px 0;font-size:11px;color:'+(okk?'var(--text)':'var(--red)')+'">'+
+      '<div style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;opacity:'+(okk?1:.55)+'">'+_oreImgTag(o.img,20)+'</div>'+
+      '<span>'+o.n+'</span>'+
+      '<span style="margin-left:auto;font-weight:700;color:'+(okk?'var(--green)':'var(--red)')+'">'+have+' / '+o.need+'</span>'+
+      (okk?'<i class="ti ti-check" style="color:var(--green);font-size:13px"></i>':'<i class="ti ti-x" style="color:var(--red);font-size:13px"></i>')+
+    '</div>';
+  }).join('');
   document.getElementById('smithBeforeStats').innerHTML=
     '<div style="font-size:11px;color:var(--text3);margin-bottom:9px">Selected: <b style="color:'+(full?'var(--gold)':'var(--text)')+'">'+_combineSel.length+' / '+COMBINE_COUNT+'</b></div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+slots+'</div>'+
-    '<div style="font-size:10px;color:var(--text4);font-style:italic">Tap Iron pickaxes above to add them</div>';
+    '<div style="font-size:10px;color:var(--text4);font-style:italic;margin-bottom:10px">Tap Iron pickaxes above to add them</div>'+
+    '<div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text3);padding-top:9px;border-top:1px solid var(--border2);margin-bottom:5px">Materials</div>'+
+    oreRows;
   if(!_combineResult){
     document.getElementById('smithAfterStats').innerHTML='<div class="smith-stat-placeholder">Combine to forge an Adamant Pickaxe</div>';
     var ab=document.getElementById('smithAfterBox');if(ab)ab.classList.remove('revealed');
   }
   var btn=document.getElementById('smithRerollBtn');
-  var ok=full&&tokens>=COMBINE_COST;
+  var oresOk=_combineOresOk();
+  var ok=full&&tokens>=COMBINE_COST&&oresOk;
   btn.disabled=!ok;
   btn.textContent='✦ Combine 5× Iron — '+COMBINE_COST.toLocaleString()+' $EXT';
   var badge=document.getElementById('smithCostBadge');
-  badge.textContent = !full ? ('Select '+(COMBINE_COUNT-_combineSel.length)+' more') : (tokens<COMBINE_COST?'Not enough $EXT':'');
+  badge.textContent = !full ? ('Select '+(COMBINE_COUNT-_combineSel.length)+' more') : (!oresOk?'Missing materials':(tokens<COMBINE_COST?'Not enough $EXT':''));
   badge.style.color = ok?'var(--gold)':'var(--red)';
 }
 var SMITH_COSTS={Common:1000,Uncommon:5000,Rare:10000,Epic:25000,Legendary:50000,Mythic:200000};
