@@ -3733,8 +3733,25 @@ function startDungeon(){
   if(mode==='free'){
     var left=getFreeUsesLeft();
     if(left<=0){alert('No free runs left today! Come back tomorrow or spend $EXT to enter.');return;}
-    useFreeRun();updFreeLabel();
-    _beginDungeonRun();   // free run — no fee, start immediately
+    var _xdf=_getAuth();
+    if(!_xdf||!_xdf.username){openXAuth();return;}
+    var _goBtnF=document.getElementById('goBtn');
+    if(_goBtnF){_goBtnF.disabled=true;_goBtnF.style.opacity='0.6';}
+    // Verify server-side the account isn't banned before allowing a free run.
+    fetch('/api/load',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:_xdf.username,token:_xdf.token||'',action:'checkban'})
+    }).then(function(r){return r.json();}).then(function(d){
+      if(_goBtnF){_goBtnF.disabled=false;_goBtnF.style.opacity='';}
+      if(d&&d.ok){
+        useFreeRun();updFreeLabel();
+        _beginDungeonRun();
+      } else {
+        alert('Entry failed: '+((d&&d.error)||'Account not eligible.'));
+      }
+    }).catch(function(){
+      if(_goBtnF){_goBtnF.disabled=false;_goBtnF.style.opacity='';}
+      alert('Network error — entry not started. Try again.');
+    });
   } else {
     // Entry fee paid in $EXT — 80% to shared prize pool, 20% removed (burn + dev)
     if(tokens<extFee){alert('Not enough $EXT — you need '+(extFee>=1000?(extFee/1000).toFixed(extFee%1000===0?0:1)+'K':extFee)+' $EXT to enter. Mine more with your idle miner, or lower the entry fee.');return;}
