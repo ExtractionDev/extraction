@@ -224,21 +224,19 @@ export default async function handler(req, res) {
   const mineCap = MAX_MINE_PER_HOUR * (elapsedSec / 3600);
   const timeCeiling = Math.min(maxEarnPerSec(safeUps) * elapsedSec, mineCap);
 
+  // refineBurst is retired: refining a run's ore now awards GC (progression),
+  // not $EXT, so the client's lifetime_ext no longer jumps on refine. Zeroing
+  // this closes the old per-run mint headroom (last_entry_fee × 1.65) that a
+  // hacked client could otherwise claim as $EXT. Mining stays bounded by
+  // timeCeiling below. (last_entry_fee is still cleared so old flags settle.)
   let refineBurst = 0;
-  const lastFee = parseFloat(player.last_entry_fee) || 0;
-  if (lastFee > 0 && player.last_entry_at) {
-    const age = Date.now() - Date.parse(player.last_entry_at);
-    if (isFinite(age) && age >= 0 && age <= ENTRY_WINDOW_MS) {
-      refineBurst = lastFee * REFINE_CAP_MULT;
-    }
-  }
 
   let allowedDelta = Math.min(rawDelta, 1000000, timeCeiling + refineBurst);
   if (!(allowedDelta > 0)) allowedDelta = 0;
   const prevTokens = parseFloat(player.tokens) || 0;
   const headroom = Math.max(0, MAX_TOKENS - prevTokens);
   allowedDelta = Math.min(allowedDelta, headroom);
-  const consumedBurst = refineBurst > 0 && allowedDelta > timeCeiling + 0.0001;
+  const consumedBurst = false;
 
   // ── CHEAT DETECTION → AUTO-BAN ──────────────────────────────────────────
   // Only fires on values impossible for the real client, or wildly beyond what
@@ -316,7 +314,7 @@ export default async function handler(req, res) {
     achievements:   (_achiev && typeof _achiev === 'object') ? _achiev : {},
     updated_at:     new Date().toISOString()
   };
-  if (consumedBurst) row.last_entry_fee = 0;
+  row.last_entry_fee = 0; // refineBurst retired; keep field from going stale
 
   const { error: updateErr } = await supabase
     .from('players')
