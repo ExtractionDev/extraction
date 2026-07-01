@@ -3271,7 +3271,7 @@ var FLOOR_MODS=[
   {id:'none',      name:'Standard Depths', icon:'⛏',  desc:'No special conditions. A normal floor.',                                    color:'#4a4660',bg:'#0c0a14',lootMul:1,  mobMul:1,  chestGuarantee:false,excBonus:false},
   {id:'rich_vein', name:'Rich Vein',       icon:'💎',  desc:'+20% GC value on all ore nodes this floor.',                              color:'#4088c0',bg:'#080e1a',lootMul:1.2,mobMul:1,  chestGuarantee:false,excBonus:false},
   {id:'infested',  name:'Infested',        icon:'🕷',  desc:'+20% more enemies roam this floor.',                                      color:'#c84040',bg:'#1a0808',lootMul:1,  mobMul:1.2,chestGuarantee:false,excBonus:false},
-  {id:'frenzy',    name:'Feeding Frenzy',  icon:'🦇',  desc:'8–20 bats swarm this floor. A chest is guaranteed near the exit ladder.',  color:'#e84b4b',bg:'#1a0808',lootMul:1,  mobMul:1.5,chestGuarantee:true, excBonus:false,batBonus:true},
+  {id:'frenzy',    name:'Feeding Frenzy',  icon:'🦇',  desc:'8–20 bats swarm this floor near the exit ladder.',  color:'#e84b4b',bg:'#1a0808',lootMul:1,  mobMul:1.5,chestGuarantee:false, excBonus:false,batBonus:true},
   {id:'cursed',    name:'Cursed Floor',    icon:'💀',  desc:'Your speed is reduced 20%, but ore yields +30% GC.',                     color:'#8060c0',bg:'#100c1a',lootMul:1.3,mobMul:1,  chestGuarantee:false,excBonus:false,cursed:true},
   {id:'gauntlet',  name:'The Gauntlet',    icon:'⚔',  desc:'Double enemies, double GC rewards. High stakes.',                         color:'#e89040',bg:'#1a0e04',lootMul:2,  mobMul:2,  chestGuarantee:false,excBonus:false},
   {id:'quiet',     name:'Quiet Depths',    icon:'🌑',  desc:'No enemies this floor. Loot is halved — a chance to breathe.',           color:'#4a6060',bg:'#080e0e',lootMul:0.5,mobMul:0,  chestGuarantee:false,excBonus:false},
@@ -4523,7 +4523,7 @@ function showDescPreview(nextFloor){
   riskEl.style.display=(_deathPenaltyActive||dcoins>0)?'':'none';
   // Down button sub-label
   var downSub=document.getElementById('dpDownSub');
-  downSub.textContent=nextMod.chestGuarantee?'Guaranteed chest · 30% death risk':'Go deeper · 30% death risk';
+  downSub.textContent=nextMod.chestGuarantee?'Bat swarm ahead · 30% death risk':'Go deeper · 30% death risk';
   // Show the vein banner if next floor is a vein floor
   var _vb=document.getElementById('veinBanner');
   if(dflData[nextFloor]&&dflData[nextFloor].vein&&_vb){_vb.classList.add('show');}
