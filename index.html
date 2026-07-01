@@ -1807,7 +1807,8 @@ function _fetchGlobalPool(){
       else if(d.pool<_jarLastPool){_jarDropQueue=0;}
       _jarLastPool=d.pool;
       globalPool=d.pool;updExcPool();
-      var hj=document.getElementById('homeJackpotAmt');if(hj)hj.textContent=globalPool.toFixed(3)+' $EXT';
+      var hj=document.getElementById('homeJackpotAmt');
+      if(hj){var _hp=globalPool;hj.textContent=(_hp>=1000?((_hp/1000).toFixed(1))+'K':_hp.toFixed(3))+' $EXT';}
     }})
     .catch(function(){});
 }
