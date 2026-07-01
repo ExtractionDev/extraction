@@ -529,6 +529,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 @media (prefers-reduced-motion:reduce){#smithy.strike #hammer,#smithy.strike #anvil{animation-duration:.01ms}}
 /* ---- compact pickaxe selection cards in the smith grid ---- */
 .smith-wrap{max-width:640px;margin:0 auto;zoom:1.2}
+#smithModeTabs{display:flex;gap:8px;margin-bottom:18px}
+.smith-mode-tab{flex:1;text-align:center;padding:10px 12px;border-radius:10px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;border:1.5px solid var(--border2);background:var(--bg3);color:var(--text3);display:flex;align-items:center;justify-content:center;gap:7px;transition:all .14s}
+.smith-mode-tab:hover{border-color:var(--border3);color:var(--text)}
+.smith-mode-tab.on{border-color:var(--gold);background:var(--gold3);color:var(--gold)}
 #smithPickGrid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;align-items:start;justify-content:center;margin-bottom:22px!important}
 #smithPickGrid .mk-card{padding:12px;border-width:1px;border-radius:11px}
 #smithPickGrid .mk-card img{width:32px!important;height:32px!important}
@@ -1265,6 +1269,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
       <div style="font-size:11px;color:var(--text3)">Select a pickaxe to reforge</div>
     </div>
   </div>
+  <!-- Mode switch: Reforge / Combine -->
+  <div id="smithModeTabs">
+    <div id="smithTabReforge" class="smith-mode-tab on" onclick="switchSmithMode('reforge')"><i class="ti ti-flame"></i> Reforge</div>
+    <div id="smithTabCombine" class="smith-mode-tab" onclick="switchSmithMode('combine')"><i class="ti ti-arrows-join"></i> Combine</div>
+  </div>
   <!-- Pickaxe grid (market style) -->
   <div id="smithPickGrid" class="mk-grid" style="margin-bottom:16px"></div>
   <div id="smithEmpty" style="display:none;font-size:12px;color:var(--text4);text-align:center;padding:30px 0;font-style:italic">No pickaxes found — run the dungeon to find one</div>
@@ -1296,7 +1305,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
         <div id="smithAfterStats"><div class="smith-stat-placeholder">Click Re-roll to reveal</div></div>
       </div>
     </div>
-    <button class="smith-reroll-btn" id="smithRerollBtn" onclick="smithReroll()">🔨 Re-roll Stats</button>
+    <button class="smith-reroll-btn" id="smithRerollBtn" onclick="smithAction()">🔨 Re-roll Stats</button>
   </div>
   </div><!-- /smith-wrap -->
 </div><!-- /t6 smith tab -->
@@ -1516,8 +1525,8 @@ var PICK_IMGS={
   chest_f4:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJAAAABgCAYAAADy1PuhAAADBElEQVR4nO3dr28UQRjG8YOQppLk+CE4guAABQJDyQkECocC04S/AVMUCIIBhUNgmxAQwB8AAnGhGAQo4BCEq2jpJcgGA4rhTdg3N9Nn5rq9+X7UZLPd3SZv3qezu7PtdAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADBX9ik/vLr69Pff8ccPnxr3OXvujHKKqZaXr0u/AzT7d/sCsLdRQJAkt38vttaG78O4tz1Sryva5mTSuP1ItxvGvcvXwthGqhe7qe4/uFNtjNKBIKGAIIlqvbli61T3YMq1Rfky+RnGNs5u3HvYuP/jR0/CeGH93Y7P++vYhTBeGpwP49rijA4ECQUEyYFZnszGTQk2tryoTY0tO5uzNs1x1ob/tt9auRvivoY4owNBQgFB4kbYXpl5Xbl5O/vxLe9GpbXgxFkN6ECQUECQFJmFlYitGMrMy5ttxfBi7tLgavgz4M3w5VzOyOhAkFBAkBSJsNI3DNvGxp+9wWifl80rOhAkFBAkM30WprAzuxIRGXPDEP+jA0FCAUFSPMK8Z1XeC+3es7bSMzvlRqJVWxTSgSChgCCRImy82A9j+2K5t/Zq/PrZ1GMumTVcnU7zMa1ca7tqi55c6ECQUECQJEeYjarR6HvjPl6sbJ+42Lh98dvbqed98fxV4/Z+/3gY25izs7kankntFjoQJBQQJK14FmZnc73C5zp09PCOf3Zr40fjcez22tCBIKGAIImKMDuj8dg2bmdqMfvnOm/q/oqaY8uiA0FCAUEStVbJrm+y8RSz9kq5iRdzzNTrKc1e27yuBbPoQJBQQJBEzcK8VzVsZLhv9Cmf/HWO2Yu4HswGHQgSCgiSbM/C7Bt9uV5QR/vRgSChgCAp/jqH8rEp1oK1Hx0IEgoIkuIR1uaPTdUcPbnQgSChgCApEmE2GganT2Y5po1C+8xL+a/QzMJ0dCBIKCBIis/Chp+/Nm7PFR/ekucYNUdPLnQgSCggSJIjzPvyRurL8+PUEzu89Vl8kWM26ECQUECQ/AHT0QF3YNCaBgAAAABJRU5ErkJggg=="
 };
 var RARS=[
-  {n:'Common',   c:'#6a6a6a',bg:'#141414',ch:.50,ar:[1,5],  ac:[1,1]},
-  {n:'Uncommon', c:'#4a8a28',bg:'#0c1a08',ch:.30,ar:[2,8],  ac:[1,2]},
+  {n:'Common',   c:'#6a6a6a',bg:'#141414',ch:.53,ar:[1,5],  ac:[1,1]},
+  {n:'Uncommon', c:'#4a8a28',bg:'#0c1a08',ch:.27,ar:[2,8],  ac:[1,2]},
   {n:'Rare',     c:'#4088c0',bg:'#081820',ch:.15,ar:[4,12],  ac:[2,3]},
   {n:'Epic',     c:'#8060c0',bg:'#140c20',ch:.04,ar:[8,18],  ac:[3,4]},
   {n:'Legendary',c:'#c8a040',bg:'#201408',ch:.01,ar:[12,25], ac:[5,5]},
@@ -4133,6 +4142,67 @@ function cavMusicToggle(){
 
 // ── Blacksmith ─────────────────────────────────────────────────────────
 var _smithItem=null;
+var smithMode='reforge';      // 'reforge' | 'combine'
+var COMBINE_COUNT=5;          // Iron pickaxes required
+var COMBINE_COST=2500;        // $EXT required
+var _combineResult=null;      // holds the just-forged Adamant during the reveal
+function switchSmithMode(m){
+  smithMode=m;_combineResult=null;
+  var ab=document.getElementById('smithAfterBox');if(ab)ab.classList.remove('revealed');
+  renderSmith();
+}
+function smithAction(){ if(smithMode==='combine')smithCombine(); else smithReroll(); }
+function smithCombine(){
+  var ironList=inventory.filter(function(x){return x.slot==='pickaxe'&&x.mat==='Iron';});
+  if(ironList.length<COMBINE_COUNT||tokens<COMBINE_COST)return;
+  tokens-=COMBINE_COST;
+  var consume=ironList.slice(0,COMBINE_COUNT).map(function(x){return x.id;});
+  inventory=inventory.filter(function(x){return consume.indexOf(x.id)===-1;});
+  var unc=RARS.find(function(r){return r.n==='Uncommon';});
+  var price=Math.floor(320*(0.85+Math.random()*0.3));
+  var adam={mat:'Adamant',type:'Pickaxe',slot:'pickaxe',slotIcon:'ti-pickaxe',rar:unc,affixes:_buildAffixes(unc),price:price,id:Math.random().toString(36).substr(2,8)};
+  inventory.push(adam);
+  _combineResult=adam;
+  saveGame(true);uiAll();try{renderBackpack();}catch(e){}
+  var ab=document.getElementById('smithAfterBox');if(ab)ab.classList.add('revealed');
+  document.getElementById('smithAfterStats').innerHTML=
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+itemIcon(unc,26)+
+    '<div><div style="font-size:13px;font-weight:700;color:'+unc.c+'">Adamant</div>'+
+    '<div style="font-size:10px;color:var(--text3)">Uncommon Pickaxe</div></div></div>'+
+    _smithStatRows(adam.affixes,'smith-stat-new');
+  strikeAnvil();
+  [0,100,200,320].forEach(function(d,i){setTimeout(function(){_snd({f:[220,330,440,660][i],wave:'square',vol:0.10,dur:0.12});},d);});
+  renderSmith();
+  setTimeout(function(){_combineResult=null;var ab2=document.getElementById('smithAfterBox');if(ab2)ab2.classList.remove('revealed');renderSmith();},3500);
+}
+function renderCombine(grid,emp,forge){
+  emp.style.display='none';
+  grid.style.display='none';
+  forge.style.display='block';
+  var ironList=inventory.filter(function(x){return x.slot==='pickaxe'&&x.mat==='Iron';});
+  var have=ironList.length;
+  var unc=RARS.find(function(r){return r.n==='Uncommon';});
+  document.getElementById('smithForgeTitle').textContent='Combine · 5× Iron → Adamant';
+  var slots='';
+  for(var i=0;i<COMBINE_COUNT;i++){
+    var filled=i<have;
+    slots+='<div style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:1px solid '+(filled?'#4a8a28':'var(--border2)')+';background:'+(filled?'#0c1a08':'var(--bg4)')+';opacity:'+(filled?1:.45)+'">'+(filled?itemIcon(RARS[0],22):'<span style="color:var(--text4);font-size:13px">+</span>')+'</div>';
+  }
+  document.getElementById('smithBeforeStats').innerHTML=
+    '<div style="font-size:11px;color:var(--text3);margin-bottom:9px">Iron Pickaxes owned: <b style="color:'+(have>=COMBINE_COUNT?'var(--green)':'var(--red)')+'">'+have+' / '+COMBINE_COUNT+'</b></div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+slots+'</div>';
+  if(!_combineResult){
+    document.getElementById('smithAfterStats').innerHTML='<div class="smith-stat-placeholder">Combine to forge an Adamant Pickaxe</div>';
+    var ab=document.getElementById('smithAfterBox');if(ab)ab.classList.remove('revealed');
+  }
+  var btn=document.getElementById('smithRerollBtn');
+  var ok=have>=COMBINE_COUNT&&tokens>=COMBINE_COST;
+  btn.disabled=!ok;
+  btn.textContent='✦ Combine 5× Iron — '+COMBINE_COST.toLocaleString()+' $EXT';
+  var badge=document.getElementById('smithCostBadge');
+  badge.textContent = have<COMBINE_COUNT ? ('Need '+(COMBINE_COUNT-have)+' more Iron') : (tokens<COMBINE_COST?'Not enough $EXT':'');
+  badge.style.color = ok?'var(--gold)':'var(--red)';
+}
 var SMITH_COSTS={Common:1000,Uncommon:5000,Rare:10000,Epic:25000,Legendary:50000,Mythic:200000};
 
 function _smithStatRows(affixes, cls){
@@ -4146,12 +4216,17 @@ function _smithStatRows(affixes, cls){
 }
 
 function renderSmith(){
-  var items=[];
-  if(equippedSlots.pickaxe)items.push({item:equippedSlots.pickaxe,label:'Equipped'});
-  inventory.filter(function(x){return x.slot==='pickaxe';}).forEach(function(x){items.push({item:x,label:'Backpack'});});
   var grid=document.getElementById('smithPickGrid');
   var emp=document.getElementById('smithEmpty');
   var forge=document.getElementById('smithForge');
+  var tR=document.getElementById('smithTabReforge'),tC=document.getElementById('smithTabCombine');
+  if(tR)tR.classList.toggle('on',smithMode==='reforge');
+  if(tC)tC.classList.toggle('on',smithMode==='combine');
+  if(smithMode==='combine'){renderCombine(grid,emp,forge);return;}
+  grid.style.display='';
+  var items=[];
+  if(equippedSlots.pickaxe)items.push({item:equippedSlots.pickaxe,label:'Equipped'});
+  inventory.filter(function(x){return x.slot==='pickaxe';}).forEach(function(x){items.push({item:x,label:'Backpack'});});
   if(!items.length){grid.innerHTML='';forge.style.display='none';emp.style.display='block';return;}
   emp.style.display='none';
   var cost=_smithItem?SMITH_COSTS[_smithItem.rar.n]:0;
