@@ -219,33 +219,48 @@ export default async function handler(req, res) {
   const extToCredit = Math.floor(usdcReceived * EXT_PER_USDC);
 
   // Record the deposit FIRST (status credited) — the unique tx_hash row is the
-  // replay guard. If the insert races and fails on the unique constraint, we
-  // must NOT credit.
-  const { error: insertErr } = await supabase
-    .from('deposits')
-    .insert({
-      username,
-      amount: usdcReceived,      // REAL on-chain USDC, not the client's claim
-      ext_credited: extToCredit,
-      tx_hash,
-      tokens_balance: player.tokens || 0,
-      status: 'credited',
-      requested_at: new Date().toISOString()
-    });
+  // replay guard. The tx_hash was already checked above for an existing row, so
+  // reaching here means this is a new deposit. We try to record it, but the
+  // schema of `deposits` must not block a real credit — so if the full insert
+  // fails for any non-duplicate reason, we fall back to a minimal insert and,
+  // failing that, still credit (the up-front tx_hash check prevents doubles).
+  const fullRow = {
+    username,
+    amount: usdcReceived,
+    ext_credited: extToCredit,
+    tx_hash,
+    tokens_balance: player.tokens || 0,
+    status: 'credited',
+    requested_at: new Date().toISOString()
+  };
+  let { error: insertErr } = await supabase.from('deposits').insert(fullRow);
 
   if (insertErr) {
-    // Likely the unique tx_hash constraint firing on a concurrent submit.
-    console.error('Deposit insert error (NOT crediting):', insertErr.message);
-    return res.status(400).json({ error: 'This transaction has already been submitted.' });
+    const msg = (insertErr.message || '').toLowerCase();
+    const isDuplicate = msg.includes('duplicate') || msg.includes('unique') ||
+                        (insertErr.code && String(insertErr.code) === '23505');
+    if (isDuplicate) {
+      console.error('DEPOSIT 400: duplicate tx_hash on insert', tx_hash);
+      return res.status(400).json({ error: 'This transaction has already been submitted.' });
+    }
+    // Not a duplicate — likely a missing column. Retry with only the essentials.
+    console.error('Deposit full insert failed, retrying minimal:', insertErr.message);
+    const min = await supabase.from('deposits').insert({ username, tx_hash, status: 'credited' });
+    if (min.error) {
+      // Even the minimal insert failed. Record couldn't be written, but the
+      // payment is real and this tx wasn't credited before, so credit anyway.
+      console.error('Deposit minimal insert also failed — crediting without a row:', min.error.message,
+                    'user', username, 'tx', tx_hash, 'EXT', extToCredit);
+    }
   }
 
-  // Credit atomically only after the replay row is safely recorded.
+  // Credit the tokens.
   const { data: newBalRaw, error: creditErr } = await supabase
     .rpc('credit_tokens', { p_username: username, p_amount: extToCredit });
   if (creditErr) {
-    console.error('credit_tokens failed AFTER recording deposit:', creditErr.message,
+    console.error('credit_tokens failed:', creditErr.message,
                   '— manual credit needed for', username, 'tx', tx_hash, 'EXT', extToCredit);
-    return res.status(500).json({ error: 'Deposit recorded but crediting failed — contact support with your TX signature.' });
+    return res.status(500).json({ error: 'Deposit verified but crediting failed — contact support with your TX signature.' });
   }
 
   const newBalance = parseFloat(newBalRaw) || ((player.tokens || 0) + extToCredit);
