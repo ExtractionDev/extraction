@@ -18,6 +18,8 @@ function applyCors(req, res) {
 }
 
 const MIN_WITHDRAW = 50000;
+const WITHDRAW_BURN_PCT = 0.10; // 10% burned on withdrawal — player is debited the full
+                                // requested amount; operator pays out (1 - burn) in USDC.
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/; // Solana address charset + length
 
 export default async function handler(req, res) {
@@ -77,6 +79,14 @@ export default async function handler(req, res) {
   // Balance held BEFORE debit (recorded on the request row).
   const balanceBefore = player.tokens || 0;
 
+  // 10% withdraw burn: the player is debited the FULL requested amount (gross),
+  // but you only pay out 90% in USDC. The 10% difference is destroyed — it never
+  // leaves your custody wallet. Reconciliation stays exact:
+  //   balanceBefore - amount (gross) = newBalance.
+  //   pay the player `payout` (net). `burn` is what you keep / destroy.
+  const payoutAmount = Math.floor(safeAmount * (1 - WITHDRAW_BURN_PCT));
+  const burnAmount   = safeAmount - payoutAmount;
+
   // ATOMIC debit — subtracts only if not banned and balance is sufficient.
   // Prevents the double-withdraw / concurrent-withdraw hole.
   const { data: newBalRaw, error: debitErr } = await supabase
@@ -91,12 +101,15 @@ export default async function handler(req, res) {
   const newBalance = parseFloat(newBalRaw) || 0;
 
   // Record the pending request. If this fails, REFUND the debit.
+  // NOTE: `amount` = gross (debited from player). `payout` = net USDC to pay.
   const { error: insertErr } = await supabase
     .from('withdrawals')
     .insert({
       username,
       wallet,
-      amount: safeAmount,
+      amount: safeAmount,       // gross debited from player balance
+      payout: payoutAmount,     // <-- NET to pay the player in USDC (after 10% burn)
+      burn: burnAmount,         // 10% destroyed / retained
       tokens_balance: balanceBefore,
       runs: player.runs || 0,
       gc_extracted: player.gc_extracted || 0,
@@ -110,5 +123,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Failed to submit request. Try again.' });
   }
 
-  return res.status(200).json({ ok: true, newBalance });
+  return res.status(200).json({ ok: true, newBalance, gross: safeAmount, payout: payoutAmount, burn: burnAmount });
 }
