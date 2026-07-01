@@ -4039,7 +4039,7 @@ function startDungeon(){
       if(_goBtn){_goBtn.disabled=false;_goBtn.style.opacity='';}
       if(d&&d.ok){
         if(typeof d.newTokens==='number')tokens=d.newTokens; // server truth
-        extBurned+=extFee*0.10;devCut+=extFee*0.10;
+        extBurned+=extFee*0.40;devCut+=extFee*0.10;
         uiAll();saveGame();
         _fetchGlobalPool();
         _beginDungeonRun();   // ONLY start after the server confirms payment
@@ -4956,9 +4956,9 @@ function showRunSummary(died,final,runLootItems,excMsg){
     var _haulStr=Object.keys(dbag).filter(function(k){return dbag[k]>0;}).map(function(k){return dbag[k]+' '+k;}).join(' · ');
     refEl.innerHTML=
       '<div class="run-refine-haul">⚒ Ore haul: <b>'+_haulStr+'</b> <span style="opacity:.65">(value '+_hv+')</span></div>'+
-      '<div class="run-refine-payout">+'+_p.ext.toLocaleString()+' $EXT</div>'+
+      '<div class="run-refine-payout">+'+_p.ext.toLocaleString()+' GC</div>'+
       '<div class="run-refine-mult">'+_p.mult.toFixed(2)+'× entry fee</div>'+
-      '<button class="run-refine-btn" id="rRefineBtn" onclick="refineRun()">Refine ore → $EXT</button>'+
+      '<button class="run-refine-btn" id="rRefineBtn" onclick="refineRun()">Refine ore → GC</button>'+
       '<div class="run-refine-note">Or keep it — ore banks to your stash to sell on the market.</div>';
     refEl.style.display='';
   } else refEl.style.display='none';
@@ -4968,13 +4968,15 @@ function refineRun(){
   if(_runRefined||mode==='free'||extFee<=0||dRunRocksMined<1)return;
   var _p=refinePayout(dbag);
   if(_p.ext<=0)return;
-  // Remove this run's ore from the stash (it was just banked) and pay out $EXT
+  // Remove this run's ore from the stash (it was just banked) and pay out GC.
+  // Refine now awards GC (progression currency), NOT $EXT — refining no longer
+  // mints unbacked withdrawable tokens, which is what made runs break-even.
   for(var k in dbag){if(dbag[k]>0){oreStash[k]=Math.max(0,(oreStash[k]||0)-dbag[k]);if(oreStash[k]<=0)delete oreStash[k];}}
-  tokens+=_p.ext;lifetimeExt+=_p.ext;
+  gold+=_p.ext;
   _runRefined=true;
   saveGame();updExt();uiAll();
   var btn=document.getElementById('rRefineBtn');
-  if(btn){btn.disabled=true;btn.textContent='✓ Refined +'+_p.ext.toLocaleString()+' $EXT';}
+  if(btn){btn.disabled=true;btn.textContent='✓ Refined +'+_p.ext.toLocaleString()+' GC';}
 }
 function dLoop(){
   if(!dRunning)return;
