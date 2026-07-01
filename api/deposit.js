@@ -89,13 +89,22 @@ export default async function handler(req, res) {
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = {}; } }
-  // NOTE: client-sent `amount` is intentionally IGNORED. We credit the real
-  // on-chain amount only. It's accepted for backward compatibility / display.
   const { username, token, tx_hash } = body || {};
+
+  // Log EVERY deposit attempt at entry, before any validation can bail out.
+  console.log('DEPOSIT IN', JSON.stringify({
+    username: username || null,
+    hasToken: !!token,
+    tx_hash: tx_hash || null,
+    tx_len: tx_hash ? String(tx_hash).length : 0
+  }));
+
   if (!username || !token || !tx_hash) {
+    console.error('DEPOSIT 400: missing fields', { hasUser: !!username, hasToken: !!token, hasTx: !!tx_hash });
     return res.status(400).json({ error: 'Missing fields' });
   }
   if (typeof tx_hash !== 'string' || !SIG.test(tx_hash)) {
+    console.error('DEPOSIT 400: tx_hash failed regex. value=', tx_hash, 'len=', String(tx_hash).length);
     return res.status(400).json({ error: 'Invalid transaction hash.' });
   }
 
@@ -106,9 +115,9 @@ export default async function handler(req, res) {
     .eq('username', username)
     .single();
 
-  if (fetchErr || !player) return res.status(403).json({ error: 'Player not found.' });
-  if (player.session_token !== token) return res.status(403).json({ error: 'Invalid session.' });
-  if (player.banned) return res.status(403).json({ error: 'Account suspended.' });
+  if (fetchErr || !player) { console.error('DEPOSIT 403: player not found', username, fetchErr && fetchErr.message); return res.status(403).json({ error: 'Player not found.' }); }
+  if (player.session_token !== token) { console.error('DEPOSIT 403: session mismatch for', username); return res.status(403).json({ error: 'Invalid session.' }); }
+  if (player.banned) { console.error('DEPOSIT 403: banned', username); return res.status(403).json({ error: 'Account suspended.' }); }
 
   // Replay protection: a given tx can only ever be credited once.
   const { data: existing } = await supabase
@@ -117,6 +126,7 @@ export default async function handler(req, res) {
     .eq('tx_hash', tx_hash)
     .maybeSingle();
   if (existing) {
+    console.error('DEPOSIT 400: replay — tx already submitted', tx_hash);
     return res.status(400).json({ error: 'This transaction has already been submitted.' });
   }
 
