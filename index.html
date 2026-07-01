@@ -1949,6 +1949,8 @@ function submitWithdraw(){
     body:JSON.stringify({username:_xd.username,token:_xd.token||'',wallet:wallet,amount:amt})
   }).then(function(r){return r.json();}).then(function(d){
     if(d.ok){
+      // Server already debited — reflect the real returned balance, don't keep the stale local one.
+      if(typeof d.newBalance==='number'){ tokens=d.newBalance; uiAll(); }
       msg.style.color='var(--green)';
       msg.textContent='✓ Request submitted! You will receive your $EXT within 24 hours.';
       setTimeout(closeWithdraw,3000);
@@ -3732,31 +3734,37 @@ function startDungeon(){
     var left=getFreeUsesLeft();
     if(left<=0){alert('No free runs left today! Come back tomorrow or spend $EXT to enter.');return;}
     useFreeRun();updFreeLabel();
+    _beginDungeonRun();   // free run — no fee, start immediately
   } else {
     // Entry fee paid in $EXT — 80% to shared prize pool, 20% removed (burn + dev)
     if(tokens<extFee){alert('Not enough $EXT — you need '+(extFee>=1000?(extFee/1000).toFixed(extFee%1000===0?0:1)+'K':extFee)+' $EXT to enter. Mine more with your idle miner, or lower the entry fee.');return;}
     var _xd2=_getAuth();
     if(!_xd2||!_xd2.username){openXAuth();return;}
-    // Deduct locally for instant feedback
-    tokens-=extFee;
-    extBurned+=extFee*0.10;
-    devCut+=extFee*0.10;
-    uiAll();
-    // Send fee to server: 80% into shared global pool, 20% removed
+    var _goBtn=document.getElementById('goBtn');
+    if(_goBtn){_goBtn.disabled=true;_goBtn.style.opacity='0.6';}
+    // Do NOT start the run yet and do NOT deduct locally. Wait for the server to
+    // confirm the fee was actually debited — otherwise a rejected entry could
+    // still let the player into the dungeon.
     fetch('/api/load',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({username:_xd2.username,token:_xd2.token||'',entryFee:extFee})
     }).then(function(r){return r.json();}).then(function(d){
+      if(_goBtn){_goBtn.disabled=false;_goBtn.style.opacity='';}
       if(d&&d.ok){
-        if(typeof d.newTokens==='number')tokens=d.newTokens; // sync to server truth
-        _fetchGlobalPool(); // refresh shared pool display
-      } else if(d&&d.error){
-        // Server rejected — refund locally
-        tokens+=extFee;extBurned-=extFee*0.10;devCut-=extFee*0.10;uiAll();
-        alert('Entry failed: '+d.error);
+        if(typeof d.newTokens==='number')tokens=d.newTokens; // server truth
+        extBurned+=extFee*0.10;devCut+=extFee*0.10;
+        uiAll();saveGame();
+        _fetchGlobalPool();
+        _beginDungeonRun();   // ONLY start after the server confirms payment
+      } else {
+        alert('Entry failed: '+((d&&d.error)||'Could not process entry fee. Try again.'));
       }
-    }).catch(function(){});
-    saveGame();
+    }).catch(function(){
+      if(_goBtn){_goBtn.disabled=false;_goBtn.style.opacity='';}
+      alert('Network error — entry not started. Try again.');
+    });
   }
+}
+function _beginDungeonRun(){
   dGameOver=false;excMsg=null;cavMusicStart();dBuildFloors();_placeExcalibur();dfl=0;
   _deathPenaltyActive=false;_descPending=false;
   dp={x:40,y:DGY-30,vx:0,vy:0,w:18,h:26,gnd:false,onThin:false,face:1,hp:100,inv:0,spkCd:0,dropT:0,pullSt:0,jumps:0,coyoteT:0,jumpCharge:0,chargedJump:false,burnTicks:0,burnTimer:0,bigJumpCD:0};
