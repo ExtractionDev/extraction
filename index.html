@@ -120,7 +120,21 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 .cta-wallet.connected{border-color:var(--green);color:#90c848}
 /* DUNGEON */
 .dung{flex:1;display:flex;flex-direction:column;background:var(--bg);overflow:hidden;position:relative}
-.dung-entry{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;zoom:1.45}
+.dung-entry{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;zoom:1.45;order:2;flex:0 1 auto}
+/* Responsive entry layout — panels flank the cards, and wrap/stack when space is tight so nothing can ever overlap. */
+.dung-entry-layout{flex:1;min-height:0;width:100%;display:flex;flex-wrap:wrap;align-items:center;align-content:center;justify-content:center;gap:24px;overflow-y:auto;padding:16px}
+#excPodium,#entryControls{position:static!important;top:auto!important;left:auto!important;right:auto!important;bottom:auto!important;height:auto!important;flex:0 0 auto}
+#excPodium{order:1}
+#entryControls{order:3}
+@media(max-width:1200px){
+  #excPodium,#entryControls{zoom:1.2!important}
+  .dung-entry{zoom:1.2}
+}
+@media(max-width:560px){
+  #excPodium,#entryControls{zoom:1!important;width:min(340px,92vw)!important}
+  .dung-entry{zoom:1}
+  .dung-cards{max-width:none;width:min(340px,92vw)}
+}
 .dctrl-title{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);font-weight:700;display:flex;align-items:center;gap:7px;margin-bottom:18px;padding-bottom:10px;border-bottom:1px solid var(--border2)}
 .dctrl-section{font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--text4);margin-bottom:8px;margin-top:14px}
 .dctrl-section:first-of-type{margin-top:0}
@@ -641,6 +655,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 
 <!-- DUNGEON -->
 <div class="tab noscroll dung" id="t1">
+  <div class="dung-entry-layout" id="dungEntryLayout">
   <div class="dung-entry" id="dungEntry">
     <div class="dung-title">Choose your fate</div>
     <div class="dung-cards">
@@ -671,7 +686,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
   </div>
 
   <!-- floating controls box — absolutely positioned in the right open space -->
-  <div id="entryControls" class="ctrl-helper" style="position:absolute;top:18%;right:30px;left:auto;bottom:auto;zoom:1.5;width:306px;height:308px;box-sizing:border-box">
+  <div id="entryControls" class="ctrl-helper" style="zoom:1.5;width:306px;box-sizing:border-box">
     <div class="ctrl-helper-title"><i class="ti ti-device-gamepad-2" style="font-size:13px"></i> Controls</div>
     <div style="display:flex;flex-direction:column">
       <div class="ctrl-row"><div class="ctrl-keys"><span class="ctrl-key" style="color:var(--text2)">A</span><span class="ctrl-key" style="color:var(--text2)">←</span></div><span class="ctrl-desc">Move left</span></div>
@@ -684,11 +699,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     </div>
   </div>
   <!-- Excalibur champions podium (previous jackpot winners) -->
-  <div id="excPodium" class="exc-podium" style="position:absolute;top:18%;left:30px;right:auto;bottom:auto;zoom:1.5;width:306px;height:308px;box-sizing:border-box">
+  <div id="excPodium" class="exc-podium" style="zoom:1.5;width:306px;box-sizing:border-box">
     <div class="exc-podium-title"><i class="ti ti-trophy"></i> Excalibur Champions</div>
     <div class="exc-podium-stage" id="excPodiumStage"></div>
     <div class="exc-podium-note">⚔ Previous jackpot winners</div>
   </div>
+  </div><!-- /dung-entry-layout -->
   <div id="dungGame" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden">
     <div id="veinBanner" class="vein-banner"><div class="vein-banner-title">✦ VEIN FLOOR ✦</div><div class="vein-banner-sub">Rock value doubled</div></div>
     <div id="descPreview" class="desc-preview hidden">
@@ -1679,6 +1695,7 @@ function goTab(n){
   // FIX: if switching to dungeon tab and no run is active, ensure entry screen is visible
   if(n===1&&!dRunning){
     var de=document.getElementById('dungEntry'),dg=document.getElementById('dungGame');
+    var dl=document.getElementById('dungEntryLayout');if(dl)dl.style.display='flex';
     if(de)de.style.display='flex';
     if(dg)dg.style.display='none';
     var ec=document.getElementById('entryControls');if(ec)ec.style.display='block';
@@ -4026,6 +4043,7 @@ function _beginDungeonRun(){
   // Init minimap
   if(!mmcv){mmcv=document.getElementById('mmcv');if(mmcv)MMC=mmcv.getContext('2d');}
   document.getElementById('dungEntry').style.display='none';
+  var _dl=document.getElementById('dungEntryLayout');if(_dl)_dl.style.display='none';
   var ec=document.getElementById('entryControls');if(ec)ec.style.display='none';
   var ep=document.getElementById('excPodium');if(ep)ep.style.display='none';
   document.getElementById('dungGame').style.display='flex';
@@ -4885,7 +4903,7 @@ function drawMinimap(){
   MMC.strokeStyle='#fff8';MMC.lineWidth=1;
   MMC.beginPath();MMC.arc(plx,ply,4,0,6.28);MMC.stroke();
 }
-function closeSummaryPlay(){document.getElementById('runSummary').classList.remove('show');document.getElementById('dungEntry').style.display='flex';var ec=document.getElementById('entryControls');if(ec)ec.style.display='block';var ep=document.getElementById('excPodium');if(ep)ep.style.display='block';renderExcPodium();pickMode(mode);}
+function closeSummaryPlay(){document.getElementById('runSummary').classList.remove('show');var _dl=document.getElementById('dungEntryLayout');if(_dl)_dl.style.display='flex';document.getElementById('dungEntry').style.display='flex';var ec=document.getElementById('entryControls');if(ec)ec.style.display='block';var ep=document.getElementById('excPodium');if(ep)ep.style.display='block';renderExcPodium();pickMode(mode);}
 function closeSummaryHome(){document.getElementById('runSummary').classList.remove('show');goTab(0);}
 function showRunSummary(died,final,runLootItems,excMsg){
   var el=document.getElementById('runSummary');
