@@ -53,7 +53,8 @@ export default async function handler(req, res) {
             : (it.type || it.mat || 'Item') + (it.rarN ? ` (${it.rarN})` : ''),
           price_usdc: s.price_usdc,
           buyer: s.buyer,
-          sold_at: s.sold_at
+          sold_at: s.sold_at,
+          item_data: s.item_data
         };
       });
       res.setHeader('Cache-Control', 'no-store');
