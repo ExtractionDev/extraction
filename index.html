@@ -1137,7 +1137,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
       <div class="docs-loop-step"><div class="docs-loop-num">3</div><div><div class="docs-loop-title">Defeat Guardian Bosses</div><div class="docs-loop-desc">Floor 5 spawns the <b>Guardian</b> (600 HP) and Floor 10 the <b>Inferno Guardian</b> (1200 HP). Both fire <b>3-shot fireball volleys</b> toward you with a ±fan spread. Stay mobile.</div></div></div>
       <div class="docs-loop-step"><div class="docs-loop-num">4</div><div><div class="docs-loop-title">2× Loot on Floors 6–10</div><div class="docs-loop-desc">All GC mined on floors 6–10 is automatically doubled. Vein Floors stack on top of this for up to 4× GC.</div></div></div>
       <div class="docs-loop-step"><div class="docs-loop-num">5</div><div><div class="docs-loop-title">Hunt the Excalibur Stone ⚔</div><div class="docs-loop-desc">One <b>⚔ Excalibur Stone</b> is hidden per paid run — spawns per floor: <b>3% on floor 3</b>, <b>4% on floor 4</b>, <b>5% on floors 5+</b>. Mine it and roll the <b>25% jackpot pull</b>. Win and you receive a share of the pool that scales with your entry fee — <b>4–7.5%</b> for entries up to 20K, scaling up to <b>~40%</b> at a 100K entry. The rest stays in the pool and keeps building. <span style="color:#40c8f0">★ 5% secondary chance</span> to also receive the ultra-rare <b>Mythic Prismatic Pickaxe</b> — the game's rarest item, unobtainable any other way.</div></div></div>
-      <div class="docs-loop-step"><div class="docs-loop-num">6</div><div><div class="docs-loop-title">Equip &amp; Mine Idle</div><div class="docs-loop-desc">Equip your best pickaxe in Backpack. Your miner auto-swings 24/7 against the crystal cave, earning $EXT. Rare rocks give up to 25× payout.</div></div></div>
+      <div class="docs-loop-step"><div class="docs-loop-num">6</div><div><div class="docs-loop-title">Equip &amp; Mine Idle</div><div class="docs-loop-desc">Equip your best pickaxe — and a <b>companion</b> if you've won one from the Shop's <b>Pet Gatcha</b> — in Backpack. Your miner auto-swings 24/7 against the crystal cave, earning $EXT. Rare rocks give up to 25× payout.</div></div></div>
       <div class="docs-loop-step"><div class="docs-loop-num">7</div><div><div class="docs-loop-title">Reforge at the Blacksmith</div><div class="docs-loop-desc">Spend $EXT at the Blacksmith tab to re-roll a pickaxe's stats. Select a pickaxe from the grid, then hit Re-roll — you see Before vs After before committing. Costs scale with rarity.</div></div></div>
       <div class="docs-loop-step"><div class="docs-loop-num">8</div><div><div class="docs-loop-title">Withdraw Your $EXT</div><div class="docs-loop-desc">Your in-game $EXT balance is real. Request a withdrawal from the Home screen and it will be sent to your connected Solana wallet within 24 hours. Minimum withdrawal: <b>50,000 $EXT</b>. A <b>10% withdraw burn</b> applies (request 50,000 → receive 45,000). Your balance carries over between sessions — never expires.</div></div></div>
     </div>
@@ -1207,16 +1207,59 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
       </tbody>
     </table>
     <table class="docs-table" style="margin-top:8px">
-      <thead><tr><th>Upgrade</th><th>Effect/Level</th><th>Base Cost</th></tr></thead>
+      <thead><tr><th>Upgrade</th><th>Effect / Level</th></tr></thead>
       <tbody>
-        <tr><td>⚡ Speed</td><td>+0.015 swings/sec</td><td>40 GC</td></tr>
-        <tr><td>💥 Power</td><td>+0.12 dmg/swing</td><td>50 GC</td></tr>
-        <tr><td>💎 Sell</td><td>+0.00026 $EXT/rock</td><td>45 GC</td></tr>
-        <tr><td>🍀 Luck</td><td>Rare rock chance +0.1/0.01/0.001%</td><td>65 GC</td></tr>
+        <tr><td>⚡ Speed</td><td>+0.015 swings/sec</td></tr>
+        <tr><td>💥 Power</td><td>+0.12 dmg/swing</td></tr>
+        <tr><td>💎 Sell</td><td>+0.00026 $EXT/rock</td></tr>
+        <tr><td>🍀 Luck</td><td>Rare-rock chance +0.1% / +0.01% / +0.001% (Silver / Gold / Mystrile)</td></tr>
+      </tbody>
+    </table>
+    <div class="docs-p" style="margin-top:8px"><b>Cost:</b> Levels 1–49 use a cheap GC-only ramp. From <b>level 50</b> the real economy begins — every upgrade costs <b>GC (90 at L50, ×1.075 per level)</b> plus a <b>recipe of several ores</b> that shifts toward rarer ore as you climb:</div>
+    <table class="docs-table" style="margin-top:6px">
+      <thead><tr><th>Levels</th><th>Ores required</th></tr></thead>
+      <tbody>
+        <tr><td>50–69</td><td>Coal + Iron + Silver</td></tr>
+        <tr><td>70–79</td><td>Iron + Silver + Gold</td></tr>
+        <tr><td>80–99</td><td>Iron + Silver + Gold + Mystrile</td></tr>
+        <tr><td>100–129</td><td>Silver + Gold + Mystrile</td></tr>
+        <tr><td>130+</td><td>Gold + Mystrile</td></tr>
       </tbody>
     </table>
     <div class="docs-callout purple" style="margin-top:10px"><strong style="color:var(--sol)">Tip:</strong> Upgrade Speed → Power → Sell → Luck. Speed × Power = DPS. Sell turns DPS into $EXT. Luck multiplies payouts from rare rocks.</div>
-    <div class="docs-callout" style="margin-top:8px;border-left-color:var(--gold)"><strong style="color:var(--gold)">Heads up:</strong> Each upgrade costs both <b>GC and ore</b> (your cheapest ore is spent first). GC cost rises +8% per level; ore cost rises +4% — the button shows the exact ore breakdown.</div>
+    <div class="docs-callout" style="margin-top:8px;border-left-color:var(--gold)"><strong style="color:var(--gold)">Heads up:</strong> You must have <b>every</b> ore in the recipe to upgrade — the button shows each ore's icon and your have / need, turning red for any you're short on. You need more of the common ore and less of the rare (about Coal ×1 · Iron ×0.6 · Silver ×0.4 · Gold ×0.25 · Mystrile ×0.12 of the base amount). Both GC and ore costs rise ~7.5% per level.</div>
+  </div>
+
+  <!-- COMPANIONS -->
+  <div class="docs-section">
+    <div class="docs-h2"><i class="ti ti-paw"></i> Companions</div>
+    <div class="docs-p">Companions ride along with your idle miner and grant passive bonuses. You can own several, but only <b>one is equipped at a time</b> — equip from the Backpack or the Marketplace → Companions tab. They're won from the <b>Pet Gatcha</b> in the Shop.</div>
+    <table class="docs-table" style="margin-top:8px">
+      <thead><tr><th>Companion</th><th>Bonuses</th></tr></thead>
+      <tbody>
+        <tr><td style="color:#ff9ec4">Sanchez</td><td>+10% Miner Output · +10% Dungeon Ore</td></tr>
+        <tr><td style="color:#ff9a3c">Fox</td><td>+20% Mining Speed · +15% Luck</td></tr>
+        <tr><td style="color:#93a1ad">Trollawhalo</td><td>+30% Mining Power · +10% Sell Price</td></tr>
+        <tr><td style="color:#e5484d">Gnomeo</td><td>+35% Luck · +15% Mining Speed</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- PET GATCHA -->
+  <div class="docs-section">
+    <div class="docs-h2"><i class="ti ti-refresh"></i> Pet Gatcha (Shop)</div>
+    <div class="docs-p">Spin the wheel in the <b>Shop</b> tab for a chance at a companion. Your <b>first spin is free</b>; every spin after costs <b>$1 USDC</b> from your Phantom wallet. No daily limit — spin as often as you like. Every spin is guaranteed a prize: land a pet, or win ore added straight to your stash.</div>
+    <table class="docs-table" style="margin-top:8px">
+      <thead><tr><th>Prize</th><th>Odds</th></tr></thead>
+      <tbody>
+        <tr><td style="color:#e5484d">Gnomeo</td><td>1.00% &nbsp;(1 in 100)</td></tr>
+        <tr><td style="color:#ff9a3c">Fox</td><td>0.50% &nbsp;(1 in 200)</td></tr>
+        <tr><td style="color:#93a1ad">Trollawhalo</td><td>0.33% &nbsp;(1 in 300)</td></tr>
+        <tr><td style="color:#ff9ec4">Sanchez</td><td>0.25% &nbsp;(1 in 400)</td></tr>
+        <tr><td>Ore bundle</td><td>remaining ~97.9%</td></tr>
+      </tbody>
+    </table>
+    <div class="docs-callout" style="margin-top:8px;border-left-color:#e5484d"><strong style="color:#e5484d">Ore drops:</strong> Coal / Copper / Iron ×10–20 · Silver / Gold ×5–10 · Mystrile ×1–3, weighted toward the common ores. Rolls, payment, and the once-free spin are all enforced server-side; live odds are shown in the Shop.</div>
   </div>
 
   <!-- PICKAXES & ITEMS -->
