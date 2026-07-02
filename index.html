@@ -1928,8 +1928,15 @@ function _doApiSave(data){
       .then(function(r){if(!r.ok){console.error('Save failed:',r.status);return null;}return r.json();})
       .then(function(d){
         if(d&&d.reset){
-          // Admin wiped this account server-side. Clear the local save so the old
-          // data isn't re-uploaded, then reload into the fresh account.
+          // Admin wiped this account server-side. Nuke ALL local save keys so no
+          // stale data (e.g. miner/upgrade levels) survives to be re-uploaded, then
+          // reload into the fresh server row. We remove every 'extraction_v1' key
+          // (covers per-user + legacy) but leave the auth key so they stay logged in.
+          try{
+            var _wipe=[];
+            for(var _i=0;_i<localStorage.length;_i++){var _k=localStorage.key(_i);if(_k&&_k.indexOf('extraction_v1')===0)_wipe.push(_k);}
+            _wipe.forEach(function(_k){try{localStorage.removeItem(_k);}catch(e){}});
+          }catch(e){}
           try{localStorage.removeItem(_getSaveKey());}catch(e){}
           try{localStorage.removeItem(_saveKey);}catch(e){}
           _forceReload();
