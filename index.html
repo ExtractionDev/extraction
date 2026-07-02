@@ -3035,9 +3035,11 @@ function uiAll(){
     else{var oc=getOreCost(ts[i]),aff=(gold>=c&&_oreTotal()>=oc);btn.className='up-btn'+(aff?'':' off');btn.innerHTML='<i class="ti ti-arrow-up"></i> Upgrade · '+c+' 🪙'+(oc>0?' · '+oc+' ⛏':'');
       if(oreEl){
         if(oc<=0){oreEl.innerHTML='<span class="lbl">no ore needed yet</span>';}
-        else{var pv=_oreSpendPreview(oc),parts=pv.list.map(function(o){return '<span class="oq" style="color:'+_oreTc(o.n)+'">'+o.q+' '+o.n+'</span>';});
-        if(pv.short>0)parts.push('<span class="short">need '+pv.short+' more</span>');
-        oreEl.innerHTML='<span class="lbl">spends</span> '+(parts.length?parts.join('<span class="sep">·</span>'):'<span class="short">no ore yet</span>');}
+        else{var pv=_oreSpendPreview(oc);
+          var chips=pv.list.map(function(o){var _im='';for(var _d=0;_d<DORES.length;_d++){if(DORES[_d].n===o.n){_im=DORES[_d].img;break;}}
+            return '<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px;vertical-align:middle">'+_oreImgTag(_im,16)+'<span style="font-weight:700">'+o.q+'</span></span>';}).join('');
+          if(pv.short>0)chips+='<span style="color:var(--red);font-weight:700">need '+pv.short+' more</span>';
+          oreEl.innerHTML=chips;}
       }
     }
     if(tip)tip.textContent=ups[ts[i]]>=500?'Maxed':tipFns[i]();
