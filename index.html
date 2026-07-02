@@ -1779,10 +1779,10 @@ function updExt(){
   // Loot value label
   var _lbl=document.getElementById('lootValLabel');
   if(_lbl){
-    var _m=1+19*(Math.log10(extFee)-3)/2;
-    if(_m<4){_lbl.textContent='LOW';_lbl.style.color='#888';}
-    else if(_m<10){_lbl.textContent='MEDIUM';_lbl.style.color='#4a9adf';}
-    else if(_m<16){_lbl.textContent='HIGH';_lbl.style.color='var(--gold)';}
+    var _m=0.448*Math.pow(extFee/1000,0.773);
+    if(_m<1.5){_lbl.textContent='LOW';_lbl.style.color='#888';}
+    else if(_m<5){_lbl.textContent='MEDIUM';_lbl.style.color='#4a9adf';}
+    else if(_m<11){_lbl.textContent='HIGH';_lbl.style.color='var(--gold)';}
     else{_lbl.textContent='MAX';_lbl.style.color='#ff4a4a';}
   }
   updExcPool();
@@ -1806,7 +1806,7 @@ function getSell(){return(0.01+ups.sell*0.003)*(1+getItemBonus('sell')/100);}
 var UP_BASE={speed:40,power:50,sell:45,luck:65}; // per-track starting cost
 // ===== TUNABLE: every idle upgrade ALSO costs ore (cheapest-first), scaling with level =====
 var ORE_UP_BASE=3, ORE_UP_GROWTH=1.04;
-function getOreCost(t){return Math.ceil(ORE_UP_BASE*Math.pow(ORE_UP_GROWTH,ups[t]));}
+function getOreCost(t){var l=ups[t]||0;return l<50?Math.max(1,Math.ceil(1+l*0.7)):Math.ceil(36*Math.pow(1.075,l-50));} // ore is the tighter bottleneck (~25% more grind than GC) past L50
 function _oreTotal(){var n=0;for(var k in oreStash)n+=oreStash[k];return n;}
 function _oreUnitVal(name){for(var i=0;i<DORES.length;i++)if(DORES[i].n===name)return DORES[i].v;return 1;}
 function _oreSpend(n){ // consume n ore units, cheapest value first (keeps Gold/Mystrile for refine/market)
@@ -1820,7 +1820,7 @@ function _oreSpendPreview(n){ // non-destructive: which ores WOULD be consumed f
   return{list:out,short:need};
 }
 function _oreTc(name){for(var i=0;i<DORES.length;i++)if(DORES[i].n===name)return DORES[i].tc;return '#999';}
-function getCost(t){return Math.floor((UP_BASE[t]||40)*Math.pow(1.08,ups[t]));} // +8%/level — smooth curve to lvl 500
+function getCost(t){var l=ups[t]||0;return l<50?Math.floor(5+l*0.8):Math.floor(45*Math.pow(1.075,l-50));} // L1-50 = near-free tutorial ramp; real economy from L50 (eff=level-50)
 function buyUp(t){if(ups[t]>=500)return;var c=getCost(t),oc=getOreCost(t);if(gold>=c&&_oreTotal()>=oc){gold-=c;_oreSpend(oc);ups[t]++;sndLevelUp();saveGame();uiAll();}}
 function equipItem(id){
   var it=inventory.find(function(x){return x.id===id});
@@ -3364,7 +3364,8 @@ var REFINE_CAP=1.65;      // ceiling as a multiple of entry fee — only a big h
 var REFINE_FLOOR=0.22;    // minimum: any run with ≥1 mined rock refines for at least 22% of entry
 var _runRefined=false;    // guard: one refine per summary
 function oreHaulValue(bag){var v=0;for(var k in bag){for(var i=0;i<DORES.length;i++){if(DORES[i].n===k){v+=bag[k]*(DORES[i].rv||DORES[i].v);break;}}}return v;}
-function refinePayout(bag){var val=oreHaulValue(bag);var ratio=Math.max(REFINE_FLOOR,Math.min(REFINE_CAP,val/REFINE_DIVISOR));var ext=Math.round((extFee>0?extFee:0)*ratio);return{ext:ext,val:val,mult:ratio};}
+var _lastRunGC=0; // GC mined in the most recent run (drives trash payout)
+function refinePayout(bag){var val=oreHaulValue(bag);var ext=Math.round((_lastRunGC>0?_lastRunGC:0)*1.5);return{ext:ext,val:val,mult:1.5};}
 var dRockBreaks=[]; // active "crack in half" break animations
 function _rockSpriteKey(r){
   var m={Coal:'stone_1',Copper:'copper_node',Iron:'stone_2',Silver:'silver_node',Gold:'gold_node',Mystrile:'mystrile_node'};
@@ -3713,7 +3714,7 @@ function dMine(){
           }
         }).catch(function(e){console.error('Jackpot fetch threw:',e);excMsg='⚔ Excalibur mined, but payout check failed: '+(e&&e.message||'network');});
       }
-      var excVal=Math.round(ore.v*(r.nodeMulti||1)*(mode==='free'?1:(1+19*(Math.log10(extFee)-3)/2))*10);
+      var excVal=Math.round(ore.v*(r.nodeMulti||1)*(mode==='free'?1:(0.448*Math.pow(extFee/1000,0.773)))*10);
       if(dfl>=5)excVal*=2;
       dbag[ore.n]=(dbag[ore.n]||0)+1;dcoins+=excVal;sndCoin();dUpdHUD();
       if(!excMsg)excMsg='⚔ Excalibur Stone mined! +'+excVal+' GC';
@@ -3734,11 +3735,11 @@ function dMine(){
     var nodeVal=ore.v*(r.nodeMulti||1);
     var _veinM=dflData[dfl]&&dflData[dfl].vein?2:1;
     var _modM=dflData[dfl]&&dflData[dfl].mod?dflData[dfl].mod.lootMul:1;
-    var solM=(mode==='free'?1:(1+19*(Math.log10(extFee)-3)/2))*_veinM*_modM;
+    var solM=(mode==='free'?1:(0.448*Math.pow(extFee/1000,0.773)))*_veinM*_modM;
     var _dgcB=1+(getItemBonus('dungeonGC')/100);
     nodeVal=Math.round(nodeVal*solM*_dgcB);
     if(dfl>=5)nodeVal*=2;
-    var _oreQty=(mode==='free')?1:rollOre(ore.mq);if(sanchezEquipped()&&mode!=='free')_oreQty=Math.round(_oreQty*1.1);
+    var _oreQty=(mode==='free')?1:Math.max(1,Math.round(rollOre(ore.mq)*solM));if(sanchezEquipped()&&mode!=='free')_oreQty=Math.round(_oreQty*1.1);
     dbag[ore.n]=(dbag[ore.n]||0)+_oreQty;dcoins+=nodeVal;sndCoin();dRunRocksMined++;
     var dispVal='+'+_oreQty+' '+ore.n+' '+nodeVal+'GC';
     if(r.nodeMulti>1)dispVal+=' (x'+r.nodeMulti+' bonus)';
@@ -4640,6 +4641,7 @@ function dEndGame(died){
   }
   _deathPenaltyActive=false;_descPending=false;
   var final=Math.round(dcoins*risMul);
+  _lastRunGC=final;
   gold+=final;runs++;
   // Transfer dungeon ores to permanent stash
   Object.keys(dbag).forEach(function(k){oreStash[k]=(oreStash[k]||0)+dbag[k];});
@@ -4982,7 +4984,7 @@ function showRunSummary(died,final,runLootItems,excMsg){
     refEl.innerHTML=
       '<div class="run-refine-haul">⚒ Ore haul: <b>'+_haulStr+'</b> <span style="opacity:.65">(value '+_hv+')</span></div>'+
       '<div class="run-refine-payout">+'+_p.ext.toLocaleString()+' GC</div>'+
-      '<div class="run-refine-mult">'+_p.mult.toFixed(2)+'× entry fee</div>'+
+      '<div class="run-refine-mult">'+_p.mult.toFixed(1)+'× your mined GC</div>'+
       '<button class="run-refine-btn" id="rRefineBtn" onclick="refineRun()">Refine ore → GC</button>'+
       '<div class="run-refine-note">Or keep it — ore banks to your stash to sell on the market.</div>';
     refEl.style.display='';
