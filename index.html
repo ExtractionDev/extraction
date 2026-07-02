@@ -1512,6 +1512,9 @@ function recordExcaliburWin(name,amount){
   EXC_WINNERS=EXC_WINNERS.slice(0,20);
   _saveExcWinners();
   renderExcPodium();
+  // Pull the authoritative global list so this win shows for everyone (and gets
+  // ranked against other players' wins). Delay lets the server insert commit.
+  setTimeout(function(){try{_fetchExcWinners();}catch(e){}},2000);
 }
 function _fmtExtShort(n){
   n=Number(n)||0;
@@ -1547,7 +1550,7 @@ function renderExcPodium(){
 }
 // Try to pull a shared winners list if the backend exposes one; fall back to local
 function _fetchExcWinners(){
-  fetch('/api/excalibur-winners?v='+Date.now())
+  fetch('/api/load?champions=1&v='+Date.now())
     .then(function(r){return r.ok?r.json():null;})
     .then(function(data){
       var rows=Array.isArray(data)?data:(data&&data.rows);
