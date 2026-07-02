@@ -3237,7 +3237,9 @@ async function spinGacha(){
     if(d.reward.type==='pet'){ grantPetLocally(d.reward.key); }
     else if(d.reward.type==='ore'){ oreStash[d.reward.key]=(oreStash[d.reward.key]||0)+d.reward.qty; }
     if(d.owned_pets)hydrateOwnedPets(d.owned_pets);
-    if(d.ore_stash&&typeof d.ore_stash==='object')oreStash=Object.assign(oreStash,d.ore_stash);
+    // Do NOT overwrite local oreStash from d.ore_stash: the server's copy can lag a
+    // spend you just made, and overwriting would restore ore you just used. The ore
+    // reward (if any) was already added to the correct local total just above.
     saveGame(true); try{uiAll();}catch(e){}
     var idx=GACHA_SEGMENTS.findIndex(function(s){return s.key===d.reward.key;});
     if(idx<0)idx=0;
