@@ -3345,11 +3345,7 @@ function drawMiner(){
       MC.save();MC.globalAlpha=0.25;MC.fillStyle='#000';
       MC.beginPath();MC.ellipse(_sx+_sw/2,MGY+1,15,4,0,0,6.28);MC.fill();MC.restore();
       MC.imageSmoothingEnabled=false;
-      if(_isFox){ // fox art faces right — flip horizontally so it faces LEFT like Sanchez
-        MC.save();MC.translate(_sx+_sw,_sy);MC.scale(-1,1);MC.drawImage(_pimg,0,0,_sw,_sh);MC.restore();
-      }else{
-        MC.drawImage(_pimg,_sx,_sy,_sw,_sh); // natural orientation (snout left)
-      }
+      MC.drawImage(_pimg,_sx,_sy,_sw,_sh); // fox faces right (natural); Sanchez faces left (natural)
     }
   }
   var mDrawn=drawMinerFrame(MC,mAnimState,mAnimFrame,mx,ty,mDstW,mDstH,false,equipped?equipped.rar.c:null);
