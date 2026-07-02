@@ -1821,7 +1821,7 @@ function _oreSpendPreview(n){ // non-destructive: which ores WOULD be consumed f
 }
 function _oreTc(name){for(var i=0;i<DORES.length;i++)if(DORES[i].n===name)return DORES[i].tc;return '#999';}
 function getCost(t){var l=ups[t]||0;return l<50?Math.floor(5+l*0.8):Math.floor(45*Math.pow(1.075,l-50));} // L1-50 = near-free tutorial ramp; real economy from L50 (eff=level-50)
-function buyUp(t){if(ups[t]>=500)return;var c=getCost(t),oc=getOreCost(t);if(gold>=c&&_oreTotal()>=oc){gold-=c;_oreSpend(oc);ups[t]++;sndLevelUp();saveGame();uiAll();}}
+function buyUp(t){if(ups[t]>=500)return;var c=getCost(t),oc=getOreCost(t);if(gold>=c&&_oreTotal()>=oc){gold-=c;_oreSpend(oc);ups[t]++;sndLevelUp();saveGame(true);uiAll();}}
 function equipItem(id){
   var it=inventory.find(function(x){return x.id===id});
   if(!it)return;
@@ -1962,16 +1962,34 @@ function saveGame(force){
   try{
     var data=_buildSaveData();
     localStorage.setItem(_getSaveKey(),JSON.stringify(data));
-    if(_apiSaveTmr)clearTimeout(_apiSaveTmr);
     if(force){
-      // Immediate API save — used after critical actions like withdrawing listings
-      _doApiSave(data);_apiSaveTmr=null;
-    }else{
-      // Debounce API save — max once every 8 seconds
-      _apiSaveTmr=setTimeout(function(){_doApiSave(data);},8000);
+      if(_apiSaveTmr){clearTimeout(_apiSaveTmr);_apiSaveTmr=null;}
+      _doApiSave(data);
+    }else if(!_apiSaveTmr){
+      // TRAILING debounce: fires ~8s after the first pending change and is NOT
+      // reset by later calls. The idle miner calls saveGame() on every rock break
+      // (faster than 8s), which under a resetting debounce perpetually deferred the
+      // save so upgrades/progress never persisted. Rebuild data at fire time so it
+      // captures the latest state.
+      _apiSaveTmr=setTimeout(function(){_apiSaveTmr=null;_doApiSave(_buildSaveData());},8000);
     }
   }catch(e){}
 }
+// Safety net: if the tab is closed/refreshed while a debounced save is pending,
+// flush it with keepalive so the request still completes during unload. Without
+// this, upgrades/gold earned in the last 8s were lost on a quick refresh.
+function _flushSave(){
+  try{
+    if(_apiSaveTmr){clearTimeout(_apiSaveTmr);_apiSaveTmr=null;}
+    var _xd=JSON.parse(localStorage.getItem(_xAuthKey)||'null');
+    if(_xd&&_xd.username){
+      var data=_buildSaveData();
+      fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,body:JSON.stringify({username:_xd.username,token:_xd.token||'',build:CLIENT_BUILD,data:data})});
+    }
+  }catch(e){}
+}
+window.addEventListener('pagehide',_flushSave);
+window.addEventListener('beforeunload',_flushSave);
 function _relinkItem(raw){
   if(!raw)return null;
   if(raw.isSanchez||raw.id==='sanchez_pet'){return makeSanchezItem();}
