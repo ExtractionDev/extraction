@@ -130,10 +130,19 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
   #excPodium,#entryControls{zoom:1.2!important}
   .dung-entry{zoom:1.2}
 }
+@media(max-width:768px){
+  /* Dungeon entry: stack vertically, put the PLAY panel (cards + Descend) first,
+     champions/controls below it, kill zoom, full width so nothing overflows. */
+  .dung-entry-layout{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:14px;padding:12px}
+  .dung-entry{order:0!important;zoom:1!important;width:100%!important;max-width:100%!important;padding:4px}
+  #excPodium{order:1!important;zoom:1!important;width:100%!important;max-width:100%!important;min-width:0!important}
+  #entryControls{order:2!important;zoom:1!important;width:100%!important;max-width:100%!important;min-width:0!important}
+  .dung-cards{max-width:none;width:100%}
+  .exc-pool,.ctrl-helper{width:100%!important;box-sizing:border-box}
+}
 @media(max-width:560px){
-  #excPodium,#entryControls{zoom:1!important;width:min(340px,92vw)!important}
-  .dung-entry{zoom:1}
-  .dung-cards{max-width:none;width:min(340px,92vw)}
+  .dung-cards{gap:8px}
+  .dc-name{font-size:13px}.dc-desc{font-size:9px}
 }
 .dctrl-title{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);font-weight:700;display:flex;align-items:center;gap:7px;margin-bottom:18px;padding-bottom:10px;border-bottom:1px solid var(--border2)}
 .dctrl-section{font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--text4);margin-bottom:8px;margin-top:14px}
@@ -1807,7 +1816,7 @@ function updExcPool(){
   var displayPool=globalPool>0?globalPool:excPool;
   if(poolEl)poolEl.textContent=displayPool.toFixed(3);
   var jackOdds=1.0; // jackpot pull odds always 1% once found
-  if(oddsEl)oddsEl.textContent='⚔ Stone appears: '+odds.toFixed(1)+'% this run  ·  Jackpot pull: 1% if found  ·  Pool: '+displayPool.toFixed(3)+' $EXT';
+  if(oddsEl)oddsEl.textContent='⚔ Stone appears: '+odds.toFixed(1)+'% this run  ·  Jackpot pull: 25% if found  ·  Pool: '+displayPool.toFixed(3)+' $EXT';
   var bl=document.getElementById('excBurnTxt');if(bl)bl.textContent='🔥 40% burn  ·  10% dev  ·  50% feeds the prize pool';
 }
 function _upMult(it){return Math.pow(1.30,(it&&it.up)||0);} // +30% stats per upgrade level (compounding)
