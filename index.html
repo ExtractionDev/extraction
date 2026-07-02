@@ -4336,14 +4336,24 @@ function cavMusicToggle(){
 // ── Blacksmith ─────────────────────────────────────────────────────────
 var _smithItem=null;
 var smithMode='reforge';      // 'reforge' | 'combine'
-var COMBINE_COUNT=5;          // Iron pickaxes required
-var COMBINE_COST=2500;        // $EXT required
-var COMBINE_ORES=[{n:'Coal',img:'stone_1',need:25},{n:'Iron',img:'stone_2',need:25},{n:'Copper',img:'copper_ore',need:30}];
+var COMBINE_COUNT=5;          // pickaxes required per combine
+// Tiered combine: 5 of tier N's material -> one of tier N+1's material.
+var COMBINE_TIERS=[
+  {from:'Iron',    fromRar:'Common',   to:'Adamant',  toRar:'Uncommon', cost:2500,
+    ores:[{n:'Coal',img:'stone_1',need:25},{n:'Iron',img:'stone_2',need:25},{n:'Copper',img:'copper_ore',need:30}]},
+  {from:'Adamant', fromRar:'Uncommon', to:'Crystal',  toRar:'Rare',     cost:10000,
+    ores:[{n:'Coal',img:'stone_1',need:150},{n:'Copper',img:'copper_ore',need:125},{n:'Iron',img:'stone_2',need:100},{n:'Silver',img:'silver_ore',need:50},{n:'Gold',img:'gold_ore',need:10}]},
+  {from:'Crystal', fromRar:'Rare',     to:'Myatrile', toRar:'Epic',     cost:30000,
+    ores:[{n:'Coal',img:'stone_1',need:300},{n:'Copper',img:'copper_ore',need:250},{n:'Iron',img:'stone_2',need:200},{n:'Silver',img:'silver_ore',need:125},{n:'Gold',img:'gold_ore',need:40},{n:'Mystrile',img:'mystrile_ore',need:10}]}
+];
+var _combineTier=0;
+function _ct(){return COMBINE_TIERS[_combineTier]||COMBINE_TIERS[0];}
 function _oreImgTag(img,sz){sz=sz||20;return '<img src="'+((typeof _B64!=='undefined'&&_B64[img])||'')+'" width="'+sz+'" height="'+sz+'" style="image-rendering:pixelated;display:block">';}
 function _gcIcon(sz){sz=sz||16;return '<img src="'+((typeof _B64!=='undefined'&&_B64.gc_coin)||'')+'" width="'+sz+'" height="'+sz+'" style="image-rendering:pixelated;vertical-align:middle;display:inline-block">';}
-function _combineOresOk(){return COMBINE_ORES.every(function(o){return (oreStash[o.n]||0)>=o.need;});}
-var _combineResult=null;      // holds the just-forged Adamant during the reveal
-var _combineSel=[];           // ids of Iron pickaxes chosen to combine (max COMBINE_COUNT)
+function _combineOresOk(){return _ct().ores.every(function(o){return (oreStash[o.n]||0)>=o.need;});}
+var _combineResult=null;      // holds the just-forged pickaxe during the reveal
+var _combineSel=[];           // ids of source pickaxes chosen to combine (max COMBINE_COUNT)
+function combineSetTier(i){_combineTier=i;_combineSel=[];_combineResult=null;var ab=document.getElementById('smithAfterBox');if(ab)ab.classList.remove('revealed');renderSmith();}
 function switchSmithMode(m){
   smithMode=m;_combineResult=null;_combineSel=[];
   var ab=document.getElementById('smithAfterBox');if(ab)ab.classList.remove('revealed');
@@ -4358,27 +4368,28 @@ function combineToggle(id){
   renderSmith();
 }
 function smithCombine(){
-  // only combine the explicitly selected Iron pickaxes
+  var T=_ct();
+  // only combine the explicitly selected source-material pickaxes for this tier
   var byId={};inventory.forEach(function(x){byId[x.id]=x;});
-  var chosen=_combineSel.filter(function(id){var x=byId[id];return x&&x.slot==='pickaxe'&&x.mat==='Iron';});
-  if(chosen.length<COMBINE_COUNT||tokens<COMBINE_COST||!_combineOresOk())return;
-  tokens-=COMBINE_COST;
-  COMBINE_ORES.forEach(function(o){oreStash[o.n]=(oreStash[o.n]||0)-o.need;if(oreStash[o.n]<=0)delete oreStash[o.n];});
+  var chosen=_combineSel.filter(function(id){var x=byId[id];return x&&x.slot==='pickaxe'&&x.mat===T.from;});
+  if(chosen.length<COMBINE_COUNT||tokens<T.cost||!_combineOresOk())return;
+  tokens-=T.cost;
+  T.ores.forEach(function(o){oreStash[o.n]=(oreStash[o.n]||0)-o.need;if(oreStash[o.n]<=0)delete oreStash[o.n];});
   var consume=chosen.slice(0,COMBINE_COUNT);
   inventory=inventory.filter(function(x){return consume.indexOf(x.id)===-1;});
   _combineSel=[];
-  var unc=RARS.find(function(r){return r.n==='Uncommon';});
-  var price=Math.floor(320*(0.85+Math.random()*0.3));
-  var adam={mat:'Adamant',type:'Pickaxe',slot:'pickaxe',slotIcon:'ti-pickaxe',rar:unc,affixes:_buildAffixes(unc),price:price,id:Math.random().toString(36).substr(2,8)};
-  inventory.push(adam);
-  _combineResult=adam;
+  var outRar=RARS.find(function(r){return r.n===T.toRar;});
+  var price=Math.floor(({Uncommon:320,Rare:900,Epic:2400}[T.toRar]||320)*(0.85+Math.random()*0.3));
+  var forged={mat:T.to,type:'Pickaxe',slot:'pickaxe',slotIcon:'ti-pickaxe',rar:outRar,affixes:_buildAffixes(outRar),price:price,id:Math.random().toString(36).substr(2,8)};
+  inventory.push(forged);
+  _combineResult=forged;
   saveGame(true);uiAll();try{renderBackpack();}catch(e){}
   var ab=document.getElementById('smithAfterBox');if(ab)ab.classList.add('revealed');
   document.getElementById('smithAfterStats').innerHTML=
-    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+itemIcon(unc,26)+
-    '<div><div style="font-size:13px;font-weight:700;color:'+unc.c+'">Adamant</div>'+
-    '<div style="font-size:10px;color:var(--text3)">Uncommon Pickaxe</div></div></div>'+
-    _smithStatRows(adam.affixes,'smith-stat-new');
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+itemIcon(outRar,26)+
+    '<div><div style="font-size:13px;font-weight:700;color:'+outRar.c+'">'+T.to+'</div>'+
+    '<div style="font-size:10px;color:var(--text3)">'+T.toRar+' Pickaxe</div></div></div>'+
+    _smithStatRows(forged.affixes,'smith-stat-new');
   strikeAnvil();
   [0,100,200,320].forEach(function(d,i){setTimeout(function(){_snd({f:[220,330,440,660][i],wave:'square',vol:0.10,dur:0.12});},d);});
   renderSmith();
@@ -4387,35 +4398,48 @@ function smithCombine(){
 function renderCombine(grid,emp,forge){
   emp.style.display='none';
   forge.style.display='block';
-  var ironList=inventory.filter(function(x){return x.slot==='pickaxe'&&x.mat==='Iron';});
-  // keep selection valid
-  var ids={};ironList.forEach(function(x){ids[x.id]=1;});
-  _combineSel=_combineSel.filter(function(id){return ids[id];});
-  var unc=RARS.find(function(r){return r.n==='Uncommon';});
-  // ---- selectable Iron grid ----
-  grid.style.display='';
-  if(!ironList.length){
-    grid.style.display='none';emp.textContent='No Iron pickaxes in your backpack to combine';emp.style.display='block';
+  var T=_ct();
+  // ---- tier selector (Iron→Adamant | Adamant→Crystal | Crystal→Epic) ----
+  var tierBar=document.getElementById('combineTierBar');
+  if(!tierBar){
+    tierBar=document.createElement('div');
+    tierBar.id='combineTierBar';
+    tierBar.style.cssText='display:flex;gap:6px;margin-bottom:10px';
+    forge.insertBefore(tierBar,forge.firstChild);
   }
-  grid.innerHTML=ironList.map(function(it){
+  tierBar.innerHTML=COMBINE_TIERS.map(function(t,i){
+    var on=i===_combineTier;
+    return '<div onclick="combineSetTier('+i+')" style="flex:1;text-align:center;cursor:pointer;padding:6px 4px;border-radius:8px;font-size:10px;font-weight:700;border:1px solid '+(on?'var(--gold)':'var(--border2)')+';background:'+(on?'var(--gold3)':'var(--bg3)')+';color:'+(on?'var(--gold)':'var(--text3)')+'">'+t.from+' → '+t.to+'<div style="font-size:8px;font-weight:400;color:var(--text4);letter-spacing:.08em;text-transform:uppercase">'+t.toRar+'</div></div>';
+  }).join('');
+  var srcList=inventory.filter(function(x){return x.slot==='pickaxe'&&x.mat===T.from;});
+  // keep selection valid
+  var ids={};srcList.forEach(function(x){ids[x.id]=1;});
+  _combineSel=_combineSel.filter(function(id){return ids[id];});
+  // ---- selectable source grid ----
+  grid.style.display='';
+  if(!srcList.length){
+    grid.style.display='none';emp.textContent='No '+T.from+' pickaxes in your backpack to combine';emp.style.display='block';
+  }
+  grid.innerHTML=srcList.map(function(it){
     var sel=_combineSel.indexOf(it.id)>=0;
     return '<div class="mk-card'+(sel?' combine-sel':'')+'" onclick="combineToggle(\''+it.id+'\')" style="border-color:'+(sel?'var(--gold)':'var(--border)')+';background:'+(sel?'var(--gold3)':'var(--bg3)')+';position:relative">'+
       (sel?'<div style="position:absolute;top:6px;right:8px;color:var(--gold);font-size:13px;font-weight:700">✓</div>':'')+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+itemIcon(it.rar,26)+
         '<div><div style="font-size:13px;font-weight:700;color:'+it.rar.c+'">'+it.mat+'</div>'+
-        '<div style="font-size:10px;color:var(--text3)">Common · Backpack</div></div></div>'+
+        '<div style="font-size:10px;color:var(--text3)">'+T.fromRar+' · Backpack</div></div></div>'+
       it.affixes.map(function(a){return '<div style="font-size:11px;color:var(--green);line-height:1.8">+'+a.v+'% '+a.t.n+'</div>';}).join('')+
     '</div>';
   }).join('');
   // ---- ingredients (neutral slots, no green) ----
-  document.getElementById('smithForgeTitle').textContent='Combine · 5× Iron → Adamant';
+  document.getElementById('smithForgeTitle').textContent='Combine · 5× '+T.from+' → '+T.to+' ('+T.toRar+')';
   var slots='';
+  var srcRar=RARS.find(function(r){return r.n===T.fromRar;})||RARS[0];
   for(var i=0;i<COMBINE_COUNT;i++){
     var filled=i<_combineSel.length;
-    slots+='<div style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:1px '+(filled?'solid var(--border3)':'dashed var(--border2)')+';background:'+(filled?'var(--bg4)':'transparent')+';opacity:'+(filled?1:.5)+'">'+(filled?itemIcon(RARS[0],22):'<span style="color:var(--text4);font-size:13px">+</span>')+'</div>';
+    slots+='<div style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:1px '+(filled?'solid var(--border3)':'dashed var(--border2)')+';background:'+(filled?'var(--bg4)':'transparent')+';opacity:'+(filled?1:.5)+'">'+(filled?itemIcon(srcRar,22):'<span style="color:var(--text4);font-size:13px">+</span>')+'</div>';
   }
   var full=_combineSel.length>=COMBINE_COUNT;
-  var oreRows=COMBINE_ORES.map(function(o){
+  var oreRows=T.ores.map(function(o){
     var have=oreStash[o.n]||0,okk=have>=o.need;
     return '<div style="display:flex;align-items:center;gap:7px;padding:3px 0;font-size:11px;color:'+(okk?'var(--text)':'var(--red)')+'">'+
       '<div style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;opacity:'+(okk?1:.55)+'">'+_oreImgTag(o.img,20)+'</div>'+
@@ -4427,20 +4451,20 @@ function renderCombine(grid,emp,forge){
   document.getElementById('smithBeforeStats').innerHTML=
     '<div style="font-size:11px;color:var(--text3);margin-bottom:9px">Selected: <b style="color:'+(full?'var(--gold)':'var(--text)')+'">'+_combineSel.length+' / '+COMBINE_COUNT+'</b></div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+slots+'</div>'+
-    '<div style="font-size:10px;color:var(--text4);font-style:italic;margin-bottom:10px">Tap Iron pickaxes above to add them</div>'+
+    '<div style="font-size:10px;color:var(--text4);font-style:italic;margin-bottom:10px">Tap '+T.from+' pickaxes above to add them</div>'+
     '<div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text3);padding-top:9px;border-top:1px solid var(--border2);margin-bottom:5px">Materials</div>'+
     oreRows;
   if(!_combineResult){
-    document.getElementById('smithAfterStats').innerHTML='<div class="smith-stat-placeholder">Combine to forge an Adamant Pickaxe</div>';
+    document.getElementById('smithAfterStats').innerHTML='<div class="smith-stat-placeholder">Combine to forge a '+T.to+' ('+T.toRar+') Pickaxe</div>';
     var ab=document.getElementById('smithAfterBox');if(ab)ab.classList.remove('revealed');
   }
   var btn=document.getElementById('smithRerollBtn');
   var oresOk=_combineOresOk();
-  var ok=full&&tokens>=COMBINE_COST&&oresOk;
+  var ok=full&&tokens>=T.cost&&oresOk;
   btn.disabled=!ok;
-  btn.textContent='✦ Combine 5× Iron — '+COMBINE_COST.toLocaleString()+' $EXT';
+  btn.textContent='✦ Combine 5× '+T.from+' — '+T.cost.toLocaleString()+' $EXT';
   var badge=document.getElementById('smithCostBadge');
-  badge.textContent = !full ? ('Select '+(COMBINE_COUNT-_combineSel.length)+' more') : (!oresOk?'Missing materials':(tokens<COMBINE_COST?'Not enough $EXT':''));
+  badge.textContent = !full ? ('Select '+(COMBINE_COUNT-_combineSel.length)+' more') : (!oresOk?'Missing materials':(tokens<T.cost?'Not enough $EXT':''));
   badge.style.color = ok?'var(--gold)':'var(--red)';
 }
 var SMITH_COSTS={Common:1000,Uncommon:5000,Rare:10000,Epic:25000,Legendary:50000,Mythic:200000};
@@ -4462,6 +4486,7 @@ function renderSmith(){
   var tR=document.getElementById('smithTabReforge'),tC=document.getElementById('smithTabCombine');
   if(tR)tR.classList.toggle('on',smithMode==='reforge');
   if(tC)tC.classList.toggle('on',smithMode==='combine');
+  var _tb=document.getElementById('combineTierBar');if(_tb)_tb.style.display=(smithMode==='combine')?'flex':'none';
   if(smithMode==='combine'){renderCombine(grid,emp,forge);return;}
   grid.style.display='';
   var items=[];
