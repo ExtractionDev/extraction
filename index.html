@@ -970,7 +970,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
       </div>
       <div style="min-width:240px;max-width:300px;background:var(--bg3);border:1.5px solid var(--border3);border-radius:14px;padding:16px">
         <div class="mk-section-title" style="margin-top:0"><i class="ti ti-list-details" style="color:var(--gold)"></i> Drop Rates</div>
-        <div style="font-size:11px;color:var(--text4);margin:-4px 0 10px">One spin per day · $1 USDC per spin · odds enforced server-side</div>
+        <div style="font-size:11px;color:var(--text4);margin:-4px 0 10px">First spin FREE · then $1 USDC per spin · odds enforced server-side</div>
         <div id="gachaOdds"></div>
       </div>
     </div>
@@ -2964,7 +2964,7 @@ var GACHA_SEGMENTS=[
 // Must mirror the gacha logic in /api/load exactly.
 var GACHA_PETS=[{key:'gnomeo',name:'Gnomeo',p:1/100},{key:'fox',name:'Fox',p:1/200},{key:'whale',name:'Trollawhalo',p:1/300},{key:'sanchez',name:'Sanchez',p:1/400}];
 var GACHA_ORES=[{key:'Coal',w:26,min:10,max:20},{key:'Copper',w:24,min:10,max:20},{key:'Iron',w:22,min:10,max:20},{key:'Silver',w:13,min:5,max:10},{key:'Gold',w:9,min:5,max:10},{key:'Mystrile',w:6,min:1,max:3}];
-var _gachaRot=0, _gachaSpinning=false;
+var _gachaRot=0, _gachaSpinning=false, _gachaFirstFree=false;
 
 function _gAuth(){ try{return JSON.parse(localStorage.getItem(_xAuthKey)||'null');}catch(e){return null;} }
 function _gFmt(ms){ var s=Math.max(0,Math.floor(ms/1000)); var h=Math.floor(s/3600), m=Math.floor((s%3600)/60); return h>0?(h+'h '+m+'m'):(m+'m'); }
@@ -2978,31 +2978,26 @@ function _buildWheel(){
   var svg=document.getElementById('gachaWheel'); if(!svg)return;
   var parts='';
   GACHA_SEGMENTS.forEach(function(s,i){
-    // Wedge. Pet wedges get a dark tint so the sprite stands out; ore wedges use the ore colour.
-    var wedgeFill = s.type==='pet' ? '#191622' : s.color;
-    parts+='<path d="'+_gachaWedgePath(i)+'" fill="'+wedgeFill+'" stroke="rgba(0,0,0,.4)" stroke-width="0.8"/>';
-    // thin colour arc at the rim so pet segments still read as their colour
-    if(s.type==='pet'){
-      var a0=(i*36-90)*Math.PI/180, a1=((i+1)*36-90)*Math.PI/180, rr=96;
-      var rx0=(100+rr*Math.cos(a0)).toFixed(2), ry0=(100+rr*Math.sin(a0)).toFixed(2);
-      var rx1=(100+rr*Math.cos(a1)).toFixed(2), ry1=(100+rr*Math.sin(a1)).toFixed(2);
-      parts+='<path d="M'+rx0+' '+ry0+' A'+rr+' '+rr+' 0 0 1 '+rx1+' '+ry1+'" fill="none" stroke="'+s.color+'" stroke-width="6"/>';
-    }
+    // Dark wedge with a thick coloured rim arc — keeps each reward's colour
+    // identity while giving every icon (pet sprite or ore gem) high contrast.
+    parts+='<path d="'+_gachaWedgePath(i)+'" fill="#191622" stroke="rgba(0,0,0,.4)" stroke-width="0.8"/>';
+    var a0=(i*36-90)*Math.PI/180, a1=((i+1)*36-90)*Math.PI/180, rr=95;
+    var rx0=(100+rr*Math.cos(a0)).toFixed(2), ry0=(100+rr*Math.sin(a0)).toFixed(2);
+    var rx1=(100+rr*Math.cos(a1)).toFixed(2), ry1=(100+rr*Math.sin(a1)).toFixed(2);
+    parts+='<path d="M'+rx0+' '+ry0+' A'+rr+' '+rr+' 0 0 1 '+rx1+' '+ry1+'" fill="none" stroke="'+s.color+'" stroke-width="7"/>';
     var ang=(i*36+18-90)*Math.PI/180, cx=100+60*Math.cos(ang), cy=100+60*Math.sin(ang);
     if(s.type==='pet'){
       var p=petCatalog().find(function(c){return c.key===s.key;});
-      var sz=30;
-      // dark chip behind the sprite for contrast
-      parts+='<rect x="'+(cx-sz/2-2).toFixed(1)+'" y="'+(cy-sz/2-2).toFixed(1)+'" width="'+(sz+4)+'" height="'+(sz+4)+'" rx="6" fill="rgba(0,0,0,.35)"/>';
+      var sz=24; // smaller, no background box
       if(p&&p.img&&p.img.src){
         parts+='<image href="'+p.img.src+'" xlink:href="'+p.img.src+'" x="'+(cx-sz/2).toFixed(1)+'" y="'+(cy-sz/2).toFixed(1)+'" width="'+sz+'" height="'+sz+'" preserveAspectRatio="xMidYMid meet" style="image-rendering:pixelated"/>';
       }
     }else{
-      // ore gem: a diamond in the ore colour with a light top facet
-      var g=13;
+      // Ore gem: bright diamond in the ore colour, light top facet + white outline.
+      var g=14;
       parts+='<g transform="translate('+cx.toFixed(1)+','+cy.toFixed(1)+') rotate(45)">'
-        +'<rect x="'+(-g/2)+'" y="'+(-g/2)+'" width="'+g+'" height="'+g+'" rx="2.5" fill="'+s.color+'" stroke="rgba(255,255,255,.65)" stroke-width="1.1"/>'
-        +'<rect x="'+(-g/2)+'" y="'+(-g/2)+'" width="'+g+'" height="'+(g/2)+'" rx="2.5" fill="rgba(255,255,255,.28)"/>'
+        +'<rect x="'+(-g/2)+'" y="'+(-g/2)+'" width="'+g+'" height="'+g+'" rx="2.5" fill="'+s.color+'" stroke="rgba(255,255,255,.85)" stroke-width="1.2"/>'
+        +'<rect x="'+(-g/2)+'" y="'+(-g/2)+'" width="'+g+'" height="'+(g*0.42).toFixed(1)+'" rx="2.5" fill="rgba(255,255,255,.45)"/>'
         +'</g>';
     }
   });
@@ -3037,8 +3032,11 @@ function _gachaRefreshEligibility(){
     .then(function(r){return r.json();})
     .then(function(d){
       if(!d||!d.ok)return;
-      if(d.canSpin){ if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-refresh" style="margin-right:6px"></i>Spin — $1 USDC';} if(msg)msg.textContent=''; }
-      else { if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-clock"></i> Next spin in '+_gFmt(d.msLeft);} if(msg)msg.textContent='You\u2019ve used today\u2019s spin. Come back tomorrow.'; }
+      _gachaFirstFree=!!d.firstFree;
+      if(btn){ btn.disabled=false; btn.innerHTML=_gachaFirstFree
+        ? '<i class="ti ti-gift" style="margin-right:6px"></i>Spin \u2014 FREE'
+        : '<i class="ti ti-refresh" style="margin-right:6px"></i>Spin \u2014 $1 USDC'; }
+      if(msg){ msg.style.color='var(--text3)'; msg.textContent=_gachaFirstFree?'Your first spin is on the house \ud83c\udf81':''; }
     }).catch(function(){});
 }
 function _animateWheelTo(i, cb){
@@ -3090,31 +3088,31 @@ async function spinGacha(){
   if(_gachaSpinning)return;
   var btn=document.getElementById('gachaSpinBtn'), msg=document.getElementById('gachaMsg');
   var xd=_gAuth();
-  function reset(t){ _gachaSpinning=false; if(btn){btn.disabled=false;btn.innerHTML=t||'<i class="ti ti-refresh" style="margin-right:6px"></i>Spin — $1 USDC';} }
+  function reset(t){ _gachaSpinning=false; if(btn){btn.disabled=false;btn.innerHTML=t||(_gachaFirstFree?'<i class="ti ti-gift" style="margin-right:6px"></i>Spin \u2014 FREE':'<i class="ti ti-refresh" style="margin-right:6px"></i>Spin \u2014 $1 USDC');} }
   if(!xd||!xd.username){ msg.style.color='var(--red)';msg.textContent='Sign in to spin.';return; }
-  if(!walletConnected||!walletAddress){ msg.style.color='var(--red)';msg.textContent='Connect your Phantom wallet first.';return; }
-  if(!window.solanaWeb3){ msg.style.color='var(--red)';msg.textContent='Web3 not loaded — refresh and retry.';return; }
   try{
     _gachaSpinning=true; btn.disabled=true; document.getElementById('gachaResult').style.display='none';
     msg.style.color='var(--text3)';
-    // 1) daily eligibility (so we never take a $1 for a spin they can't use)
     btn.innerHTML='<i class="ti ti-loader"></i> Checking...';
     var elig=await fetch('/api/load?gacha_status=1&username='+encodeURIComponent(xd.username)+'&token='+encodeURIComponent(xd.token||'')).then(function(r){return r.json();});
     if(!elig||!elig.ok){ throw new Error((elig&&elig.error)||'Could not verify eligibility.'); }
-    if(!elig.canSpin){ msg.textContent='You already spun today. Next spin in '+_gFmt(elig.msLeft); reset('<i class="ti ti-clock"></i> Next spin in '+_gFmt(elig.msLeft)); btn.disabled=true; return; }
-    // 2) pay $1 USDC
-    btn.innerHTML='<i class="ti ti-wallet"></i> Approve $1 in wallet...';
-    var sig=await _payUsdcForSpin();
-    // 3) server rolls + grants
+    var isFree=!!elig.firstFree; _gachaFirstFree=isFree;
+    var sig=null;
+    if(!isFree){
+      if(!walletConnected||!walletAddress){ msg.style.color='var(--red)';msg.textContent='Connect your Phantom wallet first.'; reset(); return; }
+      if(!window.solanaWeb3){ msg.style.color='var(--red)';msg.textContent='Web3 not loaded \u2014 refresh and retry.'; reset(); return; }
+      btn.innerHTML='<i class="ti ti-wallet"></i> Approve $1 in wallet...';
+      sig=await _payUsdcForSpin();
+    }
     btn.innerHTML='<i class="ti ti-loader"></i> Spinning...';
-    var d=await fetch('/api/load',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({username:xd.username,token:xd.token||'',action:'gacha_spin',signature:sig})}).then(function(r){return r.json();});
+    var payload={username:xd.username,token:xd.token||'',action:'gacha_spin'};
+    if(sig)payload.signature=sig;
+    var d=await fetch('/api/load',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){return r.json();});
     if(!d||!d.ok||!d.reward){
       msg.style.color='var(--red)';
-      msg.textContent=(d&&d.error)?d.error:('Spin failed. If $1 was deducted, contact support with TX: '+sig.substr(0,12)+'\u2026');
+      msg.textContent=(d&&d.error)?d.error:('Spin failed.'+(sig?(' If $1 was deducted, contact support with TX: '+sig.substr(0,12)+'\u2026'):''));
       reset(); return;
     }
-    // 4) apply grant locally + persist, then animate to the result
     if(d.reward.type==='pet'){ grantPetLocally(d.reward.key); }
     else if(d.reward.type==='ore'){ oreStash[d.reward.key]=(oreStash[d.reward.key]||0)+d.reward.qty; }
     if(d.owned_pets)hydrateOwnedPets(d.owned_pets);
@@ -3126,13 +3124,14 @@ async function spinGacha(){
     _animateWheelTo(idx, function(){
       _gachaReveal(d.reward);
       _gachaSpinning=false;
-      var next=d.nextMs||86400000;
-      if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-clock"></i> Next spin in '+_gFmt(next);}
+      _gachaFirstFree=false;
+      if(btn){ btn.disabled=false; btn.innerHTML='<i class="ti ti-refresh" style="margin-right:6px"></i>Spin \u2014 $1 USDC'; }
+      _gachaRefreshEligibility();
     });
   }catch(e){
     console.error('Gacha spin error:',e);
     msg.style.color='var(--red)';
-    msg.textContent=(e&&e.message)?e.message.substr(0,140):'Spin failed — nothing was charged.';
+    msg.textContent=(e&&e.message)?e.message.substr(0,140):'Spin failed \u2014 nothing was charged.';
     reset();
   }
 }
