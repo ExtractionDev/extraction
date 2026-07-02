@@ -1906,7 +1906,24 @@ function getSell(){return(0.0009+ups.sell*0.00026)*(1+getItemBonus('sell')/100)*
 var UP_BASE={speed:40,power:50,sell:45,luck:65}; // per-track starting cost
 // ===== TUNABLE: every idle upgrade ALSO costs ore (cheapest-first), scaling with level =====
 var ORE_UP_BASE=3, ORE_UP_GROWTH=1.04;
-function getOreCost(t){var l=ups[t]||0;return l<50?0:Math.ceil(36*Math.pow(1.075,l-50));} // L1-50 = GC only (no ore); ore bottleneck begins at L50
+function getOreCost(t){var l=ups[t]||0;return l<50?0:Math.ceil(36*Math.pow(1.075,l-50));} // base ore units for the level; each required ore is a fraction of this (see ORE_WEIGHTS)
+// Each upgrade past L50 costs SEVERAL ores at once. The band picks WHICH ores;
+// ORE_WEIGHTS sets how much of each (rarer ore = smaller fraction of the base).
+var ORE_WEIGHTS={Coal:1.0,Copper:0.8,Iron:0.6,Silver:0.4,Gold:0.25,Mystrile:0.12};
+var ORE_BANDS=[
+  {min:50,  ores:['Coal','Iron','Silver']},            // L50-69
+  {min:70,  ores:['Iron','Silver','Gold']},            // L70-79
+  {min:80,  ores:['Iron','Silver','Gold','Mystrile']}, // L80-99
+  {min:100, ores:['Silver','Gold','Mystrile']},        // L100-129
+  {min:130, ores:['Gold','Mystrile']}                  // L130+
+];
+// Returns [{ore, qty}, ...] required to buy this track's next level.
+function getOreReqs(t){
+  var l=ups[t]||0; if(l<50)return [];
+  var oc=getOreCost(t), band=ORE_BANDS[0];
+  for(var i=0;i<ORE_BANDS.length;i++){ if(l>=ORE_BANDS[i].min)band=ORE_BANDS[i]; }
+  return band.ores.map(function(o){ return { ore:o, qty:Math.max(1,Math.ceil(oc*(ORE_WEIGHTS[o]||1))) }; });
+}
 function _oreTotal(){var n=0;for(var k in oreStash)n+=oreStash[k];return n;}
 function _oreUnitVal(name){for(var i=0;i<DORES.length;i++)if(DORES[i].n===name)return DORES[i].v;return 1;}
 function _oreSpend(n){ // consume n ore units, cheapest value first (keeps Gold/Mystrile for refine/market)
@@ -1920,8 +1937,16 @@ function _oreSpendPreview(n){ // non-destructive: which ores WOULD be consumed f
   return{list:out,short:need};
 }
 function _oreTc(name){for(var i=0;i<DORES.length;i++)if(DORES[i].n===name)return DORES[i].tc;return '#999';}
-function getCost(t){var l=ups[t]||0;return l<50?Math.floor(5+l*0.8):Math.floor(45*Math.pow(1.075,l-50));} // L1-50 = near-free tutorial ramp; real economy from L50 (eff=level-50)
-function buyUp(t){if(ups[t]>=500)return;var c=getCost(t),oc=getOreCost(t);var haveCoal=oreStash['Coal']||0;if(gold>=c&&haveCoal>=oc){gold-=c;if(oc>0){oreStash['Coal']=haveCoal-oc;if(oreStash['Coal']<=0)delete oreStash['Coal'];}ups[t]++;sndLevelUp();saveGame(true);uiAll();}}
+function getCost(t){var l=ups[t]||0;return l<50?Math.floor(2*(5+l*0.8)):Math.floor(90*Math.pow(1.075,l-50));} // gold cost 2x (base 45 -> 90 at L50+)
+function buyUp(t){
+  if(ups[t]>=500)return;
+  var c=getCost(t),reqs=getOreReqs(t);
+  if(gold<c)return;
+  for(var i=0;i<reqs.length;i++){ if((oreStash[reqs[i].ore]||0)<reqs[i].qty)return; } // must have ALL ores
+  gold-=c;
+  for(var j=0;j<reqs.length;j++){ var o=reqs[j].ore; oreStash[o]=(oreStash[o]||0)-reqs[j].qty; if(oreStash[o]<=0)delete oreStash[o]; }
+  ups[t]++;sndLevelUp();saveGame(true);uiAll();
+}
 function equipItem(id){
   var it=inventory.find(function(x){return x.id===id});
   if(!it)return;
@@ -3466,9 +3491,16 @@ function uiAll(){
               function(){var lk=ups.luck+1;return'Silver→'+((0.10+lk*0.001)*100).toFixed(1)+'%';}];
   for(var i=0;i<4;i++){var c=getCost(ts[i]),btn=el(ids[i]+'Bt'),tip=el(ids[i]+'BtTip'),oreEl=el(ids[i]+'Ore');
     if(ups[ts[i]]>=500){btn.className='up-btn maxed';btn.innerHTML='MAXED';if(oreEl)oreEl.innerHTML='';}
-    else{var oc=getOreCost(ts[i]),_haveOre=(oreStash['Coal']||0),_gcOk=gold>=c,_oreOk=_haveOre>=oc,aff=(_gcOk&&_oreOk);btn.className='up-btn'+(aff?'':' off');
+    else{var reqs=getOreReqs(ts[i]),_gcOk=gold>=c,_oreOk=true;
+      for(var _r=0;_r<reqs.length;_r++){ if((oreStash[reqs[_r].ore]||0)<reqs[_r].qty)_oreOk=false; }
+      var aff=(_gcOk&&_oreOk);btn.className='up-btn'+(aff?'':' off');
       var _gcTxt='<span style="color:'+(_gcOk?'inherit':'#e84b4b')+'">'+c+'</span>';
-      var _oreBtn=oc>0?(' · <img src="'+((typeof _B64!=='undefined'&&_B64['stone_1'])||'')+'" width="16" height="16" style="image-rendering:pixelated;vertical-align:middle;display:inline-block"> <span style="color:'+(_oreOk?'inherit':'#e84b4b')+'">'+_haveOre.toLocaleString()+'/'+oc.toLocaleString()+'</span>'):'';
+      var _oreBtn='';
+      for(var _q=0;_q<reqs.length;_q++){
+        var _o=reqs[_q].ore,_need=reqs[_q].qty,_have=(oreStash[_o]||0),_ok=_have>=_need;
+        var _im=(typeof _B64!=='undefined'&&_B64[(_ORE_IMG&&_ORE_IMG[_o])||'stone_1'])||'';
+        _oreBtn+=' · <img src="'+_im+'" width="16" height="16" style="image-rendering:pixelated;vertical-align:middle;display:inline-block"> <span style="color:'+(_ok?'inherit':'#e84b4b')+'">'+_have.toLocaleString()+'/'+_need.toLocaleString()+'</span>';
+      }
       btn.innerHTML='<i class="ti ti-arrow-up"></i> Upgrade · '+_gcTxt+' '+_gcIcon(16)+_oreBtn;
       if(oreEl)oreEl.innerHTML='';
     }
