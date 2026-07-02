@@ -4348,6 +4348,7 @@ function cavMusicToggle(){
 // ── Blacksmith ─────────────────────────────────────────────────────────
 var _smithItem=null;
 var smithMode='reforge';      // 'reforge' | 'combine'
+var SMITH_COSTS={Common:1000,Uncommon:5000,Rare:10000,Epic:25000,Legendary:50000,Mythic:200000}; // reforge (re-roll) cost by rarity
 var COMBINE_COUNT=5;          // pickaxes required per combine
 // Tiered combine: 5 of tier N's material -> one of tier N+1's material.
 var COMBINE_TIERS=[
