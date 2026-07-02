@@ -1971,7 +1971,7 @@ function pName(it){return it?(it.mat+' '+it.type+(it.up>0?' +'+it.up:'')):'';} /
 function getItemBonus(k){var t=0;['pickaxe','head','ring','amulet'].forEach(function(s){var it=equippedSlots[s];if(it){var m=_upMult(it);it.affixes.forEach(function(a){if(a.t.k===k)t+=a.v*m;});}});return t;}
 function getSpd(){return(0.5+ups.speed*0.015)*(1+getItemBonus('speed')/100)*(foxEquipped()?1.2:1)*(gnomeoEquipped()?1.15:1);}
 function getPow(){return(1+ups.power*0.12)*(1+getItemBonus('power')/100)*(whaleEquipped()?1.3:1);}
-function getSell(){return(0.0009+ups.sell*0.00026)*(1+getItemBonus('sell')/100)*(whaleEquipped()?1.1:1);} // trimmed ~11.6x: L50 idle ≈ 300 EXT/day (per-rock mechanic unchanged)
+function getSell(){return 5*(0.0009+ups.sell*0.00026)*(1+getItemBonus('sell')/100)*(whaleEquipped()?1.1:1);} // 5x idle boost: L50 idle ≈ 1500 EXT/day (per-rock mechanic unchanged)
 var UP_BASE={speed:40,power:50,sell:45,luck:65}; // per-track starting cost
 // ===== TUNABLE: every idle upgrade ALSO costs ore (cheapest-first), scaling with level =====
 var ORE_UP_BASE=3, ORE_UP_GROWTH=1.04;
