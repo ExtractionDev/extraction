@@ -403,54 +403,66 @@ export default async function handler(req, res) {
     }
 
     // ---------- PET GACHA SPIN ----------
-    // Session already verified above (player row + banned check). The $1 payment,
-    // once-daily limit, replay protection, RNG and granting are all enforced here.
+    // Session already verified above. First spin per account is FREE; every spin
+    // after costs $1 USDC. No daily cooldown. RNG + granting happen here.
     if (action === 'gacha_spin') {
       if (!GACHA_WALLET_ADDR) {
         console.error('GACHA: no GACHA_WALLET / DEPOSIT_WALLET set — refusing to spin.');
         return res.status(500).json({ error: 'Gacha temporarily unavailable.' });
       }
-      const signature = body && body.signature;
-      if (!signature || typeof signature !== 'string' || !GACHA_SIG_RE.test(signature)) {
-        return res.status(400).json({ error: 'Invalid transaction signature.' });
+
+      const freeSig = 'free:' + username;
+      const { data: freeRow } = await supabase
+        .from('gacha_spins').select('id').eq('signature', freeSig).maybeSingle();
+      const freeAvailable = !freeRow;
+
+      const reward = gachaRoll();
+
+      if (freeAvailable) {
+        // FREE first-ever spin — no payment. Claim the slot atomically: the unique
+        // `signature` constraint guarantees exactly one free spin per account even
+        // if two requests race.
+        const claim = await supabase.from('gacha_spins')
+          .insert({ username, signature: freeSig, reward, created_at: new Date().toISOString() });
+        if (claim.error) {
+          const msg = (claim.error.message || '').toLowerCase();
+          if (msg.includes('duplicate') || msg.includes('unique') || String(claim.error.code) === '23505') {
+            return res.status(402).json({ error: 'Free spin already used — each additional spin costs $1 USDC.', needsPayment: true });
+          }
+          console.error('GACHA free claim failed:', claim.error.message);
+          return res.status(500).json({ error: 'Spin failed. Try again.' });
+        }
+      } else {
+        // PAID spin — verify a $1 USDC transaction.
+        const signature = body && body.signature;
+        if (!signature || typeof signature !== 'string' || !GACHA_SIG_RE.test(signature)) {
+          return res.status(400).json({ error: 'Invalid transaction signature.' });
+        }
+        const { data: usedSig } = await supabase
+          .from('gacha_spins').select('id').eq('signature', signature).maybeSingle();
+        if (usedSig) return res.status(400).json({ error: 'This transaction has already been used.' });
+
+        const gtx = await gachaGetParsedTx(signature);
+        if (!gtx) return res.status(400).json({ error: 'Transaction not found / not confirmed yet. Try again in a moment.' });
+        if (gtx.meta && gtx.meta.err) return res.status(400).json({ error: 'Transaction failed on chain.' });
+
+        const paid = gachaUsdcReceived(gtx, GACHA_WALLET_ADDR);
+        try {
+          const _post = (gtx.meta && gtx.meta.postTokenBalances) ? gtx.meta.postTokenBalances : [];
+          console.log('GACHA RAW', JSON.stringify({
+            username, spinWallet: GACHA_WALLET_ADDR, paid,
+            post: _post.map(b => ({ owner: b.owner, mint: b.mint, amt: b.uiTokenAmount && b.uiTokenAmount.uiAmountString }))
+          }));
+        } catch (e) {}
+        if (!(paid >= GACHA_COST_USDC * (1 - GACHA_SLIPPAGE))) {
+          console.error('GACHA underpaid:', JSON.stringify({ username, paid, signature }));
+          return res.status(400).json({ error: 'Spin costs $1 USDC. Payment to the spin wallet was not found or was too small.' });
+        }
       }
 
-      // Replay protection: a given payment can only ever spin once.
-      const { data: usedSig } = await supabase
-        .from('gacha_spins').select('id').eq('signature', signature).maybeSingle();
-      if (usedSig) return res.status(400).json({ error: 'This transaction has already been used.' });
-
-      // Once-daily gate (24h rolling). Client checks this before paying; this is
-      // the authoritative backstop.
-      const lastSpin = await gachaSpinsInLastDay(username);
-      if (lastSpin) {
-        const msLeft = Math.max(0, GACHA_DAY_MS - (Date.now() - Date.parse(lastSpin.created_at)));
-        return res.status(429).json({ error: 'You already spun today. Come back later.', msLeft,
-          note: 'If USDC was deducted, contact support with your TX signature — it was not consumed for a spin.' });
-      }
-
-      // Verify the $1 USDC payment on-chain.
-      const gtx = await gachaGetParsedTx(signature);
-      if (!gtx) return res.status(400).json({ error: 'Transaction not found / not confirmed yet. Try again in a moment.' });
-      if (gtx.meta && gtx.meta.err) return res.status(400).json({ error: 'Transaction failed on chain.' });
-      const paid = gachaUsdcReceived(gtx, GACHA_WALLET_ADDR);
-      try {
-        const _post = (gtx.meta && gtx.meta.postTokenBalances) ? gtx.meta.postTokenBalances : [];
-        console.log('GACHA RAW', JSON.stringify({
-          username, spinWallet: GACHA_WALLET_ADDR, paid,
-          post: _post.map(b => ({ owner: b.owner, mint: b.mint, amt: b.uiTokenAmount && b.uiTokenAmount.uiAmountString }))
-        }));
-      } catch (e) {}
-      if (!(paid >= GACHA_COST_USDC * (1 - GACHA_SLIPPAGE))) {
-        console.error('GACHA underpaid:', JSON.stringify({ username, paid, signature }));
-        return res.status(400).json({ error: 'Spin costs $1 USDC. Payment to the spin wallet was not found or was too small.' });
-      }
-
-      // Roll (server-side) + grant. Record the spin LAST so a grant failure doesn't
-      // consume the daily slot; the signature replay-check above prevents doubles.
+      // ── Grant the reward ──────────────────────────────────────────────────
       const { data: gp2 } = await supabase
         .from('players').select('ore_stash, owned_pets').eq('username', username).single();
-      const reward = gachaRoll();
       let newOreStash  = (gp2 && gp2.ore_stash)  || {};
       let newOwnedPets = (gp2 && gp2.owned_pets) || {};
 
@@ -459,8 +471,8 @@ export default async function handler(req, res) {
         cur[reward.key] = Math.max(0, Math.floor(cur[reward.key] || 0)) + reward.qty;
         const { error: oErr } = await supabase.from('players').update({ ore_stash: cur }).eq('username', username);
         if (oErr) {
-          console.error('GACHA ore grant failed:', oErr.message, '— manual grant needed for', username, 'tx', signature, JSON.stringify(reward));
-          return res.status(500).json({ error: 'Spin verified but granting failed — contact support with your TX signature.' });
+          console.error('GACHA ore grant failed:', oErr.message, '— manual grant needed for', username, JSON.stringify(reward));
+          return res.status(500).json({ error: 'Spin succeeded but granting failed — contact support with your details.' });
         }
         newOreStash = cur;
       } else if (reward.type === 'pet') {
@@ -468,18 +480,21 @@ export default async function handler(req, res) {
         cur[reward.key] = true;
         const { error: pgErr } = await supabase.from('players').update({ owned_pets: cur }).eq('username', username);
         if (pgErr) {
-          console.error('GACHA pet grant failed:', pgErr.message, '— manual grant needed for', username, 'tx', signature, JSON.stringify(reward));
-          return res.status(500).json({ error: 'Spin verified but granting failed — contact support with your TX signature.' });
+          console.error('GACHA pet grant failed:', pgErr.message, '— manual grant needed for', username, JSON.stringify(reward));
+          return res.status(500).json({ error: 'Spin succeeded but granting failed — contact support with your details.' });
         }
         newOwnedPets = cur;
       }
 
-      const { error: recErr } = await supabase.from('gacha_spins').insert({
-        username, signature, reward, created_at: new Date().toISOString()
-      });
-      if (recErr) console.error('GACHA spin record failed AFTER grant — reconcile:', recErr.message, username, signature, JSON.stringify(reward));
+      // For PAID spins, record the payment signature now (free was recorded above).
+      if (!freeAvailable) {
+        const signature = body && body.signature;
+        const { error: recErr } = await supabase.from('gacha_spins')
+          .insert({ username, signature, reward, created_at: new Date().toISOString() });
+        if (recErr) console.error('GACHA paid record failed AFTER grant — reconcile:', recErr.message, username, signature, JSON.stringify(reward));
+      }
 
-      return res.status(200).json({ ok: true, reward, ore_stash: newOreStash, owned_pets: newOwnedPets, nextMs: GACHA_DAY_MS });
+      return res.status(200).json({ ok: true, reward, free: freeAvailable, ore_stash: newOreStash, owned_pets: newOwnedPets });
     }
 
     // ---------- DUNGEON ENTRY FEE ----------
@@ -671,8 +686,8 @@ export default async function handler(req, res) {
   }
 
   // ---------- PET GACHA ELIGIBILITY (auth) ----------
-  // Client calls this before prompting the $1 payment so we never take a dollar
-  // for a spin they can't use today.
+  // The first spin per account is FREE; every spin after costs $1 USDC. There is
+  // no daily cooldown — the client uses `firstFree` to decide whether to charge.
   if (req.query.gacha_status) {
     const { username, token } = req.query;
     if (!username || !token) return res.status(400).json({ error: 'Missing credentials' });
@@ -681,10 +696,10 @@ export default async function handler(req, res) {
     if (gErr || !gp) return res.status(403).json({ error: 'Player not found' });
     if (gp.session_token !== token) return res.status(403).json({ error: 'Invalid session' });
     if (gp.banned) return res.status(403).json({ error: 'Account suspended.' });
-    const last = await gachaSpinsInLastDay(username);
-    const msLeft = last ? Math.max(0, GACHA_DAY_MS - (Date.now() - Date.parse(last.created_at))) : 0;
+    const { data: freeRow } = await supabase
+      .from('gacha_spins').select('id').eq('signature', 'free:' + username).maybeSingle();
     res.setHeader('Cache-Control', 'no-store');
-    return res.status(200).json({ ok: true, canSpin: !last, msLeft, costUsdc: GACHA_COST_USDC });
+    return res.status(200).json({ ok: true, firstFree: !freeRow, costUsdc: GACHA_COST_USDC });
   }
 
   // ---------- PLAYER LOAD ----------
