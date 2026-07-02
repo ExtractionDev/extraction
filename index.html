@@ -1725,7 +1725,7 @@ function goTab(n){
     var ep=document.getElementById('excPodium');if(ep)ep.style.display='block';
     renderExcPodium();_fetchExcWinners();
   }
-  uiAll();if(n===3){if(mkActiveTab==='ores')renderOreMarket();else renderMarket(mkFilter);}if(n===4){scaleBpLayout();renderBackpack();}if(n===6){smithMode='reforge';_combineSel=[];_upSel=null;renderSmith();}if(n===7)_lbFullFetch();
+  uiAll();if(n===3){if(mkActiveTab==='ores')renderOreMarket();else renderMarket(mkFilter);}if(n===4){scaleBpLayout();renderBackpack();}if(n===6){smithMode='reforge';_combineSel=[];_upSel=null;_smithItem=null;var _ab6=document.getElementById('smithAfterBox');if(_ab6)_ab6.classList.remove('revealed');renderSmith();}if(n===7)_lbFullFetch();
 }
 
 async function connectPhantom(){
@@ -4408,8 +4408,9 @@ var _combineResult=null;      // holds the just-forged pickaxe during the reveal
 var _combineSel=[];           // ids of source pickaxes chosen to combine (max COMBINE_COUNT)
 function combineSetTier(i){_combineTier=i;_combineSel=[];_combineResult=null;var ab=document.getElementById('smithAfterBox');if(ab)ab.classList.remove('revealed');renderSmith();}
 function switchSmithMode(m){
-  smithMode=m;_combineResult=null;_combineSel=[];
+  smithMode=m;_combineResult=null;_combineSel=[];_upSel=null;_smithItem=null;
   var ab=document.getElementById('smithAfterBox');if(ab)ab.classList.remove('revealed');
+  var as=document.getElementById('smithAfterStats');if(as)as.innerHTML='<div class="smith-stat-placeholder">—</div>';
   renderSmith();
 }
 function smithAction(){ if(smithMode==='combine')smithCombine(); else if(smithMode==='upgrade')pickDoUpgrade(); else smithReroll(); }
@@ -4630,6 +4631,9 @@ function renderSmith(){
     forge.style.display='block';
     document.getElementById('smithForgeTitle').textContent=_smithItem.mat+' '+_smithItem.rar.n+' Pickaxe'+(_smithItem.up>0?' +'+_smithItem.up:'');
     document.getElementById('smithBeforeStats').innerHTML=_smithStatRows(_smithItem.affixes,'',_upMult(_smithItem));
+    if(!document.getElementById('smithAfterBox').classList.contains('revealed')){
+      document.getElementById('smithAfterStats').innerHTML='<div class="smith-stat-placeholder">Click Re-roll to reveal</div>';
+    }
     var btn=document.getElementById('smithRerollBtn');
     var affordable=tokens>=cost;
     btn.disabled=!affordable;
