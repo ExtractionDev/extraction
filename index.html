@@ -3037,9 +3037,10 @@ function uiAll(){
               function(){var lk=ups.luck+1;return'Silver→'+((0.10+lk*0.001)*100).toFixed(1)+'%';}];
   for(var i=0;i<4;i++){var c=getCost(ts[i]),btn=el(ids[i]+'Bt'),tip=el(ids[i]+'BtTip'),oreEl=el(ids[i]+'Ore');
     if(ups[ts[i]]>=500){btn.className='up-btn maxed';btn.innerHTML='MAXED';if(oreEl)oreEl.innerHTML='';}
-    else{var oc=getOreCost(ts[i]),aff=(gold>=c&&_oreTotal()>=oc);btn.className='up-btn'+(aff?'':' off');
-      var _oreBtn=oc>0?(' · <img src="'+((typeof _B64!=='undefined'&&_B64['stone_1'])||'')+'" width="16" height="16" style="image-rendering:pixelated;vertical-align:middle;display:inline-block"> '+oc.toLocaleString()):'';
-      btn.innerHTML='<i class="ti ti-arrow-up"></i> Upgrade · '+c+' '+_gcIcon(16)+_oreBtn;
+    else{var oc=getOreCost(ts[i]),_haveOre=_oreTotal(),_gcOk=gold>=c,_oreOk=_haveOre>=oc,aff=(_gcOk&&_oreOk);btn.className='up-btn'+(aff?'':' off');
+      var _gcTxt='<span style="color:'+(_gcOk?'inherit':'#e84b4b')+'">'+c+'</span>';
+      var _oreBtn=oc>0?(' · <img src="'+((typeof _B64!=='undefined'&&_B64['stone_1'])||'')+'" width="16" height="16" style="image-rendering:pixelated;vertical-align:middle;display:inline-block"> <span style="color:'+(_oreOk?'inherit':'#e84b4b')+'">'+_haveOre.toLocaleString()+'/'+oc.toLocaleString()+'</span>'):'';
+      btn.innerHTML='<i class="ti ti-arrow-up"></i> Upgrade · '+_gcTxt+' '+_gcIcon(16)+_oreBtn;
       if(oreEl)oreEl.innerHTML='';
     }
     if(tip)tip.textContent=ups[ts[i]]>=500?'Maxed':tipFns[i]();
