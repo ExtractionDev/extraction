@@ -100,7 +100,7 @@ export default async function handler(req, res) {
     // Verify the player's session once, up front
     const { data: player, error: pErr } = await supabase
       .from('players')
-      .select('session_token, tokens, banned')
+      .select('session_token, tokens, banned, last_entry_fee')
       .eq('username', username)
       .single();
 
@@ -231,12 +231,17 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, won: false });
       }
 
-      // Pay out a random 15–22% of the current pool. No clawback: read the pool,
-      // credit only the payout to the winner, then write the pool down by that
-      // amount. The winner's balance is touched exactly once. (award_jackpot is
-      // not used here because it credits/zeros the ENTIRE pool.)
+      // Pay out a share of the pool based on the entry fee that earned this pull
+      // (server-recorded in last_entry_fee — can't be faked by the client). Flat
+      // ~4–7.5% for any entry up to 20K; above 20K it scales up on a log curve to
+      // ~40% at a 100K entry. No clawback: read pool, credit payout, write pool down.
+      const entryFeePaid = Math.max(1000, Math.min(100000, parseFloat(player.last_entry_fee) || 1000));
+      const SCALE_START = 20000;
+      const tFee = entryFeePaid <= SCALE_START ? 0
+        : (Math.log10(entryFeePaid) - Math.log10(SCALE_START)) / (Math.log10(100000) - Math.log10(SCALE_START));
+      const centerPct = 0.0575 + tFee * (0.40 - 0.0575);       // flat 5.75% ≤20K, then → 40% at 100K
+      const pct = Math.max(0.04, Math.min(0.40, centerPct + (Math.random() - 0.5) * 0.035));
       const poolNow = await getPoolAmount();
-      const pct = 0.15 + Math.random() * 0.07;              // 15%–22%
       const payout = Math.max(0, Math.floor(poolNow * pct));
 
       if (payout > 0) {
