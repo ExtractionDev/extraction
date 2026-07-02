@@ -959,10 +959,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
   <div id="shopPanelGacha">
     <div style="display:flex;flex-wrap:wrap;gap:26px;align-items:flex-start;justify-content:center">
       <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
-        <div style="position:relative;width:400px;height:400px;max-width:88vw">
-          <div style="position:absolute;top:-4px;left:50%;transform:translateX(-50%);z-index:5;width:0;height:0;border-left:17px solid transparent;border-right:17px solid transparent;border-top:28px solid var(--gold);filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))"></div>
-          <svg id="gachaWheel" viewBox="0 0 200 200" width="400" height="400" style="width:100%;height:100%;transform:rotate(0deg);transform-origin:50% 50%;transition:none;filter:drop-shadow(0 8px 22px rgba(0,0,0,.5))"></svg>
-          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:46px;height:46px;border-radius:50%;background:var(--bg2);border:4px solid var(--gold);z-index:4;display:flex;align-items:center;justify-content:center"><i class="ti ti-paw" style="font-size:20px;color:#e5484d"></i></div>
+        <div style="position:relative;width:520px;height:520px;max-width:92vw">
+          <div style="position:absolute;top:-4px;left:50%;transform:translateX(-50%);z-index:5;width:0;height:0;border-left:22px solid transparent;border-right:22px solid transparent;border-top:36px solid var(--gold);filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))"></div>
+          <svg id="gachaWheel" viewBox="0 0 200 200" width="520" height="520" style="width:100%;height:100%;transform:rotate(0deg);transform-origin:50% 50%;transition:none;filter:drop-shadow(0 8px 22px rgba(0,0,0,.5))"></svg>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60px;height:60px;border-radius:50%;background:var(--bg2);border:5px solid var(--gold);z-index:4;display:flex;align-items:center;justify-content:center"><i class="ti ti-paw" style="font-size:26px;color:#e5484d"></i></div>
         </div>
         <button id="gachaSpinBtn" onclick="spinGacha()" style="min-width:220px;padding:14px 22px;border-radius:10px;font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-family:'Space Mono',monospace;cursor:pointer;border:1.5px solid var(--gold);background:var(--gold);color:#0b0b0b;transition:all .15s"><i class="ti ti-refresh" style="margin-right:6px"></i>Spin — $1 USDC</button>
         <div id="gachaMsg" style="font-size:12px;min-height:18px;text-align:center;color:var(--text3);max-width:300px"></div>
@@ -3046,6 +3046,31 @@ function _gachaRefreshEligibility(){
       if(msg){ msg.style.color='var(--text3)'; msg.textContent=_gachaFirstFree?'Your first spin is on the house \ud83c\udf81':''; }
     }).catch(function(){});
 }
+// A short "click" for the wheel ratchet — one per slot boundary passed.
+function sndWheelTick(){ try{ _snd({f:1500,sweep:850,wave:'square',vol:0.05,dur:0.018}); }catch(e){} }
+// Read the wheel's current rotation (degrees) from its animated transform matrix.
+function _gachaReadAngle(el){
+  var st=''; try{ st=getComputedStyle(el).transform; }catch(e){}
+  if(!st||st==='none')return 0;
+  var nums=(st.match(/matrix3?d?\(([^)]+)\)/)||[])[1];
+  if(!nums)return 0;
+  var v=nums.split(',').map(parseFloat);
+  return Math.atan2(v[1], v[0])*180/Math.PI; // -180..180
+}
+// Fire sndWheelTick every 36° of travel (one segment) while the wheel spins.
+function _startWheelTicks(svg){
+  var prev=_gachaReadAngle(svg), accum=0, ticked=0, running=true;
+  function frame(){
+    if(!running)return;
+    var cur=_gachaReadAngle(svg), delta=cur-prev;
+    if(delta>180)delta-=360; else if(delta<-180)delta+=360;
+    accum+=Math.abs(delta); prev=cur;
+    while(accum-ticked*36>=36){ ticked++; sndWheelTick(); }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  return function(){ running=false; };
+}
 function _animateWheelTo(i, cb){
   var svg=document.getElementById('gachaWheel'); if(!svg){if(cb)cb();return;}
   var phi=(i*36+18)%360, land=(360-phi)%360, spins=6, cur=_gachaRot||0;
@@ -3054,7 +3079,8 @@ function _animateWheelTo(i, cb){
   svg.style.transition='transform 4.4s cubic-bezier(.16,.84,.29,1)';
   void svg.getBoundingClientRect();
   svg.style.transform='rotate('+target+'deg)';
-  setTimeout(function(){ if(cb)cb(); }, 4550);
+  var stopTicks=_startWheelTicks(svg);
+  setTimeout(function(){ stopTicks(); if(cb)cb(); }, 4550);
 }
 function _gachaReveal(reward){
   var box=document.getElementById('gachaResult'); if(!box)return;
