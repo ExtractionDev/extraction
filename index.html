@@ -1184,7 +1184,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
         <tr><td style="color:#b8b8c8">Iron (Common)</td><td>50%</td><td>1</td><td>+1–5%</td></tr>
         <tr><td style="color:var(--green)">Adamant (Uncommon)</td><td>30%</td><td>1–2</td><td>+2–8%</td></tr>
         <tr><td style="color:var(--blue)">Crystal (Rare)</td><td>15%</td><td>2–3</td><td>+4–12%</td></tr>
-        <tr><td style="color:var(--purple)">Myatrile (Epic)</td><td>4%</td><td>3–4</td><td>+8–18%</td></tr>
+        <tr><td style="color:var(--purple)">Pyrite (Epic)</td><td>4%</td><td>3–4</td><td>+8–18%</td></tr>
         <tr><td style="color:var(--gold)">Ancient (Legendary)</td><td>1%</td><td>5</td><td>+12–25%</td></tr>
         <tr><td style="color:#40c8f0">Prismatic (Mythic)</td><td>Jackpot only</td><td>5</td><td>+20–40%</td></tr>
       </tbody>
@@ -1574,7 +1574,7 @@ function getFreeUsesLeft(){var s=localStorage.getItem(getFreeUsesKey());return s
 function useFreeRun(){var k=getFreeUsesKey();var used=parseInt(localStorage.getItem(k)||'0');localStorage.setItem(k,used+1);}
 
 var EQUIP_SLOTS=[
-  {slot:'pickaxe',type:'Pickaxe',icon:'ti-pickaxe',mats:{Common:'Iron',Uncommon:'Adamant',Rare:'Crystal',Epic:'Myatrile',Legendary:'Ancient',Mythic:'Prismatic'}},
+  {slot:'pickaxe',type:'Pickaxe',icon:'ti-pickaxe',mats:{Common:'Iron',Uncommon:'Adamant',Rare:'Crystal',Epic:'Pyrite',Legendary:'Ancient',Mythic:'Prismatic'}},
   {slot:'head',   type:'Helmet', icon:'ti-hardhat', mats:{Common:'Copper',Uncommon:'Iron',Rare:'Steel',Epic:'Obsidian',Legendary:'Dragonscale'}},
   {slot:'ring',   type:'Ring',   icon:'ti-circle-filled', mats:{Common:'Tin',Uncommon:'Silver',Rare:'Gold',Epic:'Ruby',Legendary:'Voidstone'}},
   {slot:'amulet', type:'Amulet', icon:'ti-diamond', mats:{Common:'Bone',Uncommon:'Crystal',Rare:'Sapphire',Epic:'Ethereal',Legendary:'Ancient'}},
@@ -1626,7 +1626,7 @@ var RARS=[
   {n:'Legendary',c:'#c8a040',bg:'#201408',ch:.01,ar:[12,25], ac:[5,5]},
   {n:'Mythic',   c:'#40c8f0',bg:'#021018',ch:0,  ar:[20,40], ac:[5,5]}
 ];
-var PIKNAMES={Common:'Iron',Uncommon:'Adamant',Rare:'Crystal',Epic:'Myatrile',Legendary:'Ancient',Mythic:'Prismatic'};
+var PIKNAMES={Common:'Iron',Uncommon:'Adamant',Rare:'Crystal',Epic:'Pyrite',Legendary:'Ancient',Mythic:'Prismatic'};
 var ATYPES=[
   {n:'mining speed',k:'speed',   i:'ti-bolt'},
   {n:'mining power',k:'power',   i:'ti-hammer'},
@@ -1999,7 +1999,8 @@ function _relinkItem(raw){
   if(raw.isSanchez||raw.id==='sanchez_pet'){return makeSanchezItem();}
   var rar=RARS.find(function(r){return r.n===raw.rarN;})||RARS[0];
   var affixes=raw.affixes.map(function(a){var t=ATYPES.find(function(x){return x.k===a.tk;})||ATYPES[0];return{t:t,v:a.v};});
-  return{id:raw.id,slot:raw.slot||'pickaxe',slotIcon:raw.slotIcon||'ti-pickaxe',mat:raw.mat,type:raw.type,rar:rar,affixes:affixes,price:raw.price};
+  var _mat=raw.mat==='Myatrile'?'Pyrite':raw.mat; // legacy rename: Epic pickaxe Myatrile -> Pyrite
+  return{id:raw.id,slot:raw.slot||'pickaxe',slotIcon:raw.slotIcon||'ti-pickaxe',mat:_mat,type:raw.type,rar:rar,affixes:affixes,price:raw.price};
 }
 function loadGame(){
   try{
@@ -4343,7 +4344,7 @@ var COMBINE_TIERS=[
     ores:[{n:'Coal',img:'stone_1',need:25},{n:'Iron',img:'stone_2',need:25},{n:'Copper',img:'copper_ore',need:30}]},
   {from:'Adamant', fromRar:'Uncommon', to:'Crystal',  toRar:'Rare',     cost:10000,
     ores:[{n:'Coal',img:'stone_1',need:150},{n:'Copper',img:'copper_ore',need:125},{n:'Iron',img:'stone_2',need:100},{n:'Silver',img:'silver_ore',need:50},{n:'Gold',img:'gold_ore',need:10}]},
-  {from:'Crystal', fromRar:'Rare',     to:'Myatrile', toRar:'Epic',     cost:30000,
+  {from:'Crystal', fromRar:'Rare',     to:'Pyrite',   toRar:'Epic',     cost:30000,
     ores:[{n:'Coal',img:'stone_1',need:300},{n:'Copper',img:'copper_ore',need:250},{n:'Iron',img:'stone_2',need:200},{n:'Silver',img:'silver_ore',need:125},{n:'Gold',img:'gold_ore',need:40},{n:'Mystrile',img:'mystrile_ore',need:10}]}
 ];
 var _combineTier=0;
