@@ -665,7 +665,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 
 <!-- DUNGEON -->
 <div class="tab noscroll dung" id="t1">
-  <div class="dung-entry-layout" id="dungEntryLayout">
+  <div class="dung-entry-layout" id="dungEntryLayout" style="position:relative">
+  <!-- Player $EXT balance — mirrors the idle miner counter -->
+  <div id="dungExtCounter" style="position:absolute;top:16px;right:20px;z-index:65;display:flex;align-items:center;gap:8px;background:rgba(6,5,10,.92);border:1.5px solid var(--border3);border-radius:12px;padding:8px 14px;backdrop-filter:blur(10px);box-shadow:0 6px 20px rgba(0,0,0,.6)">
+    <i class="ti ti-diamond" style="color:#a070ff;font-size:22px"></i>
+    <span id="dungExt" style="font-size:20px;font-weight:700;color:var(--text)">0</span>
+    <span style="font-size:13px;color:#a070ff;font-weight:700">$EXT</span>
+  </div>
   <div class="dung-entry" id="dungEntry">
     <div class="dung-title">Choose your fate</div>
     <div class="dung-cards">
@@ -3528,6 +3534,7 @@ function uiAll(){
   el('hsGold').textContent=gold;el('hsTokens').textContent=tF;el('hsRocks').textContent=totalRocks;
   ['stBestGC','stDeepest','stKills','stGoldRocks','stMystrile','stItems'].forEach(function(id,i){var v=[gameStats.bestGC,gameStats.deepestFloor,gameStats.enemiesKilled,gameStats.goldRocks,gameStats.mystrileRocks,inventory.length+(equipped?1:0)][i];var e2=document.getElementById(id);if(e2)e2.textContent=v;});
   el('mg').textContent=gold;el('mt').textContent=tF;el('mdps').textContent=(getSpd()*getPow()).toFixed(2);
+  var _dExt=el('dungExt');if(_dExt)_dExt.textContent=tF;
   el('usL').textContent='Lv '+ups.speed;el('upL').textContent='Lv '+ups.power;el('uxL').textContent='Lv '+ups.sell;el('ulL').textContent='Lv '+ups.luck;
   el('usB').style.width=(ups.speed/5)+'%';el('upB').style.width=(ups.power/5)+'%';el('uxB').style.width=(ups.sell/5)+'%';el('ulB').style.width=(ups.luck/5)+'%';
   el('usV').textContent='⚡ '+getSpd().toFixed(2)+' swings/sec';el('upV').textContent='💥 '+getPow().toFixed(1)+' dmg/swing';el('uxV').textContent='💎 '+getSell().toFixed(4)+' $EXT/rock';
