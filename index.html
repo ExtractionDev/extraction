@@ -2328,11 +2328,11 @@ var DEPOSIT_ADDRESS='B8ubxUGnvhDTGGRkkN8DkyAfnoLEfnjTPdXfQn3TnVQa';
 // ════════════════════ DEPOSIT CONFIG — $EXT ════════════════════
 //  Players type how many $EXT to send → review → confirm → their wallet signs → credited 1:1.
 //  >>> SET THESE TWO TO YOUR $EXT TOKEN: <<<
-var _DEPOSIT_MINT='EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'; // USDC mint
-var _DEPOSIT_DECIMALS=6;             // USDC = 6 decimals
-var _DEPOSIT_SYMBOL='USDC';
-var _DEPOSIT_WALLET=DEPOSIT_ADDRESS; // receives the deposited USDC
-var _DEPOSIT_RATE=10000;             // 1 USDC = 10,000 $EXT credited
+var _DEPOSIT_MINT='39J4ae3kHkH3TGBANTkmKpHnPQQa61UvR2AScq5Apump'; // $EXT mint (pump.fun CA)
+var _DEPOSIT_DECIMALS=6;             // $EXT = 6 decimals (confirmed on-chain)
+var _DEPOSIT_SYMBOL='EXT';
+var _DEPOSIT_WALLET=DEPOSIT_ADDRESS; // receives the deposited $EXT (your wallet)
+var _DEPOSIT_RATE=1;                 // 1 on-chain $EXT = 1 in-game $EXT (1:1)
 // ═══════════════════════════════════════════════════════════════
 function openDeposit(){
   closeSettings();
