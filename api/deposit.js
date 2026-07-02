@@ -111,10 +111,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid transaction hash.' });
   }
 
-  // Verify session + ban status
+  // Verify session + ban status. `wallet` is the wallet linked to this account
+  // (if any) — used below to bind the deposit to its rightful depositor.
   const { data: player, error: fetchErr } = await supabase
     .from('players')
-    .select('session_token, tokens, banned')
+    .select('session_token, tokens, banned, wallet')
     .eq('username', username)
     .single();
 
@@ -122,7 +123,8 @@ export default async function handler(req, res) {
   if (player.session_token !== token) { console.error('DEPOSIT 403: session mismatch for', username); return res.status(403).json({ error: 'Invalid session.' }); }
   if (player.banned) { console.error('DEPOSIT 403: banned', username); return res.status(403).json({ error: 'Account suspended.' }); }
 
-  // Replay protection: a given tx can only ever be credited once.
+  // Fast-path replay check (optimization only). The real guard is the atomic
+  // credit_deposit RPC + unique(tx_hash) constraint below.
   const { data: existing } = await supabase
     .from('deposits')
     .select('id')
@@ -153,6 +155,32 @@ export default async function handler(req, res) {
     pre: pre.map(b => ({ owner: b.owner, mint: b.mint, amt: b.uiTokenAmount && b.uiTokenAmount.uiAmountString })),
     post: post.map(b => ({ owner: b.owner, mint: b.mint, amt: b.uiTokenAmount && b.uiTokenAmount.uiAmountString }))
   }));
+
+  // ── Identify the paying wallet (the USDC owner whose balance dropped) ─────
+  // Used to bind the deposit to its depositor so a stray/other transfer into the
+  // deposit wallet can't be claimed by whoever submits the signature first.
+  let payer = null;
+  {
+    const dropByOwner = {};
+    const acc = (list, sign) => (list || []).forEach(b => {
+      if (!b || b.mint !== USDC_MINT || !b.owner) return;
+      const a = parseFloat(b.uiTokenAmount?.uiAmountString || b.uiTokenAmount?.uiAmount || 0) || 0;
+      dropByOwner[b.owner] = (dropByOwner[b.owner] || 0) + sign * a;
+    });
+    acc(pre, 1); acc(post, -1);   // pre minus post = amount that left each owner
+    let biggest = 0;
+    for (const o of Object.keys(dropByOwner)) {
+      if (dropByOwner[o] > biggest) { biggest = dropByOwner[o]; payer = o; }
+    }
+  }
+  // If the player has a linked wallet, require the deposit to come from it. If
+  // players.wallet is null (not linked yet) we record the payer and proceed —
+  // graceful degradation. To make binding mandatory, store a wallet on the
+  // account at login/withdraw and reject here when player.wallet is missing.
+  if (player.wallet && payer && player.wallet !== payer) {
+    console.error('DEPOSIT 403: payer wallet mismatch', username, 'paid by', payer, 'linked', player.wallet);
+    return res.status(403).json({ error: 'This deposit came from a wallet not linked to your account.' });
+  }
 
   let usdcReceived = 0;
   try {
@@ -221,64 +249,31 @@ export default async function handler(req, res) {
   // Snapshot the balance BEFORE crediting, for the log's balance_before column.
   const balanceBefore = player.tokens || 0;
 
-  // ── Credit the tokens FIRST ──────────────────────────────────────────────
-  // We credit before writing the deposit row so we can capture the true
-  // post-credit balance (from the RPC) and store it as balance_after. This is
-  // safe against double-credits because the tx_hash replay check above already
-  // rejected any tx that was previously recorded in `deposits`.
-  const { data: newBalRaw, error: creditErr } = await supabase
-    .rpc('credit_tokens', { p_username: username, p_amount: extToCredit });
+  // ── Credit + record atomically ───────────────────────────────────────────
+  // credit_deposit inserts the deposit row FIRST (unique(tx_hash) makes a
+  // concurrent duplicate fail) and only then credits, in one transaction. This
+  // closes the old double-credit race where two requests for the same tx could
+  // both pass a separate SELECT check and both credit before either inserted.
+  // Returns the new balance, or NULL if this tx was already credited.
+  const { data: newBalRaw, error: creditErr } = await supabase.rpc('credit_deposit', {
+    p_username:       username,
+    p_tx_hash:        tx_hash,
+    p_amount:         usdcReceived,
+    p_ext:            extToCredit,
+    p_balance_before: balanceBefore,
+    p_payer:          payer
+  });
   if (creditErr) {
-    console.error('credit_tokens failed:', creditErr.message,
+    console.error('credit_deposit failed:', creditErr.message,
                   '— manual credit needed for', username, 'tx', tx_hash, 'EXT', extToCredit);
     return res.status(500).json({ error: 'Deposit verified but crediting failed — contact support with your TX signature.' });
   }
-
-  const balanceAfterRaw = parseFloat(newBalRaw);
-  const newBalance = isFinite(balanceAfterRaw) ? balanceAfterRaw : (balanceBefore + extToCredit);
-
-  // ── Record the deposit row with BOTH balances ────────────────────────────
-  // balance_before = balance snapshot before this deposit
-  // balance_after  = true post-credit balance returned by credit_tokens
-  // The schema of `deposits` must not block a real credit — so if the full
-  // insert fails for any non-duplicate reason, fall back to a minimal insert.
-  // (Credit already applied above; the tx_hash check prevents doubles.)
-  const fullRow = {
-    username,
-    amount: usdcReceived,
-    tx_hash,
-    balance_before: balanceBefore,
-    balance_after: newBalance,
-    runs: 0,
-    status: 'credited',
-    requested_at: new Date().toISOString()
-  };
-  let { error: insertErr } = await supabase.from('deposits').insert(fullRow);
-
-  if (insertErr) {
-    const msg = (insertErr.message || '').toLowerCase();
-    const isDuplicate = msg.includes('duplicate') || msg.includes('unique') ||
-                        (insertErr.code && String(insertErr.code) === '23505');
-    if (isDuplicate) {
-      // Extremely unlikely to reach here (checked above), but if two requests
-      // raced, the credit already applied — surface it for reconciliation.
-      console.error('DEPOSIT: duplicate tx_hash on insert AFTER credit — reconcile', tx_hash);
-    } else {
-      // Not a duplicate — a schema/constraint issue. Log the REAL error and retry minimal.
-      console.error('DEPOSIT INSERT FAILED — real reason:', insertErr.message, '| code:', insertErr.code, '| details:', insertErr.details);
-      const min = await supabase.from('deposits').insert({
-        username, tx_hash, amount: usdcReceived,
-        balance_before: balanceBefore, balance_after: newBalance,
-        runs: 0, status: 'credited'
-      });
-      if (min.error) {
-        console.error('DEPOSIT MINIMAL INSERT ALSO FAILED:', min.error.message, '| code:', min.error.code,
-                      '| user', username, 'tx', tx_hash, 'EXT', extToCredit);
-      } else {
-        console.log('DEPOSIT: minimal row inserted OK for', username, tx_hash);
-      }
-    }
+  if (newBalRaw == null) {
+    // Lost the race / already credited. Unique(tx_hash) guaranteed one credit.
+    console.error('DEPOSIT 400: already credited (race)', tx_hash);
+    return res.status(400).json({ error: 'This transaction has already been submitted.' });
   }
+  const newBalance = parseFloat(newBalRaw);
 
   return res.status(200).json({ ok: true, usdc: usdcReceived, credited: extToCredit, newBalance });
 }
