@@ -2993,12 +2993,12 @@ function _buildWheel(){
         parts+='<image href="'+p.img.src+'" xlink:href="'+p.img.src+'" x="'+(cx-sz/2).toFixed(1)+'" y="'+(cy-sz/2).toFixed(1)+'" width="'+sz+'" height="'+sz+'" preserveAspectRatio="xMidYMid meet" style="image-rendering:pixelated"/>';
       }
     }else{
-      // Ore gem: bright diamond in the ore colour, light top facet + white outline.
-      var g=14;
-      parts+='<g transform="translate('+cx.toFixed(1)+','+cy.toFixed(1)+') rotate(45)">'
-        +'<rect x="'+(-g/2)+'" y="'+(-g/2)+'" width="'+g+'" height="'+g+'" rx="2.5" fill="'+s.color+'" stroke="rgba(255,255,255,.85)" stroke-width="1.2"/>'
-        +'<rect x="'+(-g/2)+'" y="'+(-g/2)+'" width="'+g+'" height="'+(g*0.42).toFixed(1)+'" rx="2.5" fill="rgba(255,255,255,.45)"/>'
-        +'</g>';
+      // Real ore sprite — same icons the refine/upgrade UI uses (_ORE_IMG -> _B64).
+      var oimg=(typeof _B64!=='undefined')?_B64[(_ORE_IMG&&_ORE_IMG[s.key])||'stone_1']:'';
+      var osz=26;
+      if(oimg){
+        parts+='<image href="'+oimg+'" xlink:href="'+oimg+'" x="'+(cx-osz/2).toFixed(1)+'" y="'+(cy-osz/2).toFixed(1)+'" width="'+osz+'" height="'+osz+'" preserveAspectRatio="xMidYMid meet" style="image-rendering:pixelated"/>';
+      }
     }
   });
   parts+='<circle cx="100" cy="100" r="96" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="1.2"/>';
@@ -3007,15 +3007,22 @@ function _buildWheel(){
 function _gachaOddsHtml(){
   var petSum=GACHA_PETS.reduce(function(s,p){return s+p.p;},0);
   var budget=Math.max(0,1-petSum), wsum=GACHA_ORES.reduce(function(s,o){return s+o.w;},0);
-  function row(color,name,pct,extra){
+  function row(color,name,pct,extra,iconHtml){
+    var ico=iconHtml||('<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:'+color+';margin-right:7px;vertical-align:middle"></span>');
     return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:11px">'
-      +'<span style="color:var(--text2)"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:'+color+';margin-right:7px;vertical-align:middle"></span>'+name+(extra?' <span style="color:var(--text4)">'+extra+'</span>':'')+'</span>'
+      +'<span style="color:var(--text2)">'+ico+name+(extra?' <span style="color:var(--text4)">'+extra+'</span>':'')+'</span>'
       +'<span style="color:var(--gold);font-weight:700">'+pct+'</span></div>';
   }
   var html='<div style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#e5484d;margin:2px 0 4px">Pets</div>';
   GACHA_PETS.forEach(function(p){ var seg=GACHA_SEGMENTS.find(function(s){return s.key===p.key;}); html+=row(seg.color,p.name,(p.p*100).toFixed(2)+'%'); });
   html+='<div style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#c8a040;margin:10px 0 4px">Ore (if no pet)</div>';
-  GACHA_ORES.forEach(function(o){ var seg=GACHA_SEGMENTS.find(function(s){return s.key===o.key;}); var pct=(budget*(o.w/wsum)*100).toFixed(2)+'%'; html+=row(seg.color,o.key,pct,'\u00d7'+o.min+'\u2013'+o.max); });
+  GACHA_ORES.forEach(function(o){
+    var seg=GACHA_SEGMENTS.find(function(s){return s.key===o.key;});
+    var pct=(budget*(o.w/wsum)*100).toFixed(2)+'%';
+    var oimg=(typeof _B64!=='undefined')?_B64[(_ORE_IMG&&_ORE_IMG[o.key])||'stone_1']:'';
+    var ico=oimg?('<img src="'+oimg+'" width="14" height="14" style="image-rendering:pixelated;margin-right:6px;vertical-align:middle"/>'):null;
+    html+=row(seg.color,o.key,pct,'\u00d7'+o.min+'\u2013'+o.max,ico);
+  });
   return html;
 }
 function renderGacha(){
@@ -3059,7 +3066,10 @@ function _gachaReveal(reward){
     sub='Companion pet unlocked!';
   }else{
     var seg=GACHA_SEGMENTS.find(function(s){return s.key===reward.key;});
-    visual='<div style="width:46px;height:46px;border-radius:8px;background:'+(seg?seg.color:'#888')+';display:flex;align-items:center;justify-content:center"><i class="ti ti-diamond" style="font-size:24px;color:rgba(255,255,255,.9)"></i></div>';
+    var _oimg=(typeof _B64!=='undefined')?_B64[(_ORE_IMG&&_ORE_IMG[reward.key])||'stone_1']:'';
+    visual=_oimg
+      ? '<img src="'+_oimg+'" style="width:48px;height:48px;image-rendering:pixelated" alt="'+reward.name+'"/>'
+      : '<div style="width:46px;height:46px;border-radius:8px;background:'+(seg?seg.color:'#888')+'"></div>';
     title='<span style="color:'+(seg?seg.color:'#fff')+'">'+reward.name+' \u00d7'+reward.qty+'</span>';
     sub='Added to your ore stash';
   }
