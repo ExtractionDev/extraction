@@ -959,10 +959,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
   <div id="shopPanelGacha">
     <div style="display:flex;flex-wrap:wrap;gap:26px;align-items:flex-start;justify-content:center">
       <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
-        <div style="position:relative;width:320px;height:320px">
-          <div style="position:absolute;top:-6px;left:50%;transform:translateX(-50%);z-index:5;width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:22px solid var(--gold);filter:drop-shadow(0 2px 2px rgba(0,0,0,.5))"></div>
-          <svg id="gachaWheel" viewBox="0 0 200 200" width="320" height="320" style="transform:rotate(0deg);transform-origin:50% 50%;transition:none;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45))"></svg>
-          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;background:var(--bg2);border:3px solid var(--gold);z-index:4"></div>
+        <div style="position:relative;width:400px;height:400px;max-width:88vw">
+          <div style="position:absolute;top:-4px;left:50%;transform:translateX(-50%);z-index:5;width:0;height:0;border-left:17px solid transparent;border-right:17px solid transparent;border-top:28px solid var(--gold);filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))"></div>
+          <svg id="gachaWheel" viewBox="0 0 200 200" width="400" height="400" style="width:100%;height:100%;transform:rotate(0deg);transform-origin:50% 50%;transition:none;filter:drop-shadow(0 8px 22px rgba(0,0,0,.5))"></svg>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:46px;height:46px;border-radius:50%;background:var(--bg2);border:4px solid var(--gold);z-index:4;display:flex;align-items:center;justify-content:center"><i class="ti ti-paw" style="font-size:20px;color:#e5484d"></i></div>
         </div>
         <button id="gachaSpinBtn" onclick="spinGacha()" style="min-width:220px;padding:14px 22px;border-radius:10px;font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-family:'Space Mono',monospace;cursor:pointer;border:1.5px solid var(--gold);background:var(--gold);color:#0b0b0b;transition:all .15s"><i class="ti ti-refresh" style="margin-right:6px"></i>Spin — $1 USDC</button>
         <div id="gachaMsg" style="font-size:12px;min-height:18px;text-align:center;color:var(--text3);max-width:300px"></div>
@@ -2978,11 +2978,35 @@ function _buildWheel(){
   var svg=document.getElementById('gachaWheel'); if(!svg)return;
   var parts='';
   GACHA_SEGMENTS.forEach(function(s,i){
-    parts+='<path d="'+_gachaWedgePath(i)+'" fill="'+s.color+'" stroke="rgba(0,0,0,.35)" stroke-width="0.8"/>';
-    var ang=(i*36+18-90)*Math.PI/180, mx=100+64*Math.cos(ang), my=100+64*Math.sin(ang);
-    parts+='<text x="'+mx.toFixed(1)+'" y="'+my.toFixed(1)+'" fill="#fff" font-size="8" font-family="\'Space Mono\',monospace" text-anchor="middle" dominant-baseline="central" style="pointer-events:none">'+s.mark+'</text>';
+    // Wedge. Pet wedges get a dark tint so the sprite stands out; ore wedges use the ore colour.
+    var wedgeFill = s.type==='pet' ? '#191622' : s.color;
+    parts+='<path d="'+_gachaWedgePath(i)+'" fill="'+wedgeFill+'" stroke="rgba(0,0,0,.4)" stroke-width="0.8"/>';
+    // thin colour arc at the rim so pet segments still read as their colour
+    if(s.type==='pet'){
+      var a0=(i*36-90)*Math.PI/180, a1=((i+1)*36-90)*Math.PI/180, rr=96;
+      var rx0=(100+rr*Math.cos(a0)).toFixed(2), ry0=(100+rr*Math.sin(a0)).toFixed(2);
+      var rx1=(100+rr*Math.cos(a1)).toFixed(2), ry1=(100+rr*Math.sin(a1)).toFixed(2);
+      parts+='<path d="M'+rx0+' '+ry0+' A'+rr+' '+rr+' 0 0 1 '+rx1+' '+ry1+'" fill="none" stroke="'+s.color+'" stroke-width="6"/>';
+    }
+    var ang=(i*36+18-90)*Math.PI/180, cx=100+60*Math.cos(ang), cy=100+60*Math.sin(ang);
+    if(s.type==='pet'){
+      var p=petCatalog().find(function(c){return c.key===s.key;});
+      var sz=30;
+      // dark chip behind the sprite for contrast
+      parts+='<rect x="'+(cx-sz/2-2).toFixed(1)+'" y="'+(cy-sz/2-2).toFixed(1)+'" width="'+(sz+4)+'" height="'+(sz+4)+'" rx="6" fill="rgba(0,0,0,.35)"/>';
+      if(p&&p.img&&p.img.src){
+        parts+='<image href="'+p.img.src+'" xlink:href="'+p.img.src+'" x="'+(cx-sz/2).toFixed(1)+'" y="'+(cy-sz/2).toFixed(1)+'" width="'+sz+'" height="'+sz+'" preserveAspectRatio="xMidYMid meet" style="image-rendering:pixelated"/>';
+      }
+    }else{
+      // ore gem: a diamond in the ore colour with a light top facet
+      var g=13;
+      parts+='<g transform="translate('+cx.toFixed(1)+','+cy.toFixed(1)+') rotate(45)">'
+        +'<rect x="'+(-g/2)+'" y="'+(-g/2)+'" width="'+g+'" height="'+g+'" rx="2.5" fill="'+s.color+'" stroke="rgba(255,255,255,.65)" stroke-width="1.1"/>'
+        +'<rect x="'+(-g/2)+'" y="'+(-g/2)+'" width="'+g+'" height="'+(g/2)+'" rx="2.5" fill="rgba(255,255,255,.28)"/>'
+        +'</g>';
+    }
   });
-  parts+='<circle cx="100" cy="100" r="96" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="1"/>';
+  parts+='<circle cx="100" cy="100" r="96" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="1.2"/>';
   svg.innerHTML=parts;
 }
 function _gachaOddsHtml(){
