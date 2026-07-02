@@ -3468,7 +3468,7 @@ function uiAll(){
     if(ups[ts[i]]>=500){btn.className='up-btn maxed';btn.innerHTML='MAXED';if(oreEl)oreEl.innerHTML='';}
     else{var oc=getOreCost(ts[i]),_haveOre=_oreTotal(),_gcOk=gold>=c,_oreOk=_haveOre>=oc,aff=(_gcOk&&_oreOk);btn.className='up-btn'+(aff?'':' off');
       var _gcTxt='<span style="color:'+(_gcOk?'inherit':'#e84b4b')+'">'+c+'</span>';
-      var _oreBtn=oc>0?(' · <img src="'+((typeof _B64!=='undefined'&&_B64['stone_1'])||'')+'" width="16" height="16" style="image-rendering:pixelated;vertical-align:middle;display:inline-block"> <span style="color:'+(_oreOk?'inherit':'#e84b4b')+'">'+_haveOre.toLocaleString()+'/'+oc.toLocaleString()+'</span>'):'';
+      var _oreBtn=oc>0?(' · <i class="ti ti-diamond" style="color:#8fb7d6;font-size:15px;vertical-align:middle"></i> <span style="color:'+(_oreOk?'inherit':'#e84b4b')+'">'+_haveOre.toLocaleString()+'/'+oc.toLocaleString()+' ore</span>'):'';
       btn.innerHTML='<i class="ti ti-arrow-up"></i> Upgrade · '+_gcTxt+' '+_gcIcon(16)+_oreBtn;
       if(oreEl)oreEl.innerHTML='';
     }
