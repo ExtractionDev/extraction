@@ -1331,10 +1331,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
       <div style="font-size:11px;color:var(--text3)">Select a pickaxe to reforge</div>
     </div>
   </div>
-  <!-- Mode switch: Reforge / Combine -->
+  <!-- Mode switch: Reforge / Combine / Upgrade -->
   <div id="smithModeTabs">
     <div id="smithTabReforge" class="smith-mode-tab on" onclick="switchSmithMode('reforge')"><i class="ti ti-flame"></i> Reforge</div>
     <div id="smithTabCombine" class="smith-mode-tab" onclick="switchSmithMode('combine')"><i class="ti ti-arrows-join"></i> Combine</div>
+    <div id="smithTabUpgrade" class="smith-mode-tab" onclick="switchSmithMode('upgrade')"><i class="ti ti-arrow-big-up-lines"></i> Upgrade</div>
   </div>
   <!-- Pickaxe grid (market style) -->
   <div id="smithPickGrid" class="mk-grid" style="margin-bottom:16px"></div>
@@ -1803,7 +1804,10 @@ function updExcPool(){
   if(oddsEl)oddsEl.textContent='⚔ Stone appears: '+odds.toFixed(1)+'% this run  ·  Jackpot pull: 1% if found  ·  Pool: '+displayPool.toFixed(3)+' $EXT';
   var bl=document.getElementById('excBurnTxt');if(bl)bl.textContent='🔥 40% burn  ·  10% dev  ·  50% feeds the prize pool';
 }
-function getItemBonus(k){var t=0;['pickaxe','head','ring','amulet'].forEach(function(s){if(equippedSlots[s])equippedSlots[s].affixes.forEach(function(a){if(a.t.k===k)t+=a.v;});});return t;}
+function _upMult(it){return Math.pow(1.30,(it&&it.up)||0);} // +30% stats per upgrade level (compounding)
+function _affVal(it,a){return Math.round(a.v*_upMult(it));} // displayed/effective affix value incl upgrade
+function pName(it){return it?(pName(it)+(it.up>0?' +'+it.up:'')):'';} // e.g. "Iron Pickaxe +3"
+function getItemBonus(k){var t=0;['pickaxe','head','ring','amulet'].forEach(function(s){var it=equippedSlots[s];if(it){var m=_upMult(it);it.affixes.forEach(function(a){if(a.t.k===k)t+=a.v*m;});}});return t;}
 function getSpd(){return(0.5+ups.speed*0.015)*(1+getItemBonus('speed')/100);}
 function getPow(){return(1+ups.power*0.12)*(1+getItemBonus('power')/100);}
 function getSell(){return(0.0009+ups.sell*0.00026)*(1+getItemBonus('sell')/100);} // trimmed ~11.6x: L50 idle ≈ 300 EXT/day (per-rock mechanic unchanged)
@@ -1954,7 +1958,7 @@ function _buildSaveData(){
   var _allItems=inventory.slice();
   Object.values(equippedSlots).forEach(function(it){if(it)_allItems.push(it);});
   return{gold:gold,tokens:tokens,totalRocks:totalRocks,runs:runs,chests:chests,ups:ups,excPool:excPool,lifetimeExt:lifetimeExt,extBurned:extBurned,devCut:devCut,starterGiven:starterGiven,
-    inventory:_allItems.map(function(it){return{id:it.id,slot:it.slot||'pickaxe',slotIcon:it.slotIcon||'ti-pickaxe',mat:it.mat,type:it.type,rarN:it.rar.n,affixes:it.affixes.map(function(a){return{tk:a.t.k,v:a.v};}),price:it.price,isSanchez:it.isSanchez?1:0};}),
+    inventory:_allItems.map(function(it){return{id:it.id,slot:it.slot||'pickaxe',slotIcon:it.slotIcon||'ti-pickaxe',mat:it.mat,type:it.type,rarN:it.rar.n,up:it.up||0,affixes:it.affixes.map(function(a){return{tk:a.t.k,v:a.v};}),price:it.price,isSanchez:it.isSanchez?1:0};}),
     oreStash:oreStash,
     eqSlots:{pickaxe:equippedSlots.pickaxe?equippedSlots.pickaxe.id:null,head:equippedSlots.head?equippedSlots.head.id:null,ring:equippedSlots.ring?equippedSlots.ring.id:null,amulet:equippedSlots.amulet?equippedSlots.amulet.id:null,pet:equippedSlots.pet?equippedSlots.pet.id:null},
     gameStats:gameStats,_achiev:_achiev,
@@ -2000,7 +2004,7 @@ function _relinkItem(raw){
   var rar=RARS.find(function(r){return r.n===raw.rarN;})||RARS[0];
   var affixes=raw.affixes.map(function(a){var t=ATYPES.find(function(x){return x.k===a.tk;})||ATYPES[0];return{t:t,v:a.v};});
   var _mat=raw.mat==='Myatrile'?'Pyrite':raw.mat; // legacy rename: Epic pickaxe Myatrile -> Pyrite
-  return{id:raw.id,slot:raw.slot||'pickaxe',slotIcon:raw.slotIcon||'ti-pickaxe',mat:_mat,type:raw.type,rar:rar,affixes:affixes,price:raw.price};
+  return{id:raw.id,slot:raw.slot||'pickaxe',slotIcon:raw.slotIcon||'ti-pickaxe',mat:_mat,type:raw.type,rar:rar,affixes:affixes,price:raw.price,up:raw.up||0};
 }
 function loadGame(){
   try{
@@ -2330,9 +2334,9 @@ function deleteItem(itemId){
   var it=inventory.find(function(x){return x.id===itemId;});
   if(!it)return;
   // First confirm
-  if(!confirm('Delete this '+it.rar.n+' '+it.mat+' '+it.type+'?\n\nThis cannot be undone.'))return;
+  if(!confirm('Delete this '+it.rar.n+' '+pName(it)+'?\n\nThis cannot be undone.'))return;
   // Second confirm
-  if(!confirm('Are you absolutely sure?\n\nThe '+it.rar.n+' '+it.mat+' '+it.type+' will be permanently destroyed.'))return;
+  if(!confirm('Are you absolutely sure?\n\nThe '+it.rar.n+' '+pName(it)+' will be permanently destroyed.'))return;
   // If equipped, unequip first
   for(var s in equippedSlots){if(equippedSlots[s]&&equippedSlots[s].id===itemId)equippedSlots[s]=null;}
   inventory=inventory.filter(function(x){return x.id!==itemId;});
@@ -2414,7 +2418,7 @@ function renderBackpack(){
           +'<span class="sl-hint">tap: unequip</span>';
       }else{
         el.innerHTML='<i class="ti '+slotIcons[s]+'" style="color:'+item.rar.c+';font-size:18px"></i>'
-          +'<span class="sl-mat" style="color:'+item.rar.c+'">'+item.mat+'</span>'
+          +'<span class="sl-mat" style="color:'+item.rar.c+'">'+item.mat+(item.up>0?' +'+item.up:'')+'</span>'
           +'<span class="sl-name">'+item.rar.n+'</span>'
           +'<span class="sl-hint">tap: unequip</span>';
       }
@@ -2434,7 +2438,7 @@ function renderBackpack(){
         if(equippedSlots[s]){
           equippedSlots[s].affixes.forEach(function(a){
             var label=a.t.k==='dungeonGC'?'Dungeon GC':a.t.n;
-            allChips.push('<span class="bp-bonus-chip"><i class="ti '+a.t.i+'" style="margin-right:6px;font-size:15px;vertical-align:middle"></i>+'+a.v+'% '+label+'</span>');
+            allChips.push('<span class="bp-bonus-chip"><i class="ti '+a.t.i+'" style="margin-right:6px;font-size:15px;vertical-align:middle"></i>+'+_affVal(equippedSlots[s],a)+'% '+label+'</span>');
           });
         }
       });
@@ -2477,7 +2481,7 @@ function renderBackpack(){
     var _icoHtml=it.isSanchez
       ? '<img src="'+SANCHEZ.src+'" style="width:70px;height:70px;image-rendering:pixelated;pointer-events:none" alt="Sanchez"/>'
       : itemIcon(it.rar,70);
-    cells+='<div class="bp-inv-slot" style="border-color:'+it.rar.c+';background:'+it.rar.bg+';position:relative" title="'+it.mat+' '+it.type+' · '+it.rar.n+'">'
+    cells+='<div class="bp-inv-slot" style="border-color:'+it.rar.c+';background:'+it.rar.bg+';position:relative" title="'+pName(it)+' · '+it.rar.n+'">'
       +'<div style="position:absolute;inset:0;cursor:pointer" onclick="bpEquip('+i+')" title="tap to equip"></div>'
       +_icoHtml
       +'<span style="font-size:7px;color:'+it.rar.c+';line-height:1;overflow:hidden;white-space:nowrap;max-width:100%;text-overflow:ellipsis;pointer-events:none">'+it.rar.n+'</span>'
@@ -2499,7 +2503,7 @@ function openListModal(itemId){
   var it=inventory.find(function(x){return x.id===itemId});if(!it)return;
   if(!walletConnected||!walletAddress){alert('Connect your Phantom wallet first to list items for USDC.');return;}
   listingItemId=itemId;
-  document.getElementById('listModalItem').innerHTML=sIcon(it,60)+'<div><div style="font-size:12px;color:'+it.rar.c+';font-weight:700">'+it.mat+' '+it.type+'</div><div style="font-size:12px;color:var(--text3)">'+it.rar.n+' · '+it.affixes.map(function(a){return'+'+a.v+'% '+a.t.n}).join(', ')+'</div></div>';
+  document.getElementById('listModalItem').innerHTML=sIcon(it,60)+'<div><div style="font-size:12px;color:'+it.rar.c+';font-weight:700">'+pName(it)+'</div><div style="font-size:12px;color:var(--text3)">'+it.rar.n+' · '+it.affixes.map(function(a){return'+'+_affVal(it,a)+'% '+a.t.n}).join(', ')+'</div></div>';
   document.getElementById('listPrice').value='';
   document.getElementById('listModal').style.display='flex';
 }
@@ -2544,7 +2548,7 @@ function buyListedItem(lid){
       var it=_relinkItem(d.item);if(it)inventory.push(it);
       tokens-=d.price;saveGame();uiAll();
       if(activeTab===3)renderMarket(mkFilter);
-      showAchieve('🛒','Purchase Complete','Got '+d.item.mat+' '+d.item.type+'!');
+      showAchieve('🛒','Purchase Complete','Got '+pName(d.item)+'!');
     } else {alert(d.error||'Purchase failed. Try again.');}
   }).catch(function(){alert('Network error. Try again.');});
 }
@@ -2693,7 +2697,7 @@ async function buyWithUSDC(lid,sellerWallet,priceUsdc){
       var it=_relinkItem(d.item);if(it)inventory.push(it);
       saveGame();uiAll();
       if(activeTab===3)renderMarket(mkFilter);
-      showAchieve('🛒','Purchase Complete!','Got '+d.item.mat+' '+d.item.type+' for $'+priceUsdc.toFixed(2)+' USDC!');
+      showAchieve('🛒','Purchase Complete!','Got '+pName(d.item)+' for $'+priceUsdc.toFixed(2)+' USDC!');
     }else{
       alert((d.error||'Item transfer failed.')+'\nTX: '+signed.signature+'\nContact support if USDC was deducted.');
     }
@@ -2710,7 +2714,7 @@ function renderMarket(filter){
   var _xd=_getAuth();var myUser=_xd?_xd.username:'';
   var ir=document.getElementById('mkInvRow');
   ir.innerHTML=!inventory.length?'<div class="mk-inv-empty">No items — run the dungeon first!</div>':
-    inventory.map(function(it){return'<div class="bp-inv-slot" style="border-color:'+it.rar.c+'" onclick="openListModal(\''+it.id+'\')" title="'+it.mat+' '+it.type+' · '+it.rar.n+' — tap to list for sale">'+sIcon(it,70)+'<span style="font-size:7px;color:'+it.rar.c+';line-height:1;overflow:hidden;white-space:nowrap;max-width:100%;text-overflow:ellipsis">'+it.rar.n+'</span><i class="ti ti-tag" style="position:absolute;top:7px;right:9px;font-size:12px;color:var(--text4)"></i></div>';}).join('');
+    inventory.map(function(it){return'<div class="bp-inv-slot" style="border-color:'+it.rar.c+'" onclick="openListModal(\''+it.id+'\')" title="'+pName(it)+' · '+it.rar.n+' — tap to list for sale">'+sIcon(it,70)+'<span style="font-size:7px;color:'+it.rar.c+';line-height:1;overflow:hidden;white-space:nowrap;max-width:100%;text-overflow:ellipsis">'+it.rar.n+'</span><i class="ti ti-tag" style="position:absolute;top:7px;right:9px;font-size:12px;color:var(--text4)"></i></div>';}).join('');
   var grid=document.getElementById('mkGrid');
   var mw=document.getElementById('mkMyListingsWrap'),mg=document.getElementById('mkMyListingsGrid');
   grid.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:11px">Loading...</div>';
@@ -2725,10 +2729,10 @@ function renderMarket(filter){
       if(!myListings.length){if(mw)mw.style.display='none';}
       else{if(mw)mw.style.display='block';if(mg)mg.innerHTML=myListings.map(function(l){
         var it=_relinkItem(l.item_data);if(!it)return'';
-        var afxH=it.affixes.map(function(a){return'<div class="mk-afx"><i class="ti '+a.t.i+'"></i> +'+a.v+'% '+a.t.n+'</div>';}).join('');
+        var afxH=it.affixes.map(function(a){return'<div class="mk-afx"><i class="ti '+a.t.i+'"></i> +'+_affVal(it,a)+'% '+a.t.n+'</div>';}).join('');
         return'<div style="background:var(--bg4);border:1.5px solid '+it.rar.c+';border-radius:10px;padding:10px 14px;min-width:180px;max-width:240px">'
           +'<div style="font-size:10px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>'
-          +'<div style="display:flex;align-items:center;gap:8px">'+sIcon(it,40)+'<div><div style="color:'+it.rar.c+';font-size:13px;font-weight:700;line-height:1.2">'+it.mat+' '+it.type+'</div><div style="color:'+it.rar.c+';font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.85">'+it.rar.n+'</div></div></div>'
+          +'<div style="display:flex;align-items:center;gap:8px">'+sIcon(it,40)+'<div><div style="color:'+it.rar.c+';font-size:13px;font-weight:700;line-height:1.2">'+pName(it)+'</div><div style="color:'+it.rar.c+';font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.85">'+it.rar.n+'</div></div></div>'
           +'<div class="mk-affixes">'+afxH+'</div>'
           +'<div style="color:#26c281;font-size:11px;font-weight:700">$'+(parseFloat(l.price)||0).toFixed(2)+' USDC</div>'
           +'<div onclick="withdrawListing(\''+l.id+'\')" style="margin-top:6px;font-size:9px;color:var(--text4);cursor:pointer;text-decoration:underline">Withdraw</div>'
@@ -2744,13 +2748,13 @@ function renderMarket(filter){
       grid.innerHTML=filtered.map(function(l){
         var it=_relinkItem(l.item_data);if(!it)return'';
         var isOwn=l.seller===myUser;
-        var afxH=it.affixes.map(function(a){return'<div class="mk-afx"><i class="ti '+a.t.i+'"></i> +'+a.v+'% '+a.t.n+'</div>';}).join('');
+        var afxH=it.affixes.map(function(a){return'<div class="mk-afx"><i class="ti '+a.t.i+'"></i> +'+_affVal(it,a)+'% '+a.t.n+'</div>';}).join('');
         var badge=isOwn?'<div style="font-size:9px;color:var(--green);margin-bottom:4px">YOUR LISTING</div>':'<div style="font-size:9px;color:var(--blue);margin-bottom:4px">@'+l.seller+'</div>';
         var btn=isOwn
           ?'<button style="margin-top:6px;width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--text4);padding:4px;font-size:9px;font-family:\'Space Mono\',monospace;cursor:default">Listed</button>'
           :'<button id="ubtn_'+l.id+'" onclick="buyWithUSDC(\''+l.id+'\',\''+( l.seller_wallet||'')+'\','+(parseFloat(l.price)||0)+')" style="margin-top:6px;width:100%;background:#0a2018;border:1px solid #26c281;border-radius:5px;color:#26c281;padding:4px;cursor:pointer;font-size:9px;font-family:\'Space Mono\',monospace">Buy with USDC</button>';
         return'<div style="background:var(--bg4);border:1.5px solid '+it.rar.c+';border-radius:10px;padding:10px 14px;min-width:180px;max-width:240px">'+badge
-          +'<div style="display:flex;align-items:center;gap:8px">'+sIcon(it,40)+'<div><div style="color:'+it.rar.c+';font-size:13px;font-weight:700;line-height:1.2">'+it.mat+' '+it.type+'</div><div style="color:'+it.rar.c+';font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.85">'+it.rar.n+'</div></div></div>'
+          +'<div style="display:flex;align-items:center;gap:8px">'+sIcon(it,40)+'<div><div style="color:'+it.rar.c+';font-size:13px;font-weight:700;line-height:1.2">'+pName(it)+'</div><div style="color:'+it.rar.c+';font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.85">'+it.rar.n+'</div></div></div>'
           +'<div class="mk-affixes">'+afxH+'</div>'
           +'<div style="color:#26c281;font-size:11px;font-weight:700">$'+(parseFloat(l.price)||0).toFixed(2)+' USDC</div>'+btn+'</div>';
       }).join('');
@@ -3063,13 +3067,13 @@ function uiAll(){
       else if(a.t.k==='luck')_res='Luck '+(ups.luck+getItemBonus('luck'));
       else if(a.t.k==='dungeonGC')_res='+10% dungeon GC';
       return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05)">'
-        +'<span style="color:var(--green);font-size:12px">+'+a.v+'% '+a.t.n+'</span>'
+        +'<span style="color:var(--green);font-size:12px">+'+_affVal(equipped,a)+'% '+a.t.n+'</span>'
         +'<span style="color:var(--gold);font-size:12px;font-weight:700">'+_res+'</span>'
         +'</div>';
     }).join('');
     eqEl.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
       +itemIcon(equipped.rar,32)
-      +'<div><div style="font-size:13px;color:'+equipped.rar.c+';font-weight:700">'+equipped.mat+' '+equipped.type+'</div>'
+      +'<div><div style="font-size:13px;color:'+equipped.rar.c+';font-weight:700">'+pName(equipped)+'</div>'
       +'<div style="font-size:12px;color:var(--text3)">'+equipped.rar.n+' · '+equipped.affixes.length+' stat'+(equipped.affixes.length!==1?'s':'')+'</div>'
       +'</div></div>'+_rows;
   }
@@ -3460,13 +3464,13 @@ function openChestLootModal(item){
   document.getElementById('clIcon').innerHTML=itemIcon(item.rar,72);
   document.getElementById('clIcon').style.background=item.rar.bg;
   document.getElementById('clIcon').style.border='2px solid '+item.rar.c;
-  document.getElementById('clName').textContent=item.mat+' '+item.type;
+  document.getElementById('clName').textContent=pName(item);
   document.getElementById('clName').style.color=item.rar.c;
   document.getElementById('clRarity').textContent=item.rar.n+' Pickaxe';
   document.getElementById('clRarity').style.color=item.rar.c;
   document.getElementById('clAffixes').innerHTML=
     '<div style="font-size:11px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px">Affixes</div>'+
-    item.affixes.map(function(a){return'<div class="chest-loot-afx"><i class="ti '+a.t.i+'" style="color:var(--green)"></i> +'+a.v+'% '+a.t.n+'</div>';}).join('');
+    item.affixes.map(function(a){return'<div class="chest-loot-afx"><i class="ti '+a.t.i+'" style="color:var(--green)"></i> +'+_affVal(item,a)+'% '+a.t.n+'</div>';}).join('');
   document.getElementById('clValue').textContent='Market value: ~'+item.price+' $EXT';
   var hasSameSlot=equippedSlots[item.slot]!==null;
   document.getElementById('clEquipBtn').innerHTML='<i class="ti ti-sword"></i> '+(hasSameSlot?'Replace Equipped':'Equip Now');
@@ -4350,6 +4354,53 @@ var COMBINE_TIERS=[
 ];
 var _combineTier=0;
 function _ct(){return COMBINE_TIERS[_combineTier]||COMBINE_TIERS[0];}
+// ===== PICKAXE ENHANCEMENT (+1..+5) — Smithy "Upgrade" tab =====
+// Break = pickaxe DESTROYED. Stats +30% per level (compounding, via _upMult).
+// Cost = $EXT + specific ores + a universal Gold-ore ramp. Amounts are the
+// (doubled) per-tier spec; Gold is added on top of every level.
+var PICK_UP_MAX=5;
+var PICK_UP_BREAK=[0.10,0.20,0.30,0.40,0.50];   // chance to destroy, per target level +1..+5
+var PICK_UP_GOLD=[25,50,75,100,150];             // universal Gold ore, per level
+var PICK_UP={
+  Iron:     {ext:[1000,1000,2000,2500,3000],  ores:[{Iron:50},{Iron:100},{Iron:200,Coal:100},{Iron:200,Coal:200},{Iron:400,Coal:400}]},
+  Adamant:  {ext:[2000,2000,4000,5000,6000],  ores:[{Copper:50},{Copper:100},{Copper:200,Iron:100},{Copper:200,Iron:200},{Copper:400,Iron:400}]},
+  Crystal:  {ext:[4000,4000,8000,10000,12000],ores:[{Iron:80},{Iron:160},{Iron:300,Silver:80},{Iron:300,Silver:160},{Iron:600,Silver:300}]},
+  Pyrite:   {ext:[8000,8000,16000,20000,24000],ores:[{Silver:80},{Silver:160},{Silver:300,Coal:200},{Silver:300,Coal:400},{Silver:600,Coal:600}]},
+  Ancient:  {ext:[14000,14000,28000,35000,42000],ores:[{Silver:120},{Silver:240},{Silver:400,Mystrile:40},{Silver:400,Mystrile:80},{Silver:800,Mystrile:160}]},
+  Prismatic:{ext:[24000,24000,48000,60000,72000],ores:[{Mystrile:80},{Mystrile:160},{Mystrile:300,Silver:100},{Mystrile:300,Silver:200},{Mystrile:600,Silver:400}]}
+};
+var _ORE_IMG={Coal:'stone_1',Copper:'copper_ore',Iron:'stone_2',Silver:'silver_ore',Gold:'gold_ore',Mystrile:'mystrile_ore'};
+function pickUpCost(it){
+  var lvl=(it&&it.up)||0; if(lvl>=PICK_UP_MAX)return null;
+  var tier=PICK_UP[it.mat]; if(!tier)return null;
+  var ores={}; var base=tier.ores[lvl]||{};
+  Object.keys(base).forEach(function(k){ores[k]=base[k];});
+  ores.Gold=(ores.Gold||0)+PICK_UP_GOLD[lvl];
+  return {ext:tier.ext[lvl], ores:ores, brk:PICK_UP_BREAK[lvl], toLevel:lvl+1};
+}
+function pickUpCanAfford(c){ if(!c||tokens<c.ext)return false; for(var k in c.ores){if((oreStash[k]||0)<c.ores[k])return false;} return true; }
+function pickUpSpend(c){ tokens-=c.ext; for(var k in c.ores){oreStash[k]=(oreStash[k]||0)-c.ores[k]; if(oreStash[k]<=0)delete oreStash[k];} }
+var _upSel=null; // id of pickaxe chosen to upgrade
+function pickUpSelect(id){_upSel=id;renderSmith();}
+function pickDoUpgrade(){
+  var all=inventory.slice(); if(equippedSlots.pickaxe)all.push(equippedSlots.pickaxe);
+  var it=all.find(function(x){return x.id===_upSel;}); if(!it)return;
+  var c=pickUpCost(it); if(!c||!pickUpCanAfford(c))return;
+  pickUpSpend(c);
+  if(Math.random()<c.brk){
+    // DESTROYED — remove from inventory and any equipped slot
+    inventory=inventory.filter(function(x){return x.id!==it.id;});
+    Object.keys(equippedSlots).forEach(function(s){if(equippedSlots[s]&&equippedSlots[s].id===it.id)equippedSlots[s]=null;});
+    _upSel=null;
+    try{_snd({f:120,sweep:60,wave:'sawtooth',vol:0.18,dur:0.4});}catch(e){}
+    showAchieve('💥','Pickaxe shattered!','The upgrade failed and the pickaxe was destroyed.');
+  } else {
+    it.up=((it.up||0)+1);
+    try{[0,90,180].forEach(function(d,i){setTimeout(function(){_snd({f:[330,495,660][i],wave:'square',vol:0.11,dur:0.12});},d);});}catch(e){}
+    showAchieve('✨','Upgrade success!',pName(it)+' forged.');
+  }
+  saveGame(true);uiAll();try{renderBackpack();}catch(e){}renderSmith();
+}
 function _oreImgTag(img,sz){sz=sz||20;return '<img src="'+((typeof _B64!=='undefined'&&_B64[img])||'')+'" width="'+sz+'" height="'+sz+'" style="image-rendering:pixelated;display:block">';}
 function _gcIcon(sz){sz=sz||16;return '<img src="'+((typeof _B64!=='undefined'&&_B64.gc_coin)||'')+'" width="'+sz+'" height="'+sz+'" style="image-rendering:pixelated;vertical-align:middle;display:inline-block">';}
 function _combineOresOk(){return _ct().ores.every(function(o){return (oreStash[o.n]||0)>=o.need;});}
@@ -4361,7 +4412,7 @@ function switchSmithMode(m){
   var ab=document.getElementById('smithAfterBox');if(ab)ab.classList.remove('revealed');
   renderSmith();
 }
-function smithAction(){ if(smithMode==='combine')smithCombine(); else smithReroll(); }
+function smithAction(){ if(smithMode==='combine')smithCombine(); else if(smithMode==='upgrade')pickDoUpgrade(); else smithReroll(); }
 function combineToggle(id){
   var i=_combineSel.indexOf(id);
   if(i>=0){_combineSel.splice(i,1);}
@@ -4427,9 +4478,9 @@ function renderCombine(grid,emp,forge){
     return '<div class="mk-card'+(sel?' combine-sel':'')+'" onclick="combineToggle(\''+it.id+'\')" style="border-color:'+(sel?'var(--gold)':'var(--border)')+';background:'+(sel?'var(--gold3)':'var(--bg3)')+';position:relative">'+
       (sel?'<div style="position:absolute;top:6px;right:8px;color:var(--gold);font-size:13px;font-weight:700">✓</div>':'')+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+itemIcon(it.rar,26)+
-        '<div><div style="font-size:13px;font-weight:700;color:'+it.rar.c+'">'+it.mat+'</div>'+
+        '<div><div style="font-size:13px;font-weight:700;color:'+it.rar.c+'">'+it.mat+(it.up>0?' +'+it.up:'')+'</div>'+
         '<div style="font-size:10px;color:var(--text3)">'+T.fromRar+' · Backpack</div></div></div>'+
-      it.affixes.map(function(a){return '<div style="font-size:11px;color:var(--green);line-height:1.8">+'+a.v+'% '+a.t.n+'</div>';}).join('')+
+      it.affixes.map(function(a){return '<div style="font-size:11px;color:var(--green);line-height:1.8">+'+_affVal(it,a)+'% '+a.t.n+'</div>';}).join('')+
     '</div>';
   }).join('');
   // ---- ingredients (neutral slots, no green) ----
@@ -4469,14 +4520,71 @@ function renderCombine(grid,emp,forge){
   badge.textContent = !full ? ('Select '+(COMBINE_COUNT-_combineSel.length)+' more') : (!oresOk?'Missing materials':(tokens<T.cost?'Not enough $EXT':''));
   badge.style.color = ok?'var(--gold)':'var(--red)';
 }
-var SMITH_COSTS={Common:1000,Uncommon:5000,Rare:10000,Epic:25000,Legendary:50000,Mythic:200000};
+function renderUpgrade(grid,emp,forge){
+  emp.style.display='none';forge.style.display='block';
+  var picks=[];
+  if(equippedSlots.pickaxe)picks.push(equippedSlots.pickaxe);
+  inventory.filter(function(x){return x.slot==='pickaxe';}).forEach(function(x){picks.push(x);});
+  if(_upSel&&!picks.some(function(p){return p.id===_upSel;}))_upSel=null;
+  grid.style.display='';
+  if(!picks.length){grid.style.display='none';emp.textContent='No pickaxes to upgrade';emp.style.display='block';}
+  grid.innerHTML=picks.map(function(it){
+    var sel=it.id===_upSel;
+    return '<div class="mk-card" onclick="pickUpSelect(\''+it.id+'\')" style="border-color:'+(sel?'var(--gold)':'var(--border)')+';background:'+(sel?'var(--gold3)':'var(--bg3)')+';position:relative">'+
+      (sel?'<div style="position:absolute;top:6px;right:8px;color:var(--gold);font-weight:700">✓</div>':'')+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+itemIcon(it.rar,26)+
+        '<div><div style="font-size:13px;font-weight:700;color:'+it.rar.c+'">'+pName(it)+'</div>'+
+        '<div style="font-size:10px;color:var(--text3)">'+it.rar.n+'</div></div></div>'+
+      it.affixes.map(function(a){return '<div style="font-size:11px;color:var(--green);line-height:1.7">+'+_affVal(it,a)+'% '+a.t.n+'</div>';}).join('')+
+    '</div>';
+  }).join('');
+  document.getElementById('smithForgeTitle').textContent='Upgrade Pickaxe · +'+PICK_UP_MAX+' max';
+  var it=picks.find(function(p){return p.id===_upSel;});
+  var btn=document.getElementById('smithRerollBtn'),badge=document.getElementById('smithCostBadge');
+  if(!it){
+    document.getElementById('smithBeforeStats').innerHTML='<div class="smith-stat-placeholder">Select a pickaxe to upgrade</div>';
+    document.getElementById('smithAfterStats').innerHTML='<div class="smith-stat-placeholder">—</div>';
+    btn.disabled=true;btn.textContent='✦ Upgrade';badge.textContent='';return;
+  }
+  document.getElementById('smithBeforeStats').innerHTML=
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+itemIcon(it.rar,26)+
+    '<div><div style="font-size:13px;font-weight:700;color:'+it.rar.c+'">'+pName(it)+'</div><div style="font-size:10px;color:var(--text3)">'+it.rar.n+' Pickaxe</div></div></div>'+
+    it.affixes.map(function(a){return '<div class="smith-stat-row"><span style="color:var(--green)">'+a.t.n+'</span><span style="color:var(--gold);font-weight:700">+'+_affVal(it,a)+'%</span></div>';}).join('');
+  var c=pickUpCost(it);
+  if(!c){
+    document.getElementById('smithAfterStats').innerHTML='<div class="smith-stat-placeholder">Max level reached (+'+PICK_UP_MAX+')</div>';
+    btn.disabled=true;btn.textContent='✦ MAX +'+PICK_UP_MAX;badge.textContent='';return;
+  }
+  var nextMult=Math.pow(1.30,c.toLevel);
+  var nextStats=it.affixes.map(function(a){return '<div class="smith-stat-row"><span style="color:var(--green)">'+a.t.n+'</span><span style="color:var(--gold);font-weight:700">+'+Math.round(a.v*nextMult)+'%</span></div>';}).join('');
+  var oreOk=true;
+  var oreRows=Object.keys(c.ores).map(function(k){
+    var have=oreStash[k]||0,okk=have>=c.ores[k]; if(!okk)oreOk=false;
+    return '<div style="display:flex;align-items:center;gap:7px;padding:2px 0;font-size:11px;color:'+(okk?'var(--text)':'var(--red)')+'">'+
+      '<div style="width:20px;height:20px;display:flex;align-items:center;justify-content:center">'+_oreImgTag(_ORE_IMG[k]||'stone_1',18)+'</div>'+
+      '<span>'+k+'</span><span style="margin-left:auto;font-weight:700;color:'+(okk?'var(--green)':'var(--red)')+'">'+have+' / '+c.ores[k]+'</span></div>';
+  }).join('');
+  var extOk=tokens>=c.ext;
+  document.getElementById('smithAfterStats').innerHTML=
+    '<div style="font-size:11px;color:var(--gold);font-weight:700;margin-bottom:6px">→ +'+c.toLevel+' · stats +30%</div>'+nextStats+
+    '<div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text3);padding-top:8px;border-top:1px solid var(--border2);margin:6px 0 4px">Cost</div>'+
+    '<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:'+(extOk?'var(--text)':'var(--red)')+';margin-bottom:4px"><span style="color:var(--sol);font-weight:700">'+c.ext.toLocaleString()+' $EXT</span>'+(extOk?'':' <span style="color:var(--red)">(short)</span>')+'</div>'+
+    oreRows+
+    '<div style="font-size:11px;color:#e84b4b;font-weight:700;margin-top:8px">⚠ '+Math.round(c.brk*100)+'% chance to DESTROY this pickaxe</div>';
+  var ok=extOk&&oreOk;
+  btn.disabled=!ok;
+  btn.textContent='✦ Upgrade to +'+c.toLevel+' — '+c.ext.toLocaleString()+' $EXT';
+  badge.textContent=!extOk?'Not enough $EXT':(!oreOk?'Missing ore':(Math.round(c.brk*100)+'% break risk'));
+  badge.style.color=ok?'var(--gold)':'var(--red)';
+}
 
-function _smithStatRows(affixes, cls){
+function _smithStatRows(affixes, cls, mult){
   if(!affixes||!affixes.length)return '<div class="smith-stat-placeholder">—</div>';
+  var m=mult||1;
   return affixes.map(function(a){
     return '<div class="smith-stat-row">'
       +'<span class="'+(cls||'')+'" style="color:var(--green)">'+a.t.n+'</span>'
-      +'<span class="'+(cls||'')+'" style="color:var(--gold);font-weight:700">+'+a.v+'%</span>'
+      +'<span class="'+(cls||'')+'" style="color:var(--gold);font-weight:700">+'+Math.round(a.v*m)+'%</span>'
       +'</div>';
   }).join('');
 }
@@ -4485,11 +4593,13 @@ function renderSmith(){
   var grid=document.getElementById('smithPickGrid');
   var emp=document.getElementById('smithEmpty');
   var forge=document.getElementById('smithForge');
-  var tR=document.getElementById('smithTabReforge'),tC=document.getElementById('smithTabCombine');
+  var tR=document.getElementById('smithTabReforge'),tC=document.getElementById('smithTabCombine'),tU=document.getElementById('smithTabUpgrade');
   if(tR)tR.classList.toggle('on',smithMode==='reforge');
   if(tC)tC.classList.toggle('on',smithMode==='combine');
+  if(tU)tU.classList.toggle('on',smithMode==='upgrade');
   var _tb=document.getElementById('combineTierBar');if(_tb)_tb.style.display=(smithMode==='combine')?'flex':'none';
   if(smithMode==='combine'){renderCombine(grid,emp,forge);return;}
+  if(smithMode==='upgrade'){renderUpgrade(grid,emp,forge);return;}
   grid.style.display='';
   var items=[];
   if(equippedSlots.pickaxe)items.push({item:equippedSlots.pickaxe,label:'Equipped'});
@@ -4507,19 +4617,19 @@ function renderSmith(){
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
         itemIcon(it.rar,26)+
         '<div>'+
-          '<div style="font-size:13px;font-weight:700;color:'+it.rar.c+'">'+it.mat+'</div>'+
+          '<div style="font-size:13px;font-weight:700;color:'+it.rar.c+'">'+it.mat+(it.up>0?' +'+it.up:'')+'</div>'+
           '<div style="font-size:10px;color:var(--text3)">'+it.rar.n+' · '+obj.label+'</div>'+
         '</div>'+
       '</div>'+
-      it.affixes.map(function(a){return '<div style="font-size:11px;color:var(--green);line-height:1.8">+'+a.v+'% '+a.t.n+'</div>';}).join('')+
+      it.affixes.map(function(a){return '<div style="font-size:11px;color:var(--green);line-height:1.8">+'+_affVal(it,a)+'% '+a.t.n+'</div>';}).join('')+
       '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--gold);font-weight:700">'+c.toLocaleString()+' $EXT</div>'+
     '</div>';
     return h;
   }).join('');
   if(_smithItem){
     forge.style.display='block';
-    document.getElementById('smithForgeTitle').textContent=_smithItem.mat+' '+_smithItem.rar.n+' Pickaxe';
-    document.getElementById('smithBeforeStats').innerHTML=_smithStatRows(_smithItem.affixes,'');
+    document.getElementById('smithForgeTitle').textContent=_smithItem.mat+' '+_smithItem.rar.n+' Pickaxe'+(_smithItem.up>0?' +'+_smithItem.up:'');
+    document.getElementById('smithBeforeStats').innerHTML=_smithStatRows(_smithItem.affixes,'',_upMult(_smithItem));
     var btn=document.getElementById('smithRerollBtn');
     var affordable=tokens>=cost;
     btn.disabled=!affordable;
@@ -4597,9 +4707,9 @@ function smithReroll(){
   // Show after stats with reveal animation
   var ab=document.getElementById('smithAfterBox');
   if(ab){ab.classList.add('revealed');}
-  document.getElementById('smithAfterStats').innerHTML=_smithStatRows(newAffixes,'smith-stat-new');
+  document.getElementById('smithAfterStats').innerHTML=_smithStatRows(newAffixes,'smith-stat-new',_upMult(_smithItem));
   // Also refresh before box with new (applied) stats
-  document.getElementById('smithBeforeStats').innerHTML=_smithStatRows(newAffixes,'');
+  document.getElementById('smithBeforeStats').innerHTML=_smithStatRows(newAffixes,'',_upMult(_smithItem));
   // Swing hammer + sparks
   strikeAnvil();
   // Sound
