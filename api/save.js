@@ -351,7 +351,10 @@ export default async function handler(req, res) {
     achievements:   (_achiev && typeof _achiev === 'object') ? _achiev : {},
     updated_at:     new Date().toISOString()
   };
-  row.last_entry_fee = 0; // refineBurst retired; keep field from going stale
+  // NOTE: last_entry_fee is intentionally NOT written here anymore. It's set by
+  // the entry endpoint and must survive until the jackpot pull, which scales its
+  // payout by the entry fee. refineBurst is retired so nothing credits off it,
+  // making it safe to preserve. (Reset still zeroes it in the base row.)
 
   const { error: updateErr } = await supabase
     .from('players')
