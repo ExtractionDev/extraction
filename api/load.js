@@ -151,10 +151,17 @@ async function gachaGetParsedTx(signature) {
   }
   return null;
 }
-// Whole-token USDC that landed in accounts OWNED by `wallet`.
+// Whole-token USDC that landed in accounts OWNED by `wallet`. Mirrors the proven
+// dual-method logic in deposit.js: (1) pre/post token-balance deltas, and
+// (2) a transfer-scan fallback for non-standard/derived accounts that method 1
+// can miss (this is why a single-method check was returning paid:0).
 function gachaUsdcReceived(tx, wallet) {
   const pre  = (tx.meta && tx.meta.preTokenBalances)  ? tx.meta.preTokenBalances  : [];
   const post = (tx.meta && tx.meta.postTokenBalances) ? tx.meta.postTokenBalances : [];
+  const accountKeys = ((tx.transaction && tx.transaction.message && tx.transaction.message.accountKeys) || [])
+    .map(k => (typeof k === 'string' ? k : (k && k.pubkey) || ''));
+
+  // Method 1: pre/post token-balance deltas for USDC accounts owned by `wallet`.
   const entries = list => {
     const out = {};
     (list || []).forEach(b => {
@@ -170,6 +177,29 @@ function gachaUsdcReceived(tx, wallet) {
     const d = (postMap[i] || 0) - (preMap[i] || 0);
     if (d > 0) received += d;
   });
+
+  // Method 2 fallback: scan spl-token transfers whose destination account is
+  // owned by `wallet` (via the post-balance owner map).
+  if (!(received > 0)) {
+    const ownerByAcct = {};
+    post.forEach(b => { if (b && accountKeys[b.accountIndex]) ownerByAcct[accountKeys[b.accountIndex]] = b.owner; });
+    const innerIx = (tx.meta && tx.meta.innerInstructions) ? tx.meta.innerInstructions : [];
+    const allIx = [
+      ...((tx.transaction && tx.transaction.message && tx.transaction.message.instructions) || []),
+      ...(innerIx.flatMap(ii => ii.instructions) || [])
+    ];
+    allIx.forEach(ix => {
+      if (!ix || ix.program !== 'spl-token' || !ix.parsed) return;
+      if (ix.parsed.type !== 'transfer' && ix.parsed.type !== 'transferChecked') return;
+      const info = ix.parsed.info || {};
+      const dest = info.destination;
+      if (ownerByAcct[dest] === wallet) {
+        let amt = info.amount;
+        if (amt == null && info.tokenAmount) amt = info.tokenAmount.amount;
+        received += (parseInt(amt || '0', 10) / 1e6);
+      }
+    });
+  }
   return received;
 }
 async function gachaSpinsInLastDay(username) {
@@ -404,6 +434,13 @@ export default async function handler(req, res) {
       if (!gtx) return res.status(400).json({ error: 'Transaction not found / not confirmed yet. Try again in a moment.' });
       if (gtx.meta && gtx.meta.err) return res.status(400).json({ error: 'Transaction failed on chain.' });
       const paid = gachaUsdcReceived(gtx, GACHA_WALLET_ADDR);
+      try {
+        const _post = (gtx.meta && gtx.meta.postTokenBalances) ? gtx.meta.postTokenBalances : [];
+        console.log('GACHA RAW', JSON.stringify({
+          username, spinWallet: GACHA_WALLET_ADDR, paid,
+          post: _post.map(b => ({ owner: b.owner, mint: b.mint, amt: b.uiTokenAmount && b.uiTokenAmount.uiAmountString }))
+        }));
+      } catch (e) {}
       if (!(paid >= GACHA_COST_USDC * (1 - GACHA_SLIPPAGE))) {
         console.error('GACHA underpaid:', JSON.stringify({ username, paid, signature }));
         return res.status(400).json({ error: 'Spin costs $1 USDC. Payment to the spin wallet was not found or was too small.' });
