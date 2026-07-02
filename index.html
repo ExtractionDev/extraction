@@ -588,6 +588,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     <div class="nav-btn" id="nb3" onclick="goTab(3)"><i class="ti ti-shopping-bag"></i><span>Market</span></div>
     <div class="nav-btn" id="nb4" onclick="goTab(4)"><i class="ti ti-backpack"></i><span>Backpack</span></div>
     <div class="nav-btn" id="nb6" onclick="goTab(6)"><i class="ti ti-hammer"></i><span>Smith</span></div>
+    <div class="nav-btn" id="nb8" onclick="goTab(8)"><i class="ti ti-building-store"></i><span>Shop</span></div>
     <div class="nav-btn" id="nb7" onclick="goTab(7)"><i class="ti ti-trophy"></i><span>Ranks</span></div>
   </div>
   <button class="nav-wallet" id="navDepositBtn" onclick="openDeposit()" style="margin-right:6px;padding:14px 20px;font-size:17px;gap:8px;border-radius:10px;border-color:#90c848;color:#90c848"><i class="ti ti-download" style="font-size:19px"></i><span>Deposit</span></button>
@@ -872,6 +873,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
   <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
     <div id="mkTabPickaxe" class="mk-subtab on" onclick="switchMkTab('pickaxe')" style="padding:12px 26px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;border:1.5px solid var(--gold);border-radius:9px;color:var(--gold);background:rgba(200,160,64,.12);font-family:'Space Mono',monospace;transition:all .12s"><i class="ti ti-pickaxe" style="margin-right:6px"></i>Equipment</div>
     <div id="mkTabOres" class="mk-subtab" onclick="switchMkTab('ores')" style="padding:12px 26px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;border:1.5px solid var(--border3);border-radius:9px;color:var(--text3);background:var(--bg3);font-family:'Space Mono',monospace;transition:all .12s"><i class="ti ti-diamond" style="margin-right:6px;color:#c8a040"></i>Ores</div>
+    <div id="mkTabCompanions" class="mk-subtab" onclick="switchMkTab('companions')" style="padding:12px 26px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;border:1.5px solid var(--border3);border-radius:9px;color:var(--text3);background:var(--bg3);font-family:'Space Mono',monospace;transition:all .12s"><i class="ti ti-paw" style="margin-right:6px;color:#e5484d"></i>Companions</div>
     <div id="mkTabSold" class="mk-subtab" onclick="switchMkTab('sold')" style="padding:12px 26px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;border:1.5px solid var(--border3);border-radius:9px;color:var(--text3);background:var(--bg3);font-family:'Space Mono',monospace;transition:all .12s"><i class="ti ti-receipt" style="margin-right:6px;color:#90c848"></i>Sold</div>
   </div>
 
@@ -935,9 +937,43 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     </div>
   </div>
 
+  <!-- COMPANIONS PANEL -->
+  <div id="mkPanelCompanions" style="display:none">
+    <div class="mk-section-title"><i class="ti ti-paw" style="color:#e5484d"></i> Companions — one pet may be equipped at a time</div>
+    <div style="font-size:11px;color:var(--text4);margin:-6px 0 14px;letter-spacing:.03em">Companions ride along with your idle miner and grant passive bonuses. Equip from here or from your Backpack.</div>
+    <div id="mkCompanionGrid" style="display:flex;flex-wrap:wrap;gap:14px"></div>
+  </div>
+
   <div id="mkPanelSold" style="display:none">
     <div class="mk-section-title"><i class="ti ti-receipt" style="color:#90c848"></i> Your sold items</div>
     <div id="mkSoldList" style="display:flex;flex-direction:column;gap:8px;margin-top:8px"></div>
+  </div>
+</div>
+
+<!-- SHOP TAB -->
+<div class="tab shop-tab" id="t8">
+  <div class="mk-header"><div class="mk-title">Shop</div><div class="mk-count" id="shopCount">Pet Gatcha</div></div>
+  <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+    <div id="shopTabGacha" class="mk-subtab on" onclick="switchShopTab('gacha')" style="padding:12px 26px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;border:1.5px solid var(--gold);border-radius:9px;color:var(--gold);background:rgba(200,160,64,.12);font-family:'Space Mono',monospace;transition:all .12s"><i class="ti ti-paw" style="margin-right:6px;color:#e5484d"></i>Pet Gatcha</div>
+  </div>
+  <div id="shopPanelGacha">
+    <div style="display:flex;flex-wrap:wrap;gap:26px;align-items:flex-start;justify-content:center">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+        <div style="position:relative;width:320px;height:320px">
+          <div style="position:absolute;top:-6px;left:50%;transform:translateX(-50%);z-index:5;width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:22px solid var(--gold);filter:drop-shadow(0 2px 2px rgba(0,0,0,.5))"></div>
+          <svg id="gachaWheel" viewBox="0 0 200 200" width="320" height="320" style="transform:rotate(0deg);transform-origin:50% 50%;transition:none;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45))"></svg>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;background:var(--bg2);border:3px solid var(--gold);z-index:4"></div>
+        </div>
+        <button id="gachaSpinBtn" onclick="spinGacha()" style="min-width:220px;padding:14px 22px;border-radius:10px;font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-family:'Space Mono',monospace;cursor:pointer;border:1.5px solid var(--gold);background:var(--gold);color:#0b0b0b;transition:all .15s"><i class="ti ti-refresh" style="margin-right:6px"></i>Spin — $1 USDC</button>
+        <div id="gachaMsg" style="font-size:12px;min-height:18px;text-align:center;color:var(--text3);max-width:300px"></div>
+        <div id="gachaResult" style="display:none;align-items:center;gap:12px;background:var(--bg3);border:1.5px solid var(--gold);border-radius:12px;padding:12px 16px;margin-top:2px"></div>
+      </div>
+      <div style="min-width:240px;max-width:300px;background:var(--bg3);border:1.5px solid var(--border3);border-radius:14px;padding:16px">
+        <div class="mk-section-title" style="margin-top:0"><i class="ti ti-list-details" style="color:var(--gold)"></i> Drop Rates</div>
+        <div style="font-size:11px;color:var(--text4);margin:-4px 0 10px">One spin per day · $1 USDC per spin · odds enforced server-side</div>
+        <div id="gachaOdds"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1542,6 +1578,7 @@ var gameStats={bestGC:0,deepestFloor:0,enemiesKilled:0,totalDmg:0,rareRocks:0,go
 var ups={speed:0,power:0,sell:0,luck:0};
 var inventory=[],equipped=null;
 var oreStash={}; // stackable ore storage: {Coal:5, Iron:3, ...}
+var ownedPets={}; // durable pet ownership mirror {gnomeo:true,...}; source of truth is server owned_pets
 var starterGiven=false; // one-time flag — starter pickaxe can only ever be given once
 var equippedSlots={pickaxe:null,head:null,ring:null,amulet:null,pet:null};
 // Excalibur prize pool (in $EXT)
@@ -1756,8 +1793,8 @@ function goTab(n){
     if(!_ga||!_ga.username){openXAuth();return;}
   }
   activeTab=n;
-  var _tabExtras={1:'noscroll dung',2:'noscroll miner-tab',3:'market-tab',4:'bp-tab',5:'docs-tab',7:'lb-full-tab'};
-  for(var i=0;i<8;i++){
+  var _tabExtras={1:'noscroll dung',2:'noscroll miner-tab',3:'market-tab',4:'bp-tab',5:'docs-tab',7:'lb-full-tab',8:'shop-tab'};
+  for(var i=0;i<9;i++){
     var t=document.getElementById('t'+i),nb=document.getElementById('nb'+i);
     var extras=_tabExtras[i]?(' '+_tabExtras[i]):'';
     if(t)t.className='tab'+extras+(i===n?' on':'');
@@ -1775,9 +1812,10 @@ function goTab(n){
   }
   try{uiAll();}catch(e){console.error('uiAll error (non-fatal to tab render):',e);}
   try{
-    if(n===3){if(mkActiveTab==='ores')renderOreMarket();else renderMarket(mkFilter);}
+    if(n===3){if(mkActiveTab==='ores')renderOreMarket();else if(mkActiveTab==='companions')renderCompanions();else if(mkActiveTab==='sold')renderSoldItems();else renderMarket(mkFilter);}
     if(n===4){scaleBpLayout();renderBackpack();}
     if(n===6){smithMode='reforge';_combineSel=[];_upSel=null;_smithItem=null;var _ab6=document.getElementById('smithAfterBox');if(_ab6)_ab6.classList.remove('revealed');renderSmith();}
+    if(n===8){renderGacha();}
     if(n===7)_lbFullFetch();
   }catch(e){console.error('tab render error:',e);}
 }
@@ -2014,6 +2052,7 @@ function _buildSaveData(){
   return{gold:gold,tokens:tokens,totalRocks:totalRocks,runs:runs,chests:chests,ups:ups,excPool:excPool,lifetimeExt:lifetimeExt,extBurned:extBurned,devCut:devCut,starterGiven:starterGiven,
     inventory:_allItems.map(function(it){return{id:it.id,slot:it.slot||'pickaxe',slotIcon:it.slotIcon||'ti-pickaxe',mat:it.mat,type:it.type,rarN:it.rar.n,up:it.up||0,affixes:it.affixes.map(function(a){return{tk:a.t.k,v:a.v};}),price:it.price,isSanchez:it.isSanchez?1:0,isFox:it.isFox?1:0,isWhale:it.isWhale?1:0,isGnomeo:it.isGnomeo?1:0};}),
     oreStash:oreStash,
+    ownedPets:ownedPets,
     eqSlots:{pickaxe:equippedSlots.pickaxe?equippedSlots.pickaxe.id:null,head:equippedSlots.head?equippedSlots.head.id:null,ring:equippedSlots.ring?equippedSlots.ring.id:null,amulet:equippedSlots.amulet?equippedSlots.amulet.id:null,pet:equippedSlots.pet?equippedSlots.pet.id:null},
     gameStats:gameStats,_achiev:_achiev,
     mRockNum:mRockNum,mRockHP:mRockHP,mRockMax:mRockMax,mRockType:mRockType?mRockType.n:'Rock',
@@ -2131,6 +2170,8 @@ function loadGame(){
         if(!_hasG){ inventory.push(makeGnomeoItem()); }
       }
     }catch(e){}
+    // Durable gacha-won pets — rebuild from the ownedPets mirror.
+    try{ hydrateOwnedPets(d.ownedPets); }catch(e){}
     if(d.gameStats)Object.assign(gameStats,d.gameStats);
     if(d._achiev)Object.assign(_achiev,d._achiev);
     // Offline earnings — calculate EXT earned while away (capped at 8 hours)
@@ -2853,11 +2894,11 @@ function _genOreMarket(){ oreMarketListings=[]; }
 _genOreMarket();
 function switchMkTab(tab){
   mkActiveTab=tab;
-  var pp=document.getElementById('mkPanelPickaxe'),op=document.getElementById('mkPanelOres'),sp=document.getElementById('mkPanelSold');
-  var tp=document.getElementById('mkTabPickaxe'),to2=document.getElementById('mkTabOres'),ts=document.getElementById('mkTabSold');
+  var pp=document.getElementById('mkPanelPickaxe'),op=document.getElementById('mkPanelOres'),sp=document.getElementById('mkPanelSold'),cp=document.getElementById('mkPanelCompanions');
+  var tp=document.getElementById('mkTabPickaxe'),to2=document.getElementById('mkTabOres'),ts=document.getElementById('mkTabSold'),tc=document.getElementById('mkTabCompanions');
   // reset all tabs to inactive (bordered button look)
-  [tp,to2,ts].forEach(function(t){if(t){t.style.borderColor='var(--border3)';t.style.color='var(--text3)';t.style.background='var(--bg3)';}});
-  if(pp)pp.style.display='none';if(op)op.style.display='none';if(sp)sp.style.display='none';
+  [tp,to2,ts,tc].forEach(function(t){if(t){t.style.borderColor='var(--border3)';t.style.color='var(--text3)';t.style.background='var(--bg3)';}});
+  if(pp)pp.style.display='none';if(op)op.style.display='none';if(sp)sp.style.display='none';if(cp)cp.style.display='none';
   function _activate(t){if(t){t.style.borderColor='var(--gold)';t.style.color='var(--gold)';t.style.background='rgba(200,160,64,.12)';}}
   if(tab==='pickaxe'){
     if(pp)pp.style.display='';
@@ -2867,11 +2908,246 @@ function switchMkTab(tab){
     if(op)op.style.display='';
     _activate(to2);
     renderOreMarket();
+  }else if(tab==='companions'){
+    if(cp)cp.style.display='';
+    _activate(tc);
+    renderCompanions();
   }else{
     if(sp)sp.style.display='';
     _activate(ts);
     renderSoldItems();
   }
+}
+
+// ── Companions showcase (marketplace tab) ───────────────────────────────────
+// Catalog of every companion pet. Buying/gacha isn't wired yet — this lists all
+// pets, shows their bonuses, and lets you equip any you already own.
+function petCatalog(){
+  return [
+    {key:'sanchez', id:SANCHEZ_ID, make:makeSanchezItem, img:SANCHEZ, name:'Sanchez',     accent:'#ff9ec4', stats:SANCHEZ_STATS, has:function(x){return x.isSanchez;}},
+    {key:'fox',     id:FOX_ID,     make:makeFoxItem,     img:FOX,     name:'Fox',         accent:'#ff9a3c', stats:FOX_STATS,     has:function(x){return x.isFox;}},
+    {key:'whale',   id:WHALE_ID,   make:makeWhaleItem,   img:WHALE,   name:'Trollawhalo', accent:'#93a1ad', stats:WHALE_STATS,   has:function(x){return x.isWhale;}},
+    {key:'gnomeo',  id:GNOMEO_ID,  make:makeGnomeoItem,  img:GNOMEO,  name:'Gnomeo',      accent:'#e5484d', stats:GNOMEO_STATS,  has:function(x){return x.isGnomeo;}}
+  ];
+}
+// Add a pet the player owns into their in-memory inventory if not already present.
+function grantPetLocally(key){
+  var p=petCatalog().find(function(c){return c.key===key;}); if(!p)return false;
+  ownedPets[key]=true;
+  var have=(equippedPet()&&p.has(equippedPet()))||inventory.some(p.has);
+  if(!have)inventory.push(p.make());
+  return true;
+}
+// Rebuild owned pets into inventory from the ownedPets mirror (called on load).
+function hydrateOwnedPets(src){
+  if(src&&typeof src==='object')ownedPets=Object.assign({},src);
+  petCatalog().forEach(function(p){ if(ownedPets[p.key])grantPetLocally(p.key); });
+}
+function companionEquip(id){ equipItem(id); if(mkActiveTab==='companions')renderCompanions(); }
+
+// ── Pet Gatcha (Shop tab) ───────────────────────────────────────────────────
+// The wheel is purely visual: RNG, $1 USDC verification, the once-daily limit,
+// and granting all happen server-side in /api/load (action:'gacha_spin'). This code pays $1,
+// then animates to whatever the server rolled.
+var GACHA_SEGMENTS=[
+  {key:'gnomeo',  type:'pet', label:'Gnomeo',      color:'#e5484d', mark:'G'},
+  {key:'Coal',    type:'ore', label:'Coal',        color:'#3a3a3a', mark:'\u25C6'},
+  {key:'fox',     type:'pet', label:'Fox',         color:'#ff9a3c', mark:'F'},
+  {key:'Copper',  type:'ore', label:'Copper',      color:'#c87040', mark:'\u25C6'},
+  {key:'whale',   type:'pet', label:'Trollawhalo', color:'#93a1ad', mark:'T'},
+  {key:'Iron',    type:'ore', label:'Iron',        color:'#8080a0', mark:'\u25C6'},
+  {key:'sanchez', type:'pet', label:'Sanchez',     color:'#ff9ec4', mark:'S'},
+  {key:'Silver',  type:'ore', label:'Silver',      color:'#a8b0c8', mark:'\u25C6'},
+  {key:'Gold',    type:'ore', label:'Gold',        color:'#c8a020', mark:'\u25C6'},
+  {key:'Mystrile',type:'ore', label:'Mystrile',    color:'#7858e0', mark:'\u25C6'}
+];
+// Must mirror the gacha logic in /api/load exactly.
+var GACHA_PETS=[{key:'gnomeo',name:'Gnomeo',p:1/100},{key:'fox',name:'Fox',p:1/200},{key:'whale',name:'Trollawhalo',p:1/300},{key:'sanchez',name:'Sanchez',p:1/400}];
+var GACHA_ORES=[{key:'Coal',w:26,min:10,max:20},{key:'Copper',w:24,min:10,max:20},{key:'Iron',w:22,min:10,max:20},{key:'Silver',w:13,min:5,max:10},{key:'Gold',w:9,min:5,max:10},{key:'Mystrile',w:6,min:1,max:3}];
+var _gachaRot=0, _gachaSpinning=false;
+
+function _gAuth(){ try{return JSON.parse(localStorage.getItem(_xAuthKey)||'null');}catch(e){return null;} }
+function _gFmt(ms){ var s=Math.max(0,Math.floor(ms/1000)); var h=Math.floor(s/3600), m=Math.floor((s%3600)/60); return h>0?(h+'h '+m+'m'):(m+'m'); }
+
+function _gachaWedgePath(i){
+  var a0=(i*36-90)*Math.PI/180, a1=((i+1)*36-90)*Math.PI/180, r=96, c=100;
+  var x0=c+r*Math.cos(a0), y0=c+r*Math.sin(a0), x1=c+r*Math.cos(a1), y1=c+r*Math.sin(a1);
+  return 'M'+c+' '+c+' L'+x0.toFixed(2)+' '+y0.toFixed(2)+' A'+r+' '+r+' 0 0 1 '+x1.toFixed(2)+' '+y1.toFixed(2)+' Z';
+}
+function _buildWheel(){
+  var svg=document.getElementById('gachaWheel'); if(!svg)return;
+  var parts='';
+  GACHA_SEGMENTS.forEach(function(s,i){
+    parts+='<path d="'+_gachaWedgePath(i)+'" fill="'+s.color+'" stroke="rgba(0,0,0,.35)" stroke-width="0.8"/>';
+    var ang=(i*36+18-90)*Math.PI/180, mx=100+64*Math.cos(ang), my=100+64*Math.sin(ang);
+    parts+='<text x="'+mx.toFixed(1)+'" y="'+my.toFixed(1)+'" fill="#fff" font-size="8" font-family="\'Space Mono\',monospace" text-anchor="middle" dominant-baseline="central" style="pointer-events:none">'+s.mark+'</text>';
+  });
+  parts+='<circle cx="100" cy="100" r="96" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="1"/>';
+  svg.innerHTML=parts;
+}
+function _gachaOddsHtml(){
+  var petSum=GACHA_PETS.reduce(function(s,p){return s+p.p;},0);
+  var budget=Math.max(0,1-petSum), wsum=GACHA_ORES.reduce(function(s,o){return s+o.w;},0);
+  function row(color,name,pct,extra){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:11px">'
+      +'<span style="color:var(--text2)"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:'+color+';margin-right:7px;vertical-align:middle"></span>'+name+(extra?' <span style="color:var(--text4)">'+extra+'</span>':'')+'</span>'
+      +'<span style="color:var(--gold);font-weight:700">'+pct+'</span></div>';
+  }
+  var html='<div style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#e5484d;margin:2px 0 4px">Pets</div>';
+  GACHA_PETS.forEach(function(p){ var seg=GACHA_SEGMENTS.find(function(s){return s.key===p.key;}); html+=row(seg.color,p.name,(p.p*100).toFixed(2)+'%'); });
+  html+='<div style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#c8a040;margin:10px 0 4px">Ore (if no pet)</div>';
+  GACHA_ORES.forEach(function(o){ var seg=GACHA_SEGMENTS.find(function(s){return s.key===o.key;}); var pct=(budget*(o.w/wsum)*100).toFixed(2)+'%'; html+=row(seg.color,o.key,pct,'\u00d7'+o.min+'\u2013'+o.max); });
+  return html;
+}
+function renderGacha(){
+  _buildWheel();
+  var od=document.getElementById('gachaOdds'); if(od)od.innerHTML=_gachaOddsHtml();
+  document.getElementById('gachaResult').style.display='none';
+  _gachaRefreshEligibility();
+}
+function _gachaRefreshEligibility(){
+  var btn=document.getElementById('gachaSpinBtn'), msg=document.getElementById('gachaMsg');
+  var xd=_gAuth();
+  if(!xd||!xd.username){ if(msg)msg.textContent='Sign in to spin.'; return; }
+  fetch('/api/load?gacha_status=1&username='+encodeURIComponent(xd.username)+'&token='+encodeURIComponent(xd.token||''))
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d||!d.ok)return;
+      if(d.canSpin){ if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-refresh" style="margin-right:6px"></i>Spin — $1 USDC';} if(msg)msg.textContent=''; }
+      else { if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-clock"></i> Next spin in '+_gFmt(d.msLeft);} if(msg)msg.textContent='You\u2019ve used today\u2019s spin. Come back tomorrow.'; }
+    }).catch(function(){});
+}
+function _animateWheelTo(i, cb){
+  var svg=document.getElementById('gachaWheel'); if(!svg){if(cb)cb();return;}
+  var phi=(i*36+18)%360, land=(360-phi)%360, spins=6, cur=_gachaRot||0;
+  var target=cur+spins*360+((((land-(cur%360))%360)+360)%360);
+  _gachaRot=target;
+  svg.style.transition='transform 4.4s cubic-bezier(.16,.84,.29,1)';
+  void svg.getBoundingClientRect();
+  svg.style.transform='rotate('+target+'deg)';
+  setTimeout(function(){ if(cb)cb(); }, 4550);
+}
+function _gachaReveal(reward){
+  var box=document.getElementById('gachaResult'); if(!box)return;
+  var visual, title, sub;
+  if(reward.type==='pet'){
+    var p=petCatalog().find(function(c){return c.key===reward.key;});
+    visual='<img src="'+(p?p.img.src:'')+'" style="width:52px;height:52px;image-rendering:pixelated" alt="'+reward.name+'"/>';
+    title='<span style="color:'+(p?p.accent:'#fff')+'">'+reward.name+'</span>';
+    sub='Companion pet unlocked!';
+  }else{
+    var seg=GACHA_SEGMENTS.find(function(s){return s.key===reward.key;});
+    visual='<div style="width:46px;height:46px;border-radius:8px;background:'+(seg?seg.color:'#888')+';display:flex;align-items:center;justify-content:center"><i class="ti ti-diamond" style="font-size:24px;color:rgba(255,255,255,.9)"></i></div>';
+    title='<span style="color:'+(seg?seg.color:'#fff')+'">'+reward.name+' \u00d7'+reward.qty+'</span>';
+    sub='Added to your ore stash';
+  }
+  box.innerHTML='<div style="flex-shrink:0">'+visual+'</div><div><div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text4)">You won</div><div style="font-size:16px;font-weight:700">'+title+'</div><div style="font-size:11px;color:var(--text3)">'+sub+'</div></div>';
+  box.style.display='flex';
+}
+async function _payUsdcForSpin(){
+  var mintPk=new solanaWeb3.PublicKey(_USDC_MINT);
+  var fromPk=new solanaWeb3.PublicKey(walletAddress);
+  var destPk=new solanaWeb3.PublicKey(_DEPOSIT_WALLET);
+  var units=Math.round(1*Math.pow(10,6)); // $1 USDC (6 decimals)
+  var fromATA=(await _realAcct(walletAddress))||_getATA(fromPk,mintPk);
+  var destReal=await _realAcct(_DEPOSIT_WALLET);
+  var tx=new solanaWeb3.Transaction();
+  var destATA;
+  if(destReal){destATA=destReal;}else{destATA=_getATA(destPk,mintPk);tx.add(_createATAIx(fromPk,destPk,mintPk));}
+  tx.add(_usdcIx(fromATA,destATA,fromPk,units));
+  tx.feePayer=fromPk;
+  tx.recentBlockhash=await _freshBlockhash();
+  var provider=window.phantom&&window.phantom.solana?window.phantom.solana:window.solana;
+  var signed=await provider.signAndSendTransaction(tx);
+  await _pollConfirm(signed.signature); // throws on failure — no server call if the payment didn't land
+  return signed.signature;
+}
+async function spinGacha(){
+  if(_gachaSpinning)return;
+  var btn=document.getElementById('gachaSpinBtn'), msg=document.getElementById('gachaMsg');
+  var xd=_gAuth();
+  function reset(t){ _gachaSpinning=false; if(btn){btn.disabled=false;btn.innerHTML=t||'<i class="ti ti-refresh" style="margin-right:6px"></i>Spin — $1 USDC';} }
+  if(!xd||!xd.username){ msg.style.color='var(--red)';msg.textContent='Sign in to spin.';return; }
+  if(!walletConnected||!walletAddress){ msg.style.color='var(--red)';msg.textContent='Connect your Phantom wallet first.';return; }
+  if(!window.solanaWeb3){ msg.style.color='var(--red)';msg.textContent='Web3 not loaded — refresh and retry.';return; }
+  try{
+    _gachaSpinning=true; btn.disabled=true; document.getElementById('gachaResult').style.display='none';
+    msg.style.color='var(--text3)';
+    // 1) daily eligibility (so we never take a $1 for a spin they can't use)
+    btn.innerHTML='<i class="ti ti-loader"></i> Checking...';
+    var elig=await fetch('/api/load?gacha_status=1&username='+encodeURIComponent(xd.username)+'&token='+encodeURIComponent(xd.token||'')).then(function(r){return r.json();});
+    if(!elig||!elig.ok){ throw new Error((elig&&elig.error)||'Could not verify eligibility.'); }
+    if(!elig.canSpin){ msg.textContent='You already spun today. Next spin in '+_gFmt(elig.msLeft); reset('<i class="ti ti-clock"></i> Next spin in '+_gFmt(elig.msLeft)); btn.disabled=true; return; }
+    // 2) pay $1 USDC
+    btn.innerHTML='<i class="ti ti-wallet"></i> Approve $1 in wallet...';
+    var sig=await _payUsdcForSpin();
+    // 3) server rolls + grants
+    btn.innerHTML='<i class="ti ti-loader"></i> Spinning...';
+    var d=await fetch('/api/load',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:xd.username,token:xd.token||'',action:'gacha_spin',signature:sig})}).then(function(r){return r.json();});
+    if(!d||!d.ok||!d.reward){
+      msg.style.color='var(--red)';
+      msg.textContent=(d&&d.error)?d.error:('Spin failed. If $1 was deducted, contact support with TX: '+sig.substr(0,12)+'\u2026');
+      reset(); return;
+    }
+    // 4) apply grant locally + persist, then animate to the result
+    if(d.reward.type==='pet'){ grantPetLocally(d.reward.key); }
+    else if(d.reward.type==='ore'){ oreStash[d.reward.key]=(oreStash[d.reward.key]||0)+d.reward.qty; }
+    if(d.owned_pets)hydrateOwnedPets(d.owned_pets);
+    if(d.ore_stash&&typeof d.ore_stash==='object')oreStash=Object.assign(oreStash,d.ore_stash);
+    saveGame(true); try{uiAll();}catch(e){}
+    var idx=GACHA_SEGMENTS.findIndex(function(s){return s.key===d.reward.key;});
+    if(idx<0)idx=0;
+    msg.textContent='';
+    _animateWheelTo(idx, function(){
+      _gachaReveal(d.reward);
+      _gachaSpinning=false;
+      var next=d.nextMs||86400000;
+      if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-clock"></i> Next spin in '+_gFmt(next);}
+    });
+  }catch(e){
+    console.error('Gacha spin error:',e);
+    msg.style.color='var(--red)';
+    msg.textContent=(e&&e.message)?e.message.substr(0,140):'Spin failed — nothing was charged.';
+    reset();
+  }
+}
+function switchShopTab(tab){
+  // Only Pet Gatcha exists for now; hook kept for future shop sections.
+  if(tab==='gacha'){ var p=document.getElementById('shopPanelGacha'); if(p)p.style.display=''; renderGacha(); }
+}
+function renderCompanions(){
+  var grid=document.getElementById('mkCompanionGrid');
+  if(!grid)return;
+  var eqPet=equippedPet();
+  var cat=petCatalog();
+  var mkc=document.getElementById('mkCount'); if(mkc)mkc.textContent=cat.length+' companions';
+  grid.innerHTML=cat.map(function(p){
+    var isEq  = !!(eqPet && p.has(eqPet));
+    var owned = isEq || inventory.some(p.has);
+    var statHtml=p.stats.map(function(s){
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05)">'
+        +'<span style="color:'+p.accent+';font-size:11px"><i class="ti '+s.icon+'" style="margin-right:5px;font-size:12px;vertical-align:middle"></i>'+s.label+'</span>'
+        +'<span style="color:var(--gold);font-size:11px;font-weight:700">'+s.val+'</span></div>';
+    }).join('');
+    var badge, action;
+    if(isEq){
+      badge='<span style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#0b0b0b;background:'+p.accent+';padding:3px 8px;border-radius:20px;font-weight:700">Equipped</span>';
+      action='<div style="text-align:center;font-size:11px;color:var(--text3);padding:8px 0 2px">Active companion</div>';
+    }else if(owned){
+      badge='<span style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--green);border:1px solid var(--green);padding:2px 8px;border-radius:20px;font-weight:700">Owned</span>';
+      action='<button onclick="companionEquip(\''+p.id+'\')" style="width:100%;margin-top:8px;background:'+p.accent+';border:none;border-radius:8px;color:#0b0b0b;padding:8px;cursor:pointer;font-family:\'Space Mono\',monospace;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Equip</button>';
+    }else{
+      badge='<span style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text4);border:1px solid var(--border3);padding:2px 8px;border-radius:20px">Locked</span>';
+      action='<div style="text-align:center;font-size:10px;color:var(--text4);padding:8px 0 2px">Not yet obtainable</div>';
+    }
+    return '<div style="width:210px;background:var(--bg3);border:1.5px solid '+(isEq?p.accent:'var(--border3)')+';border-radius:14px;padding:14px;display:flex;flex-direction:column;'+(owned?'':'opacity:.6')+'">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px"><span style="font-size:14px;font-weight:700;color:'+p.accent+'">'+p.name+'</span>'+badge+'</div>'
+      +'<div style="height:96px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 60%, rgba(255,255,255,.05), transparent 70%);border-radius:10px;margin-bottom:10px">'
+        +'<img src="'+p.img.src+'" style="max-width:120px;max-height:88px;image-rendering:pixelated" alt="'+p.name+'"/></div>'
+      +'<div style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text4);margin-bottom:6px">Companion</div>'
+      +statHtml+action+'</div>';
+  }).join('');
 }
 
 function renderSoldItems(){
@@ -6456,7 +6732,7 @@ function _setSignedInUI(username){
         // never overwrite local storage, or the autosave would wipe the account.
         if(d&&!d.error&&(d.updated_at||typeof d.gold==='number')){
           var mapped={gold:d.gold,tokens:d.tokens,totalRocks:d.total_rocks,runs:d.runs,chests:d.chests,
-            ups:d.ups,oreStash:d.ore_stash,inventory:d.inventory,eqSlots:d.equipped_slots,
+            ups:d.ups,oreStash:d.ore_stash,ownedPets:d.owned_pets,inventory:d.inventory,eqSlots:d.equipped_slots,
             gameStats:d.game_stats,_achiev:d.achievements,lifetimeExt:d.lifetime_ext,
             mRockNum:d.mRockNum,mRockHP:d.mRockHP,mRockMax:d.mRockMax,mRockType:d.mRockType};
           localStorage.setItem(_localKey,JSON.stringify(mapped));
