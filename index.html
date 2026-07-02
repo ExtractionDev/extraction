@@ -2379,12 +2379,16 @@ async function depositTokens(){
     var units=Math.round(amt*Math.pow(10,_DEPOSIT_DECIMALS));
     // REAL on-chain accounts via Solscan-backed lookup (handles non-standard accounts); derive/create as fallback
     var _depUSDC=(_DEPOSIT_MINT===_USDC_MINT);
-    var fromATA=(_depUSDC?await _realAcct(walletAddress):null)||_getATA(fromPk,mintPk);
+    // USDC is classic SPL Token; $EXT (pump.fun) is Token-2022. Pick the matching program.
+    var _tokProg=_depUSDC?_TOKEN_PROG:_TOKEN22_PROG;
+    var fromATA=(_depUSDC?await _realAcct(walletAddress):null)||_getATA(fromPk,mintPk,_tokProg);
     var destReal=(_depUSDC?await _realAcct(_DEPOSIT_WALLET):null);
     var tx=new solanaWeb3.Transaction();
     var destATA;
-    if(destReal){destATA=destReal;}else{destATA=_getATA(destPk,mintPk);tx.add(_createATAIx(fromPk,destPk,mintPk));}
-    tx.add(_usdcIx(fromATA,destATA,fromPk,units));
+    if(destReal){destATA=destReal;}else{destATA=_getATA(destPk,mintPk,_tokProg);tx.add(_createATAIx(fromPk,destPk,mintPk,_tokProg));}
+    // Classic USDC → plain Transfer; Token-2022 $EXT → TransferChecked (required + fee-safe).
+    if(_depUSDC){tx.add(_usdcIx(fromATA,destATA,fromPk,units));}
+    else{tx.add(_transferCheckedIx(fromATA,mintPk,destATA,fromPk,units,_DEPOSIT_DECIMALS,_tokProg));}
     tx.feePayer=fromPk;
     tx.recentBlockhash=await _freshBlockhash();
     btn.textContent='Approve in wallet...';
@@ -2768,6 +2772,7 @@ var _USDC_MINT='EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 var _DEV_WALLET='B8ubxUGnvhDTGGRkkN8DkyAfnoLEfnjTPdXfQn3TnVQa';
 var _FEE_WALLET='72MJWgvcqEb43mbuSTiHme6oYr4rEvwc7f3kaETHdNaN';
 var _TOKEN_PROG='TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+var _TOKEN22_PROG='TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'; // Token-2022 — pump.fun mints (incl. $EXT) use this
 var _ASSOC_PROG='ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL';
 
 async function _pollConfirm(signature){
@@ -2815,9 +2820,10 @@ async function _freshBlockhash(){
 
 
 function _usdcMintPk(){return new solanaWeb3.PublicKey(_USDC_MINT);}
-function _getATA(walletPk,mintPk){
+function _getATA(walletPk,mintPk,tokenProg){
+  tokenProg=tokenProg||_TOKEN_PROG;
   return solanaWeb3.PublicKey.findProgramAddressSync(
-    [walletPk.toBuffer(),new solanaWeb3.PublicKey(_TOKEN_PROG).toBuffer(),mintPk.toBuffer()],
+    [walletPk.toBuffer(),new solanaWeb3.PublicKey(tokenProg).toBuffer(),mintPk.toBuffer()],
     new solanaWeb3.PublicKey(_ASSOC_PROG)
   )[0];
 }
@@ -2835,6 +2841,24 @@ function _usdcIx(fromATA,toATA,ownerPk,amount){
     programId:new solanaWeb3.PublicKey(_TOKEN_PROG),data:data
   });
 }
+// TransferChecked (discriminator 12): data = [12, amount(8 LE), decimals(1)].
+// Required for Token-2022 transfers and safe if the mint has a transfer-fee extension.
+function _transferCheckedIx(fromATA,mintPk,toATA,ownerPk,amount,decimals,tokenProg){
+  tokenProg=tokenProg||_TOKEN_PROG;
+  var data=new Uint8Array(10);data[0]=12;
+  var amt=BigInt(Math.round(amount));
+  for(var i=0;i<8;i++){data[1+i]=Number(amt&BigInt(0xff));amt>>=BigInt(8);}
+  data[9]=decimals&0xff;
+  return new solanaWeb3.TransactionInstruction({
+    keys:[
+      {pubkey:fromATA,isSigner:false,isWritable:true},
+      {pubkey:mintPk,isSigner:false,isWritable:false},
+      {pubkey:toATA,isSigner:false,isWritable:true},
+      {pubkey:ownerPk,isSigner:true,isWritable:false}
+    ],
+    programId:new solanaWeb3.PublicKey(tokenProg),data:data
+  });
+}
 // Check if an ATA exists on-chain via server
 async function _ataExists(ataPk){
   try{
@@ -2844,8 +2868,9 @@ async function _ataExists(ataPk){
   }catch(e){return false;}
 }
 // Idempotent ATA creation — creates token account if missing, no-op if it already exists
-function _createATAIx(payerPk,ownerPk,mintPk){
-  var ata=_getATA(ownerPk,mintPk);
+function _createATAIx(payerPk,ownerPk,mintPk,tokenProg){
+  tokenProg=tokenProg||_TOKEN_PROG;
+  var ata=_getATA(ownerPk,mintPk,tokenProg);
   return new solanaWeb3.TransactionInstruction({
     keys:[
       {pubkey:payerPk,isSigner:true,isWritable:true},
@@ -2853,7 +2878,7 @@ function _createATAIx(payerPk,ownerPk,mintPk){
       {pubkey:ownerPk,isSigner:false,isWritable:false},
       {pubkey:mintPk,isSigner:false,isWritable:false},
       {pubkey:solanaWeb3.SystemProgram.programId,isSigner:false,isWritable:false},
-      {pubkey:new solanaWeb3.PublicKey(_TOKEN_PROG),isSigner:false,isWritable:false}
+      {pubkey:new solanaWeb3.PublicKey(tokenProg),isSigner:false,isWritable:false}
     ],
     programId:new solanaWeb3.PublicKey(_ASSOC_PROG),
     data:new Uint8Array([1])
