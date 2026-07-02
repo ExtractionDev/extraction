@@ -1725,7 +1725,13 @@ function goTab(n){
     var ep=document.getElementById('excPodium');if(ep)ep.style.display='block';
     renderExcPodium();_fetchExcWinners();
   }
-  uiAll();if(n===3){if(mkActiveTab==='ores')renderOreMarket();else renderMarket(mkFilter);}if(n===4){scaleBpLayout();renderBackpack();}if(n===6){smithMode='reforge';_combineSel=[];_upSel=null;_smithItem=null;var _ab6=document.getElementById('smithAfterBox');if(_ab6)_ab6.classList.remove('revealed');renderSmith();}if(n===7)_lbFullFetch();
+  try{uiAll();}catch(e){console.error('uiAll error (non-fatal to tab render):',e);}
+  try{
+    if(n===3){if(mkActiveTab==='ores')renderOreMarket();else renderMarket(mkFilter);}
+    if(n===4){scaleBpLayout();renderBackpack();}
+    if(n===6){smithMode='reforge';_combineSel=[];_upSel=null;_smithItem=null;var _ab6=document.getElementById('smithAfterBox');if(_ab6)_ab6.classList.remove('revealed');renderSmith();}
+    if(n===7)_lbFullFetch();
+  }catch(e){console.error('tab render error:',e);}
 }
 
 async function connectPhantom(){
@@ -4613,7 +4619,7 @@ function renderSmith(){
   grid.innerHTML=items.map(function(obj,idx){
     var it=obj.item;
     var sel=_smithItem&&_smithItem.id===it.id;
-    var c=SMITH_COSTS[it.rar.n];
+    var c=SMITH_COSTS[it.rar.n]||0;
     var h='<div class="mk-card" onclick="smithSelectIdx('+idx+')" style="border-color:'+(sel?it.rar.c:'var(--border)')+';background:'+(sel?it.rar.bg:'var(--bg3)')+'">'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
         itemIcon(it.rar,26)+
