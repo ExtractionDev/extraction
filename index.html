@@ -3210,13 +3210,15 @@ async function spinGacha(){
   var btn=document.getElementById('gachaSpinBtn'), msg=document.getElementById('gachaMsg');
   var xd=_gAuth();
   function reset(t){ _gachaSpinning=false; if(btn){btn.disabled=false;btn.innerHTML=t||(_gachaFirstFree?'<i class="ti ti-gift" style="margin-right:6px"></i>Spin \u2014 FREE':'<i class="ti ti-refresh" style="margin-right:6px"></i>Spin \u2014 $1 USDC');} }
+  function _sessionErr(s){ return /invalid session|session expired|player not found/i.test(String(s||'')); }
+  function _handleSession(){ _gachaSpinning=false; if(btn){btn.disabled=false;} if(msg){msg.style.color='var(--red)';msg.textContent='Your session expired \u2014 please sign in again.';} setTimeout(function(){ try{openXAuth();}catch(e){} },1200); }
   if(!xd||!xd.username){ msg.style.color='var(--red)';msg.textContent='Sign in to spin.';return; }
   try{
     _gachaSpinning=true; btn.disabled=true; document.getElementById('gachaResult').style.display='none';
     msg.style.color='var(--text3)';
     btn.innerHTML='<i class="ti ti-loader"></i> Checking...';
     var elig=await fetch('/api/load?gacha_status=1&username='+encodeURIComponent(xd.username)+'&token='+encodeURIComponent(xd.token||'')).then(function(r){return r.json();});
-    if(!elig||!elig.ok){ throw new Error((elig&&elig.error)||'Could not verify eligibility.'); }
+    if(!elig||!elig.ok){ if(_sessionErr(elig&&elig.error)){ _handleSession(); return; } throw new Error((elig&&elig.error)||'Could not verify eligibility.'); }
     var isFree=!!elig.firstFree; _gachaFirstFree=isFree;
     var sig=null;
     if(!isFree){
@@ -3230,6 +3232,7 @@ async function spinGacha(){
     if(sig)payload.signature=sig;
     var d=await fetch('/api/load',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){return r.json();});
     if(!d||!d.ok||!d.reward){
+      if(_sessionErr(d&&d.error)){ _handleSession(); return; }
       msg.style.color='var(--red)';
       msg.textContent=(d&&d.error)?d.error:('Spin failed.'+(sig?(' If $1 was deducted, contact support with TX: '+sig.substr(0,12)+'\u2026'):''));
       reset(); return;
@@ -3253,6 +3256,7 @@ async function spinGacha(){
     });
   }catch(e){
     console.error('Gacha spin error:',e);
+    if(_sessionErr(e&&e.message)){ _handleSession(); return; }
     msg.style.color='var(--red)';
     msg.textContent=(e&&e.message)?e.message.substr(0,140):'Spin failed \u2014 nothing was charged.';
     reset();
