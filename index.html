@@ -1725,7 +1725,7 @@ function goTab(n){
     var ep=document.getElementById('excPodium');if(ep)ep.style.display='block';
     renderExcPodium();_fetchExcWinners();
   }
-  uiAll();if(n===3){if(mkActiveTab==='ores')renderOreMarket();else renderMarket(mkFilter);}if(n===4){scaleBpLayout();renderBackpack();}if(n===6)renderSmith();if(n===7)_lbFullFetch();
+  uiAll();if(n===3){if(mkActiveTab==='ores')renderOreMarket();else renderMarket(mkFilter);}if(n===4){scaleBpLayout();renderBackpack();}if(n===6){smithMode='reforge';_combineSel=[];_upSel=null;renderSmith();}if(n===7)_lbFullFetch();
 }
 
 async function connectPhantom(){
