@@ -138,13 +138,19 @@ export default async function handler(req, res) {
   if (player.banned) return res.status(403).json({ error: 'Account suspended.' });
 
   // ── ADMIN RESET ─────────────────────────────────────────────────────────
-  // If an admin set reset_flag = true (e.g. via SQL), wipe this account to a
-  // fresh state server-side and tell the client to clear its local save. We do
-  // this BEFORE processing the incoming save so the client's old data cannot be
-  // written back. The client, on seeing reset:true, clears localStorage and
-  // reloads — after which it loads this fresh row. Fully server-driven: setting
-  // the flag in the DB is all that's needed to wipe a player.
+  // If an admin set reset_flag = true (e.g. via SQL), pin this account to a base
+  // state until a freshly-reloaded client confirms. We force base on EVERY save
+  // while the flag is set — this is what stops upgrade/miner levels (`ups`) from
+  // climbing back: normal saves allow ups to rise by up to MAX_UP_GAIN per save
+  // (Math.max(prev,...)), so clearing the flag after a single reset let a stale
+  // client re-inflate them. The flag only clears once the incoming save is itself
+  // already at base (ups all zero, gold <= 50), i.e. the client reloaded clean.
   if (player.reset_flag === true) {
+    const d = data || {};
+    const upsSum = (d.ups && typeof d.ups === 'object')
+      ? Object.keys(d.ups).reduce((a, k) => a + (parseFloat(d.ups[k]) || 0), 0) : 0;
+    const clientClean = upsSum === 0 && (Math.floor(parseFloat(d.gold) || 0) <= 50);
+
     const baseRow = {
       username,
       gold: 50,
@@ -152,7 +158,7 @@ export default async function handler(req, res) {
       total_rocks: 0,
       runs: 0,
       chests: 0,
-      ups: {},
+      ups: { speed: 0, power: 0, sell: 0, luck: 0 }, // explicit zeros (not {})
       ore_stash: {},
       inventory: [],
       equipped_slots: {},
@@ -160,7 +166,7 @@ export default async function handler(req, res) {
       achievements: {},
       lifetime_ext: 0,
       last_entry_fee: 0,
-      reset_flag: false,           // clear the flag so it only fires once
+      reset_flag: clientClean ? false : true, // HOLD until the client is clean
       updated_at: new Date().toISOString()
     };
     const { error: resetErr } = await supabase
@@ -170,7 +176,8 @@ export default async function handler(req, res) {
       console.error('Admin reset failed:', resetErr);
       return res.status(500).json({ error: 'Reset failed — try again.' });
     }
-    return res.status(200).json({ ok: true, reset: true });
+    // While not yet clean, tell the client to wipe local storage and reload.
+    return res.status(200).json({ ok: true, reset: !clientClean });
   }
 
   const {
