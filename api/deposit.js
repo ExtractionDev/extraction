@@ -232,7 +232,7 @@ export default async function handler(req, res) {
         ...(innerIx.flatMap(ii => ii.instructions) || [])
       ];
       allIx.forEach(ix => {
-        if (!ix || ix.program !== 'spl-token' || !ix.parsed) return;
+        if (!ix || (ix.program !== 'spl-token' && ix.program !== 'spl-token-2022') || !ix.parsed) return;
         if (ix.parsed.type !== 'transfer' && ix.parsed.type !== 'transferChecked') return;
         const info = ix.parsed.info || {};
         const dest = info.destination;
