@@ -69,14 +69,16 @@ const VALID_AFFIX_KEYS = ['speed','power','sell','luck','dungeonGC','crystalRes'
 const FIXED_AFFIX      = { dungeonGC: 10, crystalRes: 25 };
 
 function maxEarnPerSec(ups) {
-  const speed = Math.min(Math.max(0, ups.speed || 0), MAX_UP_LEVEL);
-  const power = Math.min(Math.max(0, ups.power || 0), MAX_UP_LEVEL);
-  const sell  = Math.min(Math.max(0, ups.sell  || 0), MAX_UP_LEVEL);
-  const spd   = 0.5 + speed * 0.015;
-  const pow   = 1.0 + power * 0.12;
-  const sellV = 0.01 + sell * 0.003;
-  const ROCK_HP_MIN = 5, ROCK_MULTI_MAX = 25, GEAR = 5;
-  return (sellV * GEAR) * ((spd * GEAR) * (pow * GEAR) / ROCK_HP_MIN) * ROCK_MULTI_MAX;
+  // Must track the client's minerExtPerDay() curve (driven by the sell track):
+  // L1-49 quadratic tutorial ramp -> ~300/day at L50 -> logistic to ~20k asymptote.
+  // We return a per-second cap with 2x headroom so legit gear (+50%) never gets
+  // falsely clamped, while still bounding a hacked client.
+  const lvl = Math.min(Math.max(0, ups.sell || 0), MAX_UP_LEVEL);
+  let base;
+  if (lvl < 50) { base = 300 * Math.pow(lvl / 50, 2); }
+  else { const eff = lvl - 49; base = 20000 / (1 + 68.23 * Math.exp(-0.03828 * eff)); }
+  const HEADROOM = 2; // gear + margin
+  return (base * HEADROOM) / 86400;
 }
 
 function clampInventory(inventory) {
