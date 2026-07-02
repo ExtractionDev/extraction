@@ -86,6 +86,7 @@ const GACHA_COST_USDC   = 1.0;
 const GACHA_SLIPPAGE    = 0.02;
 const GACHA_DAY_MS      = 24 * 60 * 60 * 1000;
 const GACHA_SIG_RE      = /^[1-9A-HJ-NP-Za-km-z]{43,90}$/;
+const GACHA_MAX_TX_AGE_SEC = 15 * 60; // freshness window for paid spins
 const GACHA_VALID_ORES  = ['Coal','Copper','Iron','Silver','Gold','Mystrile'];
 const GACHA_PET_PRIZES = [
   { type:'pet', key:'gnomeo',  name:'Gnomeo',      p: 1/100 },
@@ -292,66 +293,37 @@ export default async function handler(req, res) {
     }
 
     // ---------- DAILY STREAK CLAIM (24h rolling cooldown) ----------
+    // The whole cooldown check + streak update + credit now happens inside the
+    // claim_streak SQL function under a row lock (SELECT ... FOR UPDATE), so two
+    // concurrent claims can't both pass the cooldown and double-credit.
     if (action === 'claim_streak') {
-      const STREAK_REWARDS = { 1: 500, 2: 750, 3: 1000, 4: 1500, 5: 2000, 6: 3000, 7: 5000 };
-      const now = Date.now();
-      // Re-fetch claim fields (player above may not include them).
-      let claimRow = null;
-      try {
-        const cr = await supabase
-          .from('players')
-          .select('login_streak, last_streak_claim')
-          .eq('username', username)
-          .single();
-        claimRow = cr.data;
-      } catch (e) { claimRow = null; }
-
-      const lastClaimMs = claimRow && claimRow.last_streak_claim ? new Date(claimRow.last_streak_claim).getTime() : 0;
-      const prevStreak = (claimRow && claimRow.login_streak) || 0;
-      const elapsed = now - lastClaimMs;
-      const DAY = 24 * 3600 * 1000;
-
-      if (lastClaimMs && elapsed < DAY) {
-        const msLeft = DAY - elapsed;
-        return res.status(200).json({ ok: false, cooldown: true, msLeft,
-          error: 'Already claimed. Come back later.' });
-      }
-
-      // Determine new streak day: within 48h of last claim = continue, else reset.
-      let newStreak;
-      if (lastClaimMs && elapsed <= 2 * DAY) {
-        newStreak = prevStreak >= 7 ? 1 : prevStreak + 1;
-      } else {
-        newStreak = 1; // missed the window (or first ever) → restart
-      }
-      const reward = STREAK_REWARDS[newStreak] || 0;
-
-      // Persist claim state first (so a failed credit can't be double-claimed).
-      const { error: updErr } = await supabase.from('players').update({
-        login_streak: newStreak,
-        last_streak_claim: new Date(now).toISOString()
-      }).eq('username', username);
-      if (updErr) {
-        console.error('claim_streak update failed:', updErr.message);
+      const { data: result, error: csErr } = await supabase
+        .rpc('claim_streak', { p_username: username });
+      if (csErr) {
+        console.error('claim_streak rpc failed:', csErr.message);
         return res.status(500).json({ ok: false, error: 'Could not record claim. Try again.' });
       }
-
-      // Credit the reward.
-      const { data: newBalRaw, error: creditErr } = await supabase
-        .rpc('credit_tokens', { p_username: username, p_amount: reward });
-      if (creditErr) {
-        console.error('claim_streak credit failed:', creditErr.message);
-        return res.status(500).json({ ok: false, error: 'Claim recorded but credit failed — contact support.' });
+      if (!result || !result.ok) {
+        return res.status(200).json({
+          ok: false,
+          cooldown: !!(result && result.cooldown),
+          msLeft: result && result.ms_left,
+          error: 'Already claimed. Come back later.'
+        });
       }
-      const newBalance = parseFloat(newBalRaw) || 0;
-      return res.status(200).json({ ok: true, streak: newStreak, reward, newBalance, nextMs: DAY });
+      return res.status(200).json({
+        ok: true,
+        streak: result.streak,
+        reward: result.reward,
+        nextMs: 24 * 3600 * 1000
+      });
     }
 
     // ---------- JACKPOT PULL ----------
     if (action === 'jackpot') {
       // Anti-drain gate: a pull requires a paid entry that hasn't been used yet.
       // This atomically consumes one pull "ticket" (set when the entry fee was
-      // paid). No ticket → no pull. Since 80% of every entry fee feeds the pool,
+      // paid). No ticket → no pull. Since 50% of every entry fee feeds the pool,
       // pulls are self-funding and the endpoint can't be scripted to drain it.
       const { data: eligible, error: elErr } = await supabase
         .rpc('claim_jackpot_pull', { p_username: username });
@@ -368,24 +340,23 @@ export default async function handler(req, res) {
       // Pay out a share of the pool based on the entry fee that earned this pull
       // (server-recorded in last_entry_fee — can't be faked by the client). Flat
       // ~4–7.5% for any entry up to 20K; above 20K it scales up on a log curve to
-      // ~40% at a 100K entry. No clawback: read pool, credit payout, write pool down.
+      // ~40% at a 100K entry.
       const entryFeePaid = Math.max(1000, Math.min(100000, parseFloat(player.last_entry_fee) || 1000));
       const SCALE_START = 20000;
       const tFee = entryFeePaid <= SCALE_START ? 0
         : (Math.log10(entryFeePaid) - Math.log10(SCALE_START)) / (Math.log10(100000) - Math.log10(SCALE_START));
       const centerPct = 0.0575 + tFee * (0.40 - 0.0575);       // flat 5.75% ≤20K, then → 40% at 100K
       const pct = Math.max(0.04, Math.min(0.40, centerPct + (Math.random() - 0.5) * 0.035));
-      const poolNow = await getPoolAmount();
-      const payout = Math.max(0, Math.floor(poolNow * pct));
 
-      if (payout > 0) {
-        const { error: credErr } = await supabase
-          .rpc('credit_tokens', { p_username: username, p_amount: payout });
-        if (credErr) return res.status(500).json({ error: 'Award failed: ' + credErr.message });
-        const { error: updErr } = await supabase
-          .from('global_pool').update({ pool: poolNow - payout }).eq('id', 1);
-        if (updErr) console.error('pool decrement failed:', updErr.message);
-      }
+      // award_jackpot reads the pool, credits the winner, and decrements the pool
+      // in ONE transaction under a row lock (SELECT ... FOR UPDATE), and clamps
+      // the payout so the pool can never go negative. This closes the concurrent
+      // over-drain where two winners both read the same pool and both got paid
+      // while the pool was only decremented once.
+      const { data: payoutRaw, error: awErr } = await supabase
+        .rpc('award_jackpot', { p_username: username, p_pct: pct });
+      if (awErr) return res.status(500).json({ error: 'Award failed: ' + awErr.message });
+      const payout = Math.floor(parseFloat(payoutRaw) || 0);
 
       const amount = payout;
       const newTokens = (player.tokens || 0) + amount;
@@ -445,6 +416,12 @@ export default async function handler(req, res) {
         const gtx = await gachaGetParsedTx(signature);
         if (!gtx) return res.status(400).json({ error: 'Transaction not found / not confirmed yet. Try again in a moment.' });
         if (gtx.meta && gtx.meta.err) return res.status(400).json({ error: 'Transaction failed on chain.' });
+
+        // Freshness gate: reject payments not made recently. Combined with the
+        // unique(signature) constraint this limits replay of an old $1 transfer.
+        if (gtx.blockTime && (Date.now() / 1000 - gtx.blockTime) > GACHA_MAX_TX_AGE_SEC) {
+          return res.status(400).json({ error: 'Payment is too old — pay and confirm, then spin promptly.' });
+        }
 
         const paid = gachaUsdcReceived(gtx, GACHA_WALLET_ADDR);
         try {
