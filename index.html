@@ -3032,12 +3032,10 @@ function uiAll(){
               function(){var lk=ups.luck+1;return'Silver→'+((0.10+lk*0.001)*100).toFixed(1)+'%';}];
   for(var i=0;i<4;i++){var c=getCost(ts[i]),btn=el(ids[i]+'Bt'),tip=el(ids[i]+'BtTip'),oreEl=el(ids[i]+'Ore');
     if(ups[ts[i]]>=500){btn.className='up-btn maxed';btn.innerHTML='MAXED';if(oreEl)oreEl.innerHTML='';}
-    else{var oc=getOreCost(ts[i]),aff=(gold>=c&&_oreTotal()>=oc);btn.className='up-btn'+(aff?'':' off');btn.innerHTML='<i class="ti ti-arrow-up"></i> Upgrade · '+c+' 🪙'+(oc>0?' · '+oc+' ⛏':'');
-      if(oreEl){
-        if(oc<=0){oreEl.innerHTML='<span class="lbl">no ore needed yet</span>';}
-        else{var _have=_oreTotal(),_enough=_have>=oc;
-          oreEl.innerHTML='<span style="display:inline-flex;align-items:center;gap:6px;vertical-align:middle">'+_oreImgTag('stone_1',26)+'<span style="font-weight:800;font-size:16px;color:'+(_enough?'var(--gold)':'var(--red)')+'">'+oc.toLocaleString()+'</span></span>';}
-      }
+    else{var oc=getOreCost(ts[i]),aff=(gold>=c&&_oreTotal()>=oc);btn.className='up-btn'+(aff?'':' off');
+      var _oreBtn=oc>0?(' · <img src="'+((typeof _B64!=='undefined'&&_B64['stone_1'])||'')+'" width="16" height="16" style="image-rendering:pixelated;vertical-align:middle;display:inline-block"> '+oc.toLocaleString()):'';
+      btn.innerHTML='<i class="ti ti-arrow-up"></i> Upgrade · '+c+' 🪙'+_oreBtn;
+      if(oreEl)oreEl.innerHTML='';
     }
     if(tip)tip.textContent=ups[ts[i]]>=500?'Maxed':tipFns[i]();
   }
