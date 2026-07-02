@@ -20,11 +20,21 @@ function applyCors(req, res) {
 // Solana tx signatures are base58, ~87-88 chars.
 const SIG = /^[1-9A-HJ-NP-Za-km-z]{43,90}$/;
 
-const USDC_MINT     = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-// YOUR deposit wallet — set this in Vercel env. All deposits must land here.
-const DEPOSIT_WALLET = process.env.DEPOSIT_WALLET;
-// In-game credit rate. index.html advertises $10 USDC = 100,000 $EXT.
-const EXT_PER_USDC   = 10000;
+// ── $EXT on-chain SPL token ──────────────────────────────────────────────
+// The pump.fun mint (contract address) for $EXT.
+const EXT_MINT     = '39J4ae3kHkH3TGBANTkmKpHnPQQa61UvR2AScq5Apump';
+// pump.fun mints use 6 decimals (same as USDC). Only used by the fallback
+// integer-amount path below; the primary read uses uiAmountString and is
+// decimals-agnostic. If you ever confirm the mint uses a different number of
+// decimals, change this one value.
+const EXT_DECIMALS = 6;
+// Wallet that must receive the deposit. Falls back to the same DEPOSIT_WALLET
+// used for USDC if you don't set a separate one. Set in Vercel env.
+const DEPOSIT_WALLET = process.env.EXT_DEPOSIT_WALLET || process.env.DEPOSIT_WALLET;
+// How much IN-GAME $EXT to credit per 1 ON-CHAIN $EXT deposited.
+// 1 = a true 1:1 bridge (deposit 500 $EXT on chain → get 500 in-game $EXT).
+// Override with EXT_CREDIT_RATE in env without editing code if you want.
+const EXT_CREDIT_RATE = parseFloat(process.env.EXT_CREDIT_RATE || '1');
 
 // Look up the real USDC token account for a wallet (derivation can mismatch
 // non-standard accounts, so query the chain).
@@ -37,7 +47,7 @@ async function getRealUsdcAccount(wallet) {
         body: JSON.stringify({
           jsonrpc: '2.0', id: 1,
           method: 'getTokenAccountsByOwner',
-          params: [wallet, { mint: USDC_MINT }, { encoding: 'jsonParsed' }]
+          params: [wallet, { mint: EXT_MINT }, { encoding: 'jsonParsed' }]
         })
       });
       const d = await r.json();
@@ -151,7 +161,7 @@ export default async function handler(req, res) {
   const post = (tx.meta && tx.meta.postTokenBalances) ? tx.meta.postTokenBalances : [];
   console.log('DEPOSIT RAW', JSON.stringify({
     depositWallet: DEPOSIT_WALLET,
-    usdcMint: USDC_MINT,
+    extMint: EXT_MINT,
     pre: pre.map(b => ({ owner: b.owner, mint: b.mint, amt: b.uiTokenAmount && b.uiTokenAmount.uiAmountString })),
     post: post.map(b => ({ owner: b.owner, mint: b.mint, amt: b.uiTokenAmount && b.uiTokenAmount.uiAmountString }))
   }));
@@ -163,7 +173,7 @@ export default async function handler(req, res) {
   {
     const dropByOwner = {};
     const acc = (list, sign) => (list || []).forEach(b => {
-      if (!b || b.mint !== USDC_MINT || !b.owner) return;
+      if (!b || b.mint !== EXT_MINT || !b.owner) return;
       const a = parseFloat(b.uiTokenAmount?.uiAmountString || b.uiTokenAmount?.uiAmount || 0) || 0;
       dropByOwner[b.owner] = (dropByOwner[b.owner] || 0) + sign * a;
     });
@@ -182,7 +192,7 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'This deposit came from a wallet not linked to your account.' });
   }
 
-  let usdcReceived = 0;
+  let extReceived = 0;
   try {
     // Method 1: pre/post token balances. Match the deposit wallet's USDC either
     // by OWNER == DEPOSIT_WALLET, or by the token-account address (accountKeys[accountIndex])
@@ -190,11 +200,11 @@ export default async function handler(req, res) {
     const accountKeys = ((tx.transaction && tx.transaction.message && tx.transaction.message.accountKeys) || [])
       .map(k => (typeof k === 'string' ? k : (k && k.pubkey) || ''));
 
-    function usdcEntries(list) {
+    function extEntries(list) {
       // Return {index -> uiAmount} for USDC entries owned by the deposit wallet.
       const out = {};
       (list || []).forEach(b => {
-        if (!b || b.mint !== USDC_MINT) return;
+        if (!b || b.mint !== EXT_MINT) return;
         const ownerMatch = b.owner === DEPOSIT_WALLET;
         if (!ownerMatch) return;
         const a = b.uiTokenAmount ? parseFloat(b.uiTokenAmount.uiAmountString || b.uiTokenAmount.uiAmount || 0) : 0;
@@ -202,18 +212,18 @@ export default async function handler(req, res) {
       });
       return out;
     }
-    const preMap = usdcEntries(pre);
-    const postMap = usdcEntries(post);
+    const preMap = extEntries(pre);
+    const postMap = extEntries(post);
     // Sum deltas across every deposit-wallet USDC account that appears.
     const idxs = new Set([...Object.keys(preMap), ...Object.keys(postMap)]);
     idxs.forEach(i => {
       const d = (postMap[i] || 0) - (preMap[i] || 0);
-      if (d > 0) usdcReceived += d;
+      if (d > 0) extReceived += d;
     });
 
     // Method 2 fallback: if balances showed nothing, scan parsed spl-token transfers
     // for any that credit an account owned by the deposit wallet (via post balances owner map).
-    if (!(usdcReceived > 0)) {
+    if (!(extReceived > 0)) {
       const ownerByAcct = {};
       post.forEach(b => { if (b && accountKeys[b.accountIndex]) ownerByAcct[accountKeys[b.accountIndex]] = b.owner; });
       const innerIx = (tx.meta && tx.meta.innerInstructions) ? tx.meta.innerInstructions : [];
@@ -229,22 +239,22 @@ export default async function handler(req, res) {
         if (ownerByAcct[dest] === DEPOSIT_WALLET) {
           let amt = info.amount;
           if (amt == null && info.tokenAmount) amt = info.tokenAmount.amount;
-          usdcReceived += (parseInt(amt || '0', 10) / 1e6);
+          extReceived += (parseInt(amt || '0', 10) / Math.pow(10, EXT_DECIMALS));
         }
       });
     }
 
-    console.log('DEPOSIT DEBUG', JSON.stringify({ username, usdcReceived, method: usdcReceived > 0 ? 'ok' : 'none' }));
+    console.log('DEPOSIT DEBUG', JSON.stringify({ username, extReceived, method: extReceived > 0 ? 'ok' : 'none' }));
   } catch (e) {
     console.error('DEPOSIT parse error:', e && e.message);
     return res.status(400).json({ error: 'Could not read the transaction. Contact support with your TX.' });
   }
 
-  if (!(usdcReceived > 0)) {
+  if (!(extReceived > 0)) {
     console.error('DEPOSIT REJECT: no USDC to deposit wallet found. RAW post was logged above.');
-    return res.status(400).json({ error: 'No USDC to your deposit wallet found in this transaction.' });
+    return res.status(400).json({ error: 'No $EXT transfer to your deposit wallet was found in this transaction.' });
   }
-  const extToCredit = Math.floor(usdcReceived * EXT_PER_USDC);
+  const extToCredit = Math.floor(extReceived * EXT_CREDIT_RATE);
 
   // Snapshot the balance BEFORE crediting, for the log's balance_before column.
   const balanceBefore = player.tokens || 0;
@@ -258,7 +268,7 @@ export default async function handler(req, res) {
   const { data: newBalRaw, error: creditErr } = await supabase.rpc('credit_deposit', {
     p_username:       username,
     p_tx_hash:        tx_hash,
-    p_amount:         usdcReceived,
+    p_amount:         extReceived,
     p_ext:            extToCredit,
     p_balance_before: balanceBefore,
     p_payer:          payer
@@ -275,5 +285,5 @@ export default async function handler(req, res) {
   }
   const newBalance = parseFloat(newBalRaw);
 
-  return res.status(200).json({ ok: true, usdc: usdcReceived, credited: extToCredit, newBalance });
+  return res.status(200).json({ ok: true, deposited: extReceived, credited: extToCredit, newBalance });
 }
