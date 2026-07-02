@@ -433,6 +433,29 @@ export default async function handler(req, res) {
     return res.status(200).json({ pool });
   }
 
+  // ---------- EXCALIBUR CHAMPIONS ----------
+  // Global jackpot-winner podium: return the biggest recorded wins so every
+  // player sees the same champions (was localStorage-only before, so a win never
+  // showed for anyone but the winner's own browser).
+  if (req.query.champions) {
+    try {
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/jackpot_wins?select=username,amount,won_at&order=amount.desc&limit=20`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+      );
+      const rows = await r.json();
+      const list = Array.isArray(rows) ? rows.map(w => ({
+        name: w.username || 'Anonymous',
+        amount: parseFloat(w.amount) || 0,
+        ts: w.won_at ? Date.parse(w.won_at) : 0
+      })) : [];
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ rows: list });
+    } catch (e) {
+      return res.status(200).json({ rows: [] });
+    }
+  }
+
   // ---------- PLAYER LOAD ----------
   // FIX C-1 / H-2 / H-3: this used to return ANY player's full row (including
   // session_token) to ANYONE with no auth. Now it requires a valid session
