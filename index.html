@@ -41,6 +41,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 .home-sub{font-size:11px;letter-spacing:.4em;color:var(--purple);text-transform:uppercase;margin-bottom:22px}
 .home-divider{width:100%;max-width:480px;height:1px;background:linear-gradient(90deg,transparent,var(--border3),transparent);margin-bottom:20px}
 /* Jackpot pool — hero card */
+.home-ca{width:100%;max-width:520px;margin:0 auto 20px;background:linear-gradient(135deg,#140e06,#0e0a00);border:1.5px solid var(--gold);border-radius:14px;padding:12px 14px;box-sizing:border-box;display:flex;flex-direction:column;gap:8px;position:relative;overflow:hidden}
+.home-ca::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(200,160,40,.08),transparent 70%);pointer-events:none}
+.home-ca-label{font-size:9px;letter-spacing:.25em;text-transform:uppercase;color:var(--gold);text-align:center}
+.home-ca-row{display:flex;align-items:center;gap:8px;position:relative;z-index:1}
+.home-ca-addr{flex:1;min-width:0;font-family:'Space Mono',monospace;font-size:12px;color:var(--gold2);background:var(--bg);border:1px solid var(--border3);border-radius:8px;padding:9px 11px;overflow-x:auto;white-space:nowrap;letter-spacing:.02em}
+.home-ca-copy{flex-shrink:0;border:1px solid var(--gold);background:var(--bg4);color:var(--gold2);border-radius:8px;padding:9px 12px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all .18s;display:flex;align-items:center;gap:5px}
+.home-ca-copy:hover{background:#1a1408;border-color:var(--gold2)}
+.home-ca-copy.ok{color:#1dbc8f;border-color:#1dbc8f}
+.home-ca-link{font-size:9px;letter-spacing:.1em;color:var(--text3);text-align:center;text-decoration:none;position:relative;z-index:1}
+.home-ca-link:hover{color:var(--gold2)}
 .home-pool{background:linear-gradient(135deg,#140e06,#0e0a00);border:1.5px solid var(--gold);border-radius:14px;padding:16px 36px;margin-bottom:20px;position:relative;overflow:hidden;min-width:260px}
 .home-pool::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(200,160,40,.08),transparent 70%);pointer-events:none}
 .home-pool-label{font-size:9px;letter-spacing:.25em;text-transform:uppercase;color:var(--gold);margin-bottom:6px;display:flex;align-items:center;justify-content:center;gap:7px}
@@ -605,6 +615,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     <div class="home-logo">Extraction</div>
     <div class="home-sub">on solana</div>
     <div class="home-divider"></div>
+
+    <!-- Contract address -->
+    <div class="home-ca">
+      <div class="home-ca-label">$EXT Contract Address</div>
+      <div class="home-ca-row">
+        <div class="home-ca-addr" id="caAddr">39J4ae3kHkH3TGBANTkmKpHnPQQa61UvR2AScq5Apump</div>
+        <button class="home-ca-copy" id="caCopyBtn" onclick="copyCA()"><i class="ti ti-copy"></i><span id="caCopyLbl">Copy</span></button>
+      </div>
+      <a class="home-ca-link" href="https://pump.fun/coin/39J4ae3kHkH3TGBANTkmKpHnPQQa61UvR2AScq5Apump" target="_blank" rel="noopener noreferrer">View on pump.fun ↗</a>
+    </div>
 
     <!-- Jackpot pool -->
     <div class="home-pool">
@@ -6997,5 +7017,29 @@ xAuthLoad();
   </div>
 </div>
 
+<script>
+function copyCA(){
+  var ca=document.getElementById('caAddr');
+  var btn=document.getElementById('caCopyBtn');
+  var lbl=document.getElementById('caCopyLbl');
+  var txt=ca?ca.textContent.trim():'';
+  var done=function(){
+    if(btn)btn.classList.add('ok');
+    if(lbl)lbl.textContent='Copied';
+    setTimeout(function(){ if(btn)btn.classList.remove('ok'); if(lbl)lbl.textContent='Copy'; },1600);
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done).catch(function(){fallbackCopyCA(txt,done);});
+  }else{ fallbackCopyCA(txt,done); }
+}
+function fallbackCopyCA(txt,done){
+  try{
+    var t=document.createElement('textarea');
+    t.value=txt; t.style.position='fixed'; t.style.opacity='0';
+    document.body.appendChild(t); t.focus(); t.select();
+    document.execCommand('copy'); document.body.removeChild(t); done();
+  }catch(e){}
+}
+</script>
 </body>
 </html>
