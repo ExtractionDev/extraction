@@ -205,11 +205,13 @@ export default async function handler(req, res) {
   });
 
   // ── Ore stash ───────────────────────────────────────────────────────────
+  // Decreases are always allowed (the player spent ore on upgrades / listings).
+  // Increases are still capped at +MAX_ORE_GAIN per save so ore can't be fabricated.
   const safeOreStash = {};
   VALID_ORES.forEach(ore => {
     const prev = player.ore_stash ? (player.ore_stash[ore] || 0) : 0;
-    const want = Math.floor((oreStash && oreStash[ore]) || 0);
-    safeOreStash[ore] = Math.max(prev, Math.min(want, prev + MAX_ORE_GAIN));
+    const want = Math.max(0, Math.floor((oreStash && oreStash[ore]) || 0));
+    safeOreStash[ore] = Math.min(want, prev + MAX_ORE_GAIN);
   });
 
   // ── gameStats ───────────────────────────────────────────────────────────
