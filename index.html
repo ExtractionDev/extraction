@@ -1081,11 +1081,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
 <!-- DEPOSIT MODAL -->
 <div class="settings-modal" id="depositModal" onclick="if(event.target===this)closeDeposit()">
   <div class="settings-box" style="width:340px">
-    <div class="settings-title"><i class="ti ti-download" style="color:#90c848"></i> Deposit USDC <i class="ti ti-x" style="cursor:pointer;font-size:14px;color:var(--text3);float:right" onclick="closeDeposit()"></i></div>
+    <div class="settings-title"><i class="ti ti-download" style="color:#90c848"></i> Deposit $EXT <i class="ti ti-x" style="cursor:pointer;font-size:14px;color:var(--text3);float:right" onclick="closeDeposit()"></i></div>
     <!-- STEP 1: amount -->
     <div id="depStep1">
-      <div style="font-size:11px;color:var(--text2);margin:10px 0">Type how much <b style="color:#90c848">USDC</b> to send — you'll receive <b style="color:var(--purple)">10,000 $EXT</b> per $1, straight to your account.</div>
-      <div style="font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Amount (USDC)</div>
+      <div style="font-size:11px;color:var(--text2);margin:10px 0">Type how much <b style="color:#90c848">$EXT</b> to send — you'll receive the <b style="color:var(--purple)">same amount in-game, 1:1</b>, straight to your account.</div>
+      <div style="font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Amount ($EXT)</div>
       <input id="depTokAmt" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;box-sizing:border-box;background:var(--bg4);border:1px solid var(--border3);border-radius:8px;color:var(--text);padding:10px 12px;font-family:'Space Mono',monospace;font-size:14px">
       <div id="depTokMsg" style="font-size:11px;min-height:16px;margin:8px 0;color:var(--red)"></div>
       <button onclick="_depReview()" style="width:100%;padding:12px;border-radius:8px;border:1.5px solid #90c848;background:#051a0a;color:#90c848;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.1em;cursor:pointer;text-transform:uppercase">Review</button>
@@ -1094,7 +1094,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
     <div id="depStep2" style="display:none">
       <div style="background:var(--bg4);border:1px solid var(--border3);border-radius:10px;padding:14px;margin:12px 0;text-align:center">
         <div style="font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">You are sending</div>
-        <div style="font-size:26px;font-weight:800;color:#90c848;font-family:'Space Mono',monospace;margin:4px 0"><span id="depConfAmt">0</span> USDC</div>
+        <div style="font-size:26px;font-weight:800;color:#90c848;font-family:'Space Mono',monospace;margin:4px 0"><span id="depConfAmt">0</span> $EXT</div>
         <div style="font-size:10px;color:var(--text3)">to <span id="depTokDest" style="font-family:'Space Mono',monospace;color:var(--text2)">—</span></div>
         <div style="font-size:11px;color:var(--text2);margin-top:8px">You'll receive <b style="color:var(--purple)"><span id="depConfGet">0</span> $EXT</b> in your account.</div>
       </div>
@@ -1158,7 +1158,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
   <div class="docs-section">
     <div class="docs-h2"><i class="ti ti-refresh"></i> The Loop</div>
     <div class="docs-loop">
-      <div class="docs-loop-step"><div class="docs-loop-num">1</div><div><div class="docs-loop-title">Deposit & Enter the Dungeon</div><div class="docs-loop-desc">Top up your in-game $EXT from your Phantom wallet (USDC for now — <b>$10 = 100,000 $EXT</b>). Choose Free (no cost, limited runs) or a paid entry (1K–100K $EXT). Every paid entry splits <b>40% burn · 10% dev · 50% into the jackpot prize pool</b>. Navigate <b>10 procedural floors</b>, mine ore, fight enemies with <b>E</b>.</div></div></div>
+      <div class="docs-loop-step"><div class="docs-loop-num">1</div><div><div class="docs-loop-title">Deposit & Enter the Dungeon</div><div class="docs-loop-desc">Top up your in-game $EXT from your Phantom wallet (deposit <b>$EXT 1:1</b> — what you send is what you get). Choose Free (no cost, limited runs) or a paid entry (1K–100K $EXT). Every paid entry splits <b>40% burn · 10% dev · 50% into the jackpot prize pool</b>. Navigate <b>10 procedural floors</b>, mine ore, fight enemies with <b>E</b>.</div></div></div>
       <div class="docs-loop-step"><div class="docs-loop-num">2</div><div><div class="docs-loop-title">Explore Special Floors</div><div class="docs-loop-desc"><b>Vein Floors</b> glow with a "✦ VEIN FLOOR ✦" banner — every ore node gives <b>2× GC</b>. <b>Healing Shrines</b> restore +60 HP when you press <b>E</b> nearby. Chests drop pickaxes.</div></div></div>
       <div class="docs-loop-step"><div class="docs-loop-num">3</div><div><div class="docs-loop-title">Defeat Guardian Bosses</div><div class="docs-loop-desc">Floor 5 spawns the <b>Guardian</b> (600 HP) and Floor 10 the <b>Inferno Guardian</b> (1200 HP). Both fire <b>3-shot fireball volleys</b> toward you with a ±fan spread. Stay mobile.</div></div></div>
       <div class="docs-loop-step"><div class="docs-loop-num">4</div><div><div class="docs-loop-title">2× Loot on Floors 6–10</div><div class="docs-loop-desc">All GC mined on floors 6–10 is automatically doubled. Vein Floors stack on top of this for up to 4× GC.</div></div></div>
@@ -1354,7 +1354,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
   <!-- DEPOSIT & WITHDRAW -->
   <div class="docs-section">
     <div class="docs-h2"><i class="ti ti-arrows-exchange" style="color:#90c848"></i> Deposit &amp; Withdraw</div>
-    <div class="docs-callout green"><strong style="color:#90c848">Deposit:</strong> Tap <b>Deposit</b> in the top bar — your connected Phantom wallet signs the transfer and your in-game <b>$EXT</b> is credited instantly. Deposits are in <b>USDC</b> for now at <b>$10 = 100,000 $EXT</b> (10,000 $EXT per $1). Once the $EXT token launches, you'll deposit $EXT directly, 1:1.</div>
+    <div class="docs-callout green"><strong style="color:#90c848">Deposit:</strong> Tap <b>Deposit</b> in the top bar — your connected Phantom wallet signs the transfer and your in-game <b>$EXT</b> is credited instantly. Deposits are in <b>$EXT</b>, credited <b>1:1</b> — send 10,000 $EXT, get 10,000 in-game.</div>
     <div class="docs-callout" style="border-left-color:var(--sol);margin-top:6px"><strong style="color:var(--sol)">Withdraw:</strong> Request a withdrawal from Settings — your $EXT is sent to your connected Solana wallet within 24 hours. Minimum withdrawal: <b>50,000 $EXT</b>. A <b>10% withdraw burn</b> applies (request 50,000 → receive 45,000). Your balance carries between sessions and never expires.</div>
   </div>
 
