@@ -225,18 +225,30 @@ export default async function handler(req, res) {
       if (!eligible) return res.status(403).json({ error: 'No jackpot pull available — enter a paid run first.' });
 
       // Win roll — server-side; the client cannot influence it.
-      const WIN_CHANCE = (0.01 + Math.random() * 0.05);
+      const WIN_CHANCE = 0.25; // 25% jackpot payout on finding + mining Excalibur
       const won = Math.random() < WIN_CHANCE;
       if (!won) {
         return res.status(200).json({ ok: true, won: false });
       }
 
-      // Award the pool atomically (lock + read + zero + credit in one txn).
-      const { data: wonRaw, error: awardErr } = await supabase
-        .rpc('award_jackpot', { p_username: username });
-      if (awardErr) return res.status(500).json({ error: 'Award failed: ' + awardErr.message });
+      // Pay out a random 15–22% of the current pool. No clawback: read the pool,
+      // credit only the payout to the winner, then write the pool down by that
+      // amount. The winner's balance is touched exactly once. (award_jackpot is
+      // not used here because it credits/zeros the ENTIRE pool.)
+      const poolNow = await getPoolAmount();
+      const pct = 0.15 + Math.random() * 0.07;              // 15%–22%
+      const payout = Math.max(0, Math.floor(poolNow * pct));
 
-      const amount = parseFloat(wonRaw) || 0;
+      if (payout > 0) {
+        const { error: credErr } = await supabase
+          .rpc('credit_tokens', { p_username: username, p_amount: payout });
+        if (credErr) return res.status(500).json({ error: 'Award failed: ' + credErr.message });
+        const { error: updErr } = await supabase
+          .from('global_pool').update({ pool: poolNow - payout }).eq('id', 1);
+        if (updErr) console.error('pool decrement failed:', updErr.message);
+      }
+
+      const amount = payout;
       const newTokens = (player.tokens || 0) + amount;
 
       // Log the win (non-fatal)
