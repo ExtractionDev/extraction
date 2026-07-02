@@ -129,6 +129,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Transaction failed on chain: ' + errDetail, logs: logs });
     }
 
+    // Freshness gate: reject payments not made recently. Combined with the
+    // unique(signature) constraint on `sales`, this limits replay of an old
+    // matching payment (e.g. against a relisted item) to a short window.
+    // Proper fix: include a memo with the listing id (lid) in the transfer and
+    // verify it here so the payment is cryptographically bound to this listing.
+    const MAX_TX_AGE_SEC = 15 * 60;
+    if (tx.blockTime && (Date.now() / 1000 - tx.blockTime) > MAX_TX_AGE_SEC) {
+      return res.status(400).json({ error: 'Payment is too old — pay and confirm, then buy promptly.' });
+    }
+
     const totalUnits  = Math.round(parseFloat(listing.price) * 1e6);
     // Use the REAL on-chain USDC account (derivation can mismatch non-standard accounts)
     const sellerATA = await getRealUsdcAccount(listing.seller_wallet);
