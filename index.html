@@ -1166,7 +1166,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space 
       <tbody>
         <tr><td>⚡ Speed</td><td>+0.015 swings/sec</td><td>40 GC</td></tr>
         <tr><td>💥 Power</td><td>+0.12 dmg/swing</td><td>50 GC</td></tr>
-        <tr><td>💎 Sell</td><td>+0.003 $EXT/rock</td><td>45 GC</td></tr>
+        <tr><td>💎 Sell</td><td>+0.00026 $EXT/rock</td><td>45 GC</td></tr>
         <tr><td>🍀 Luck</td><td>Rare rock chance +0.1/0.01/0.001%</td><td>65 GC</td></tr>
       </tbody>
     </table>
@@ -1802,7 +1802,7 @@ function updExcPool(){
 function getItemBonus(k){var t=0;['pickaxe','head','ring','amulet'].forEach(function(s){if(equippedSlots[s])equippedSlots[s].affixes.forEach(function(a){if(a.t.k===k)t+=a.v;});});return t;}
 function getSpd(){return(0.5+ups.speed*0.015)*(1+getItemBonus('speed')/100);}
 function getPow(){return(1+ups.power*0.12)*(1+getItemBonus('power')/100);}
-function getSell(){return(0.01+ups.sell*0.003)*(1+getItemBonus('sell')/100);}
+function getSell(){return(0.0009+ups.sell*0.00026)*(1+getItemBonus('sell')/100);} // trimmed ~11.6x: L50 idle ≈ 300 EXT/day (per-rock mechanic unchanged)
 var UP_BASE={speed:40,power:50,sell:45,luck:65}; // per-track starting cost
 // ===== TUNABLE: every idle upgrade ALSO costs ore (cheapest-first), scaling with level =====
 var ORE_UP_BASE=3, ORE_UP_GROWTH=1.04;
@@ -3010,7 +3010,7 @@ function uiAll(){
   var ts=['speed','power','sell','luck'],ids=['us','up','ux','ul'];
   var tipFns=[function(){return'→ '+(0.5+ups.speed*0.015+0.015).toFixed(3)+' swings/sec';},
               function(){return'→ '+(1+ups.power*0.12+0.12).toFixed(2)+' dmg/swing';},
-              function(){return'→ '+(0.01+ups.sell*0.003+0.003).toFixed(4)+' $EXT/rock';},
+              function(){return'→ '+(0.0009+ups.sell*0.00026+0.00026).toFixed(4)+' $EXT/rock';},
               function(){var lk=ups.luck+1;return'Silver→'+((0.10+lk*0.001)*100).toFixed(1)+'%';}];
   for(var i=0;i<4;i++){var c=getCost(ts[i]),btn=el(ids[i]+'Bt'),tip=el(ids[i]+'BtTip'),oreEl=el(ids[i]+'Ore');
     if(ups[ts[i]]>=500){btn.className='up-btn maxed';btn.innerHTML='MAXED';if(oreEl)oreEl.innerHTML='';}
