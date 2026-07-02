@@ -1806,7 +1806,7 @@ function updExcPool(){
 }
 function _upMult(it){return Math.pow(1.30,(it&&it.up)||0);} // +30% stats per upgrade level (compounding)
 function _affVal(it,a){return Math.round(a.v*_upMult(it));} // displayed/effective affix value incl upgrade
-function pName(it){return it?(pName(it)+(it.up>0?' +'+it.up:'')):'';} // e.g. "Iron Pickaxe +3"
+function pName(it){return it?(it.mat+' '+it.type+(it.up>0?' +'+it.up:'')):'';} // e.g. "Iron Pickaxe +3"
 function getItemBonus(k){var t=0;['pickaxe','head','ring','amulet'].forEach(function(s){var it=equippedSlots[s];if(it){var m=_upMult(it);it.affixes.forEach(function(a){if(a.t.k===k)t+=a.v*m;});}});return t;}
 function getSpd(){return(0.5+ups.speed*0.015)*(1+getItemBonus('speed')/100);}
 function getPow(){return(1+ups.power*0.12)*(1+getItemBonus('power')/100);}
