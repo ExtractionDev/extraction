@@ -1803,22 +1803,10 @@ function getItemBonus(k){var t=0;['pickaxe','head','ring','amulet'].forEach(func
 function getSpd(){return(0.5+ups.speed*0.015)*(1+getItemBonus('speed')/100);}
 function getPow(){return(1+ups.power*0.12)*(1+getItemBonus('power')/100);}
 function getSell(){return(0.01+ups.sell*0.003)*(1+getItemBonus('sell')/100);}
-// ===== IDLE MINER EXT RATE (time-based, one rate for open + closed tab) =====
-// L1-49 = tutorial ramp (quadratic, earns well under baseline); L50 = ~300/day
-// baseline; logistic climb to ~3000/day at L115 (~100k spender), asymptote 20k;
-// gear adds up to +50%, hard cap 30k/day. Driven by the SELL upgrade track.
-function minerExtPerDay(){
-  var lvl=ups.sell||0, base;
-  if(lvl<50){base=300*Math.pow(lvl/50,2);}
-  else{var eff=lvl-49;base=20000/(1+68.23*Math.exp(-0.03828*eff));}
-  var gear=Math.min(0.5,(getItemBonus('sell')||0)/100);
-  return Math.min(30000, base*(1+gear));
-}
-function minerExtPerSec(){return minerExtPerDay()/86400;}
 var UP_BASE={speed:40,power:50,sell:45,luck:65}; // per-track starting cost
 // ===== TUNABLE: every idle upgrade ALSO costs ore (cheapest-first), scaling with level =====
 var ORE_UP_BASE=3, ORE_UP_GROWTH=1.04;
-function getOreCost(t){var l=ups[t]||0;return l<50?Math.max(1,Math.ceil(1+l*0.7)):Math.ceil(36*Math.pow(1.075,l-50));} // ore is the tighter bottleneck (~25% more grind than GC) past L50
+function getOreCost(t){var l=ups[t]||0;return l<50?0:Math.ceil(36*Math.pow(1.075,l-50));} // L1-50 = GC only (no ore); ore bottleneck begins at L50
 function _oreTotal(){var n=0;for(var k in oreStash)n+=oreStash[k];return n;}
 function _oreUnitVal(name){for(var i=0;i<DORES.length;i++)if(DORES[i].n===name)return DORES[i].v;return 1;}
 function _oreSpend(n){ // consume n ore units, cheapest value first (keeps Gold/Mystrile for refine/market)
@@ -2049,7 +2037,7 @@ function loadGame(){
     // Offline earnings — calculate EXT earned while away (capped at 8 hours)
     if(d.lastSaved){
       var _offSecs=Math.min((Date.now()-d.lastSaved)/1000, 8*3600);
-      var _offRate=minerExtPerSec(); // EXT per second — same rate as online (no more 60x split)
+      var _offRate=getSell()*getSpd()/60; // EXT per second
       var _offEarned=_offSecs*_offRate;
       if(_offEarned>0){tokens+=_offEarned;lifetimeExt+=_offEarned;excPool+=_offEarned*0.1;showAchieve('⛏️','Welcome back!','Offline earnings: +'+_offEarned.toFixed(4)+' $EXT');}
     }
@@ -3026,10 +3014,13 @@ function uiAll(){
               function(){var lk=ups.luck+1;return'Silver→'+((0.10+lk*0.001)*100).toFixed(1)+'%';}];
   for(var i=0;i<4;i++){var c=getCost(ts[i]),btn=el(ids[i]+'Bt'),tip=el(ids[i]+'BtTip'),oreEl=el(ids[i]+'Ore');
     if(ups[ts[i]]>=500){btn.className='up-btn maxed';btn.innerHTML='MAXED';if(oreEl)oreEl.innerHTML='';}
-    else{var oc=getOreCost(ts[i]),aff=(gold>=c&&_oreTotal()>=oc);btn.className='up-btn'+(aff?'':' off');btn.innerHTML='<i class="ti ti-arrow-up"></i> Upgrade · '+c+' 🪙 · '+oc+' ⛏';
-      if(oreEl){var pv=_oreSpendPreview(oc),parts=pv.list.map(function(o){return '<span class="oq" style="color:'+_oreTc(o.n)+'">'+o.q+' '+o.n+'</span>';});
+    else{var oc=getOreCost(ts[i]),aff=(gold>=c&&_oreTotal()>=oc);btn.className='up-btn'+(aff?'':' off');btn.innerHTML='<i class="ti ti-arrow-up"></i> Upgrade · '+c+' 🪙'+(oc>0?' · '+oc+' ⛏':'');
+      if(oreEl){
+        if(oc<=0){oreEl.innerHTML='<span class="lbl">no ore needed yet</span>';}
+        else{var pv=_oreSpendPreview(oc),parts=pv.list.map(function(o){return '<span class="oq" style="color:'+_oreTc(o.n)+'">'+o.q+' '+o.n+'</span>';});
         if(pv.short>0)parts.push('<span class="short">need '+pv.short+' more</span>');
         oreEl.innerHTML='<span class="lbl">spends</span> '+(parts.length?parts.join('<span class="sep">·</span>'):'<span class="short">no ore yet</span>');}
+      }
     }
     if(tip)tip.textContent=ups[ts[i]]>=500?'Maxed':tipFns[i]();
   }
@@ -3107,11 +3098,14 @@ function mHitRock(){
   var d=getPow();mRockHP-=d;mSwAnim=14;if(activeTab===2)sndMineHit();
   for(var i=0;i<3;i++)mParts.push({x:340+Math.random()*14-7,y:MGY-25+Math.random()*14-7,vx:(Math.random()-.5)*3,vy:-1.5-Math.random()*2.5,life:16+Math.random()*8,c:['#3a3440','#4a4450','#2e2838'][i],s:2+Math.random()*2});
   var pct=1-mRockHP/mRockMax;for(var i=0;i<mCracks.length;i++)if(!mCracks[i].on&&pct>(i+1)*.12)mCracks[i].on=true;
-  if(mRockHP<=0){mRockHP=0;totalRocks++;if(activeTab===2){if(mRockType.multi>1)sndRareBreak();else sndRockBreak();}
-    // EXT is now accrued by TIME in the mining interval, not per rock — rocks are
-    // visual/progression only. (Old per-rock mint removed to fix runaway rates.)
+  if(mRockHP<=0){mRockHP=0;var tv=getSell()*mRockType.multi;if(sanchezEquipped())tv*=1.1;tokens+=tv;lifetimeExt+=tv;excPool+=tv*0.1;totalRocks++;if(activeTab===2){if(mRockType.multi>1)sndRareBreak();else sndRockBreak();}
+    saveGame(); // save immediately so EXT isn't lost on refresh
     for(var i=0;i<12;i++)mParts.push({x:340+Math.random()*50-25,y:MGY-25+Math.random()*40-20,vx:(Math.random()-.5)*7,vy:-2-Math.random()*5,life:25+Math.random()*18,c:['#4a4450','#5a5460','#c8a040','#3a3440','#6050a0'][Math.floor(Math.random()*5)],s:2+Math.random()*4});
     mRspTmr=18;
+    var tv2=getSell()*mRockType.multi;
+    mEXTToast.text='+'+tv2.toFixed(4)+' $EXT'+(mRockType.multi>1?' ('+mRockType.label+')':'');
+    mEXTToast.color=mRockType.glow||'#a070ff';
+    mEXTToast.life=mEXTToast.maxLife;
     uiAll();}
 }
 function mr(x,y,w,h,c){MC.fillStyle=c;MC.fillRect(x*MS,y*MS,w*MS,h*MS);}
@@ -3204,22 +3198,8 @@ function minerLoop(){
   requestAnimationFrame(minerLoop);
 }
 // Mining LOGIC runs on setInterval so it works even when browser tab is hidden
-var _extLastT=Date.now(), _minerAccum=0, _lastMinerSave=Date.now();
 setInterval(function(){
   if(mEXTToast.life>0)mEXTToast.life--;
-  // Time-based EXT accrual — one rate whether the tab is open or throttled/hidden.
-  // Uses real elapsed time so background throttling doesn't undercount.
-  var _n=Date.now(), _dt=(_n-_extLastT)/1000; _extLastT=_n;
-  if(_dt>0&&_dt<3600){
-    var _e=minerExtPerSec()*_dt;
-    if(_e>0){tokens+=_e;lifetimeExt+=_e;excPool+=_e*0.1;_minerAccum+=_e;}
-  }
-  // Save at most every 15s so accrued EXT survives refresh without hammering the API.
-  if(_minerAccum>0 && _n-_lastMinerSave>15000){
-    mEXTToast.text='+'+_minerAccum.toFixed(3)+' $EXT';
-    mEXTToast.color='#a070ff'; mEXTToast.life=mEXTToast.maxLife;
-    _minerAccum=0; _lastMinerSave=_n; saveGame(); uiAll();
-  }
   if(mRspTmr>0){mRspTmr--;if(mRspTmr<=0)mNewRock();}
   else{var iv=60/getSpd();mSwTmr++;if(mSwTmr>=iv&&mRockHP>0){mSwTmr=0;mHitRock();}}
 },16); // ~60 ticks per second
