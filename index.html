@@ -4461,8 +4461,8 @@ function dBuildFloors(){
     if(boss){if(fi===9){boss.hp=1200;boss.hpMax=1200;boss.name='INFERNO GUARDIAN';}enemies.push(boss);}
     // Chest: 1% spawn per floor (paid modes only)
     var floorChest=null;
-    // Chest spawn scales with entry fee: 0.5% at 1K $EXT → 2% at 50K+ $EXT (linear, capped)
-    var _chestRate=Math.max(0.005,Math.min(0.02,0.005+0.015*(Math.min(extFee,50000)-1000)/49000));
+    // Chest spawn scales with entry fee: 2% at 1K $EXT → 5% at 50K+ $EXT (linear, capped)
+    var _chestRate=Math.max(0.02,Math.min(0.05,0.02+0.03*(Math.min(extFee,50000)-1000)/49000));
     if(!isFree&&Math.random()<_chestRate){ // chest spawn chance per floor, scaled by entry fee
       for(var _ca=0;_ca<30;_ca++){
         var _cpi=2+Math.floor(Math.random()*Math.max(1,plats.length-3));
